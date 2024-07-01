@@ -1,0 +1,29 @@
+program = _{ SOI ~ decl* ~ EOI }
+
+decl = { func_type | func | stms }
+
+func_type = { ident ~ "::" ~ type }
+type = { primary_type ~ ("->" ~ type)* }
+primary_type = { ident | "(" ~ type ~ ")" }
+
+func = { ident ~ arg* ~ "=" ~ stms }
+arg = { ident } // currently just identifiers, potentially allow patterns in future
+
+stms = { stm ~ ("." ~ stm)* }
+stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
+
+if_stm = { "if" ~ stms ~ "then" ~ stms ~ "else" ~ stms }
+let_stm = { "let" ~ ident ~ "=" ~ stms ~ "in" ~ stms }
+exists_stm = { "exists" ~ ident ~ "::" ~ type }
+equate_stm = { expr ~ "=:=" ~ expr }
+choice_stm = { expr ~ ("<>" ~ expr)+ }
+
+expr = { app | primary_expr }
+app = { primary_expr ~ expr+ }
+primary_expr = { ident | nat | "(" ~ stms ~ ")" }
+
+ident = @{ !keywords ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+keywords = { "if" | "then" | "else" | "let" | "exists" }
+nat = @{ ASCII_DIGIT+ }
+
+WHITESPACE = _{ WHITE_SPACE }
