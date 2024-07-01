@@ -2,6 +2,7 @@ use super::{r#type::Type, expr::Expr};
 
 pub type Stms<'a> = Vec<Stm<'a>>;
 
+#[derive(Clone, Debug)]
 pub enum Stm<'a> {
     If {
         cond: Stms<'a>,
@@ -21,5 +22,6 @@ pub enum Stm<'a> {
         lhs: Expr<'a>,
         rhs: Expr<'a>
     },
-    Choice(Vec<Expr<'a>>)
+    Choice(Vec<Expr<'a>>),
+    Expr(Expr<'a>)
 }

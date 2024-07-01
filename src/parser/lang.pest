@@ -19,7 +19,7 @@ equate_stm = { expr ~ "=:=" ~ expr }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
 expr = { app | primary_expr }
-app = { primary_expr ~ expr+ }
+app = { primary_expr ~ primary_expr+ }
 primary_expr = { ident | nat | "(" ~ stms ~ ")" }
 
 ident = @{ !keywords ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
