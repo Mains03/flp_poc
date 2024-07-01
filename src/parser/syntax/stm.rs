@@ -16,11 +16,13 @@ pub enum Stm<'a> {
     },
     Exists {
         var: &'a str,
-        r#type: Type<'a>
+        r#type: Type<'a>,
+        body: Box<Stm<'a>>
     },
     Equate {
         lhs: Expr<'a>,
-        rhs: Expr<'a>
+        rhs: Expr<'a>,
+        body: Box<Stm<'a>>
     },
     Choice(Vec<Expr<'a>>),
     Expr(Expr<'a>)

@@ -14,8 +14,8 @@ stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
 
 if_stm = { "if" ~ stms ~ "then" ~ stms ~ "else" ~ stms }
 let_stm = { "let" ~ ident ~ "=" ~ stms ~ "in" ~ stms }
-exists_stm = { "exists" ~ ident ~ "::" ~ type }
-equate_stm = { expr ~ "=:=" ~ expr }
+exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stm }
+equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
 expr = { app | primary_expr }

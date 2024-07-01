@@ -111,16 +111,18 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
 
             let var = pairs.next().unwrap().as_str();
             let r#type = parse_type(pairs.next().unwrap().into_inner());
+            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
-            Stm::Exists { var, r#type }
+            Stm::Exists { var, r#type, body }
         },
         Rule::equate_stm => {
             let mut pairs = pair.into_inner();
 
             let lhs = parse_expr(pairs.next().unwrap().into_inner());
             let rhs = parse_expr(pairs.next().unwrap().into_inner());
+            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
-            Stm::Equate { lhs, rhs }
+            Stm::Equate { lhs, rhs, body }
         },
         Rule::choice_stm => {
             let mut pairs = pair.into_inner();
