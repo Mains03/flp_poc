@@ -1,7 +1,7 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{arg::Arg, expr::Expr, program::{Decl, Prog}, stm::{Stm, Stms}, r#type::Type};
+use syntax::{arg::Arg, expr::Expr, program::{Decl, Prog}, stm::Stm, r#type::Type};
 
 pub mod syntax;
 
@@ -46,11 +46,11 @@ pub fn parse(src: &str) -> Result<Prog, Error<Rule>> {
                             }
                         };
 
-                        let body = parse_stms(body.into_inner());
+                        let body = parse_stm(body.into_inner());
 
                         Decl::Func { name, args, body }
                     },
-                    Rule::stms => Decl::Stms(parse_stms(pair.into_inner())),
+                    Rule::stm => Decl::Stm(parse_stm(pair.into_inner())),
                     _ => unreachable!()
                 })
             },
@@ -70,20 +70,6 @@ fn parse_arg(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
     }
 }
 
-fn parse_stms(mut pairs: pest::iterators::Pairs<Rule>) -> Stms {
-    let mut stms = vec![];
-
-    loop {
-        let pair = pairs.next();
-        match pair {
-            Some(p) => stms.push(parse_stm(p.into_inner())),
-            _ => break,
-        }
-    }
-
-    stms
-}
-
 fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
     let pair = pairs.next().unwrap();
 
@@ -91,9 +77,9 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
         Rule::if_stm => {
             let mut pairs = pair.into_inner();
 
-            let cond = parse_stms(pairs.next().unwrap().into_inner());
-            let then = parse_stms(pairs.next().unwrap().into_inner());
-            let r#else = parse_stms(pairs.next().unwrap().into_inner());
+            let cond = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let then = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let r#else = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
             Stm::If { cond, then, r#else }
         },
@@ -101,8 +87,8 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
             let mut pairs = pair.into_inner();
 
             let var = pairs.next().unwrap().as_str();
-            let val = parse_stms(pairs.next().unwrap().into_inner());
-            let body = parse_stms(pairs.next().unwrap().into_inner());
+            let val = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
             Stm::Let { var, val, body }
         },
@@ -111,7 +97,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
 
             let var = pairs.next().unwrap().as_str();
             let r#type = parse_type(pairs.next().unwrap().into_inner());
-            let body = parse_stms(pairs.next().unwrap().into_inner());
+            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
             Stm::Exists { var, r#type, body }
         },
@@ -120,7 +106,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
 
             let lhs = parse_expr(pairs.next().unwrap().into_inner());
             let rhs = parse_expr(pairs.next().unwrap().into_inner());
-            let body = parse_stms(pairs.next().unwrap().into_inner());
+            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
             Stm::Equate { lhs, rhs, body }
         },
@@ -152,7 +138,7 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
             let mut exprs: Vec<Expr> = vec![];
             loop {
                 match pairs.next() {
-                    Some(e) => exprs.push(parse_expr(e.into_inner())),
+                    Some(e) =>exprs.push(parse_expr(e.into_inner())),
                     None => break,
                 }
             }
@@ -172,7 +158,7 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
         Rule::primary_expr => parse_expr(pair.into_inner()),
         Rule::ident => Expr::Ident(pair.as_str()),
         Rule::nat => Expr::Nat(pair.as_str().parse().unwrap()),
-        Rule::stms => Expr::Stms(parse_stms(pair.into_inner())),
+        Rule::stm => Expr::Stm(Box::new(parse_stm(pair.into_inner()))),
         _ => unreachable!()
     }
 }
@@ -223,7 +209,7 @@ const x y = x";
                 Decl::Func {
                     name: "const",
                     args: vec!["x","y"],
-                    body: vec![Stm::Expr(Expr::Ident("x"))]
+                    body: Stm::Expr(Expr::Ident("x"))
                 }
             ]
         )
@@ -255,7 +241,7 @@ id x = x";
                 Decl::Func {
                     name: "const",
                     args: vec!["x","y"],
-                    body: vec![Stm::Expr(Expr::Ident("x"))]
+                    body: Stm::Expr(Expr::Ident("x"))
                 },
                 Decl::FuncType {
                     name: "id",
@@ -267,7 +253,7 @@ id x = x";
                 Decl::Func {
                     name: "id",
                     args: vec!["x"],
-                    body: vec![Stm::Expr(Expr::Ident("x"))]
+                    body: Stm::Expr(Expr::Ident("x"))
                 }
             ]
         )
@@ -296,22 +282,18 @@ fix f = exists n :: Nat. f n =:= n. n";
                 Decl::Func {
                     name: "fix",
                     args: vec!["f"],
-                    body: vec![
-                        Stm::Exists {
-                            var: "n",
-                            r#type: Type::Ident("Nat"),
-                            body: vec![
-                                Stm::Equate {
-                                    lhs: Expr::App(
-                                        Box::new(Expr::Ident("f")),
-                                        Box::new(Expr::Ident("n"))
-                                    ),
-                                    rhs: Expr::Ident("n"),
-                                    body: vec![Stm::Expr(Expr::Ident("n"))]
-                                }
-                            ]
-                        }
-                    ]
+                    body: Stm::Exists {
+                        var: "n",
+                        r#type: Type::Ident("Nat"),
+                        body: Box::new(Stm::Equate {
+                            lhs: Expr::App(
+                                Box::new(Expr::Ident("f")),
+                                Box::new(Expr::Ident("n"))
+                            ),
+                            rhs: Expr::Ident("n"),
+                            body: Box::new(Stm::Expr(Expr::Ident("n")))
+                        })
+                    }
                 }
             ]
         )
@@ -319,34 +301,65 @@ fix f = exists n :: Nat. f n =:= n. n";
 
     #[test]
     fn test4() {
-        let src = "exists n :: Nat. (print n. n) =:= 52. n";
+        let src = "exists n :: Nat. n =:= 52. n";
 
         let ast = parse(src).unwrap();
 
         assert_eq!(
             ast,
             vec![
-                Decl::Stms(vec![
-                    Stm::Exists {
+                Decl::Stm(Stm::Exists {
+                    var: "n",
+                    r#type: Type::Ident("Nat"),
+                    body: Box::new(Stm::Equate {
+                        lhs: Expr::Ident("n"),
+                        rhs: Expr::Nat(52),
+                        body: Box::new(Stm::Expr(Expr::Ident("n")))
+                    })
+                })
+            ]
+        )
+    }
+
+    #[test]
+    fn test5() {
+        let src: &str = "id :: Nat -> Nat
+id x = exists n :: Nat. n =:= x. n
+
+main :: Nat
+main = id 5";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::FuncType { name: "id", r#type: Type::Arrow(
+                    Box::new(Type::Ident("Nat")),
+                    Box::new(Type::Ident("Nat")))
+                },
+                Decl::Func {
+                    name: "id",
+                    args: vec!["x"],
+                    body: Stm::Exists {
                         var: "n",
                         r#type: Type::Ident("Nat"),
-                        body: vec![
-                            Stm::Equate {
-                                lhs: Expr::Stms(vec![
-                                    Stm::Expr(Expr::App(
-                                        Box::new(Expr::Ident("print")),
-                                        Box::new(Expr::Ident("n"))
-                                    )),
-                                    Stm::Expr(Expr::Ident("n"))
-                                ]),
-                                rhs: Expr::Nat(52),
-                                body: vec![
-                                    Stm::Expr(Expr::Ident("n"))
-                                ]
-                            }
-                        ]
+                        body: Box::new(Stm::Equate {
+                            lhs: Expr::Ident("n"),
+                            rhs: Expr::Ident("x"),
+                            body: Box::new(Stm::Expr(Expr::Ident("n")))
+                        })
                     }
-                ])
+                },
+                Decl::FuncType { name: "main", r#type: Type::Ident("Nat")},
+                Decl::Func {
+                    name: "main",
+                    args: vec![],
+                    body: Stm::Expr(Expr::App(
+                        Box::new(Expr::Ident("id")),
+                        Box::new(Expr::Nat(5))
+                    ))
+                }
             ]
         )
     }

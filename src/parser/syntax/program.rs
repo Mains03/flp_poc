@@ -11,7 +11,7 @@ pub enum Decl<'a> {
     Func {
         name: &'a str,
         args: Vec<Arg<'a>>,
-        body: Stms<'a>
+        body: Stm<'a>
     },
-    Stms(Stms<'a>)
+    Stm(Stm<'a>)
 }
