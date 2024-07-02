@@ -14,16 +14,16 @@ stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
 
 if_stm = { "if" ~ stms ~ "then" ~ stms ~ "else" ~ stms }
 let_stm = { "let" ~ ident ~ "=" ~ stms ~ "in" ~ stms }
-exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stm }
-equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
+exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stms }
+equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stms }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
 expr = { app | primary_expr }
-app = { primary_expr ~ primary_expr+ }
+app = { primary_expr ~ primary_expr+ ~ !"::" }
 primary_expr = { ident | nat | "(" ~ stms ~ ")" }
 
 ident = @{ !keywords ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-keywords = { "if" | "then" | "else" | "let" | "exists" }
+keywords = { "if" | "then" | "else" | "let" | "in" | "exists" }
 nat = @{ ASCII_DIGIT+ }
 
 WHITESPACE = _{ WHITE_SPACE }

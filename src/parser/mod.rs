@@ -16,7 +16,7 @@ pub fn parse(src: &str) -> Result<Prog, Error<Rule>> {
     for pair in pairs {
         match pair.as_rule() {
             Rule::decl => {
-                let pair = pair.into_inner().next().unwrap();
+                let pair: pest::iterators::Pair<Rule> = pair.into_inner().next().unwrap();
 
                 prog.push(match pair.as_rule() {
                     Rule::func_type => {
@@ -111,7 +111,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
 
             let var = pairs.next().unwrap().as_str();
             let r#type = parse_type(pairs.next().unwrap().into_inner());
-            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let body = parse_stms(pairs.next().unwrap().into_inner());
 
             Stm::Exists { var, r#type, body }
         },
@@ -120,7 +120,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
 
             let lhs = parse_expr(pairs.next().unwrap().into_inner());
             let rhs = parse_expr(pairs.next().unwrap().into_inner());
-            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let body = parse_stms(pairs.next().unwrap().into_inner());
 
             Stm::Equate { lhs, rhs, body }
         },
@@ -193,5 +193,161 @@ fn parse_type(mut pairs: pest::iterators::Pairs<Rule>) -> Type {
             Box::new(parse_type(t.into_inner()))
         ),
         None => lhs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test1() {
+        let src = "const :: a -> b -> a
+const x y = x";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::FuncType {
+                    name: "const",
+                    r#type: Type::Arrow(
+                        Box::new(Type::Ident("a")),
+                        Box::new(Type::Arrow(
+                            Box::new(Type::Ident("b")),
+                            Box::new(Type::Ident("a"))
+                        ))
+                    )
+                },
+                Decl::Func {
+                    name: "const",
+                    args: vec!["x","y"],
+                    body: vec![Stm::Expr(Expr::Ident("x"))]
+                }
+            ]
+        )
+    }
+
+    #[test]
+    fn test2() {
+        let src = "const :: a -> b -> a
+const x y = x
+
+id :: a -> a
+id x = x";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::FuncType {
+                    name: "const",
+                    r#type: Type::Arrow(
+                        Box::new(Type::Ident("a")),
+                        Box::new(Type::Arrow(
+                            Box::new(Type::Ident("b")),
+                            Box::new(Type::Ident("a"))
+                        ))
+                    )
+                },
+                Decl::Func {
+                    name: "const",
+                    args: vec!["x","y"],
+                    body: vec![Stm::Expr(Expr::Ident("x"))]
+                },
+                Decl::FuncType {
+                    name: "id",
+                    r#type: Type::Arrow(
+                        Box::new(Type::Ident("a")),
+                        Box::new(Type::Ident("a"))
+                    )
+                },
+                Decl::Func {
+                    name: "id",
+                    args: vec!["x"],
+                    body: vec![Stm::Expr(Expr::Ident("x"))]
+                }
+            ]
+        )
+    }
+
+    #[test]
+    fn test3() {
+        let src = "fix :: (Nat -> Nat) -> Nat
+fix f = exists n :: Nat. f n =:= n. n";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::FuncType {
+                    name: "fix",
+                    r#type: Type::Arrow(
+                        Box::new(Type::Arrow(
+                            Box::new(Type::Ident("Nat")),
+                            Box::new(Type::Ident("Nat"))
+                        )),
+                        Box::new(Type::Ident("Nat"))
+                    )
+                },
+                Decl::Func {
+                    name: "fix",
+                    args: vec!["f"],
+                    body: vec![
+                        Stm::Exists {
+                            var: "n",
+                            r#type: Type::Ident("Nat"),
+                            body: vec![
+                                Stm::Equate {
+                                    lhs: Expr::App(
+                                        Box::new(Expr::Ident("f")),
+                                        Box::new(Expr::Ident("n"))
+                                    ),
+                                    rhs: Expr::Ident("n"),
+                                    body: vec![Stm::Expr(Expr::Ident("n"))]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        )
+    }
+
+    #[test]
+    fn test4() {
+        let src = "exists n :: Nat. (print n. n) =:= 52. n";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Stms(vec![
+                    Stm::Exists {
+                        var: "n",
+                        r#type: Type::Ident("Nat"),
+                        body: vec![
+                            Stm::Equate {
+                                lhs: Expr::Stms(vec![
+                                    Stm::Expr(Expr::App(
+                                        Box::new(Expr::Ident("print")),
+                                        Box::new(Expr::Ident("n"))
+                                    )),
+                                    Stm::Expr(Expr::Ident("n"))
+                                ]),
+                                rhs: Expr::Nat(52),
+                                body: vec![
+                                    Stm::Expr(Expr::Ident("n"))
+                                ]
+                            }
+                        ]
+                    }
+                ])
+            ]
+        )
     }
 }
