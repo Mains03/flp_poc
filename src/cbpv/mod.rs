@@ -36,8 +36,6 @@ fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
 }
 
 fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a> {
-    println!("{:#?}", term);
-
     match term {
         Term::Var(s) => eval_term(env.get(&s).unwrap().clone(), env),
         Term::Bind { var, val, body } => {
