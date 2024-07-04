@@ -12,7 +12,6 @@ pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
     let mut env = create_env(ast);
 
     let main = env.get("main").unwrap().clone();
-    println!("{:#?}", main);
 
     eval_term(main, &mut env)
 }
@@ -53,11 +52,20 @@ fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a
         },
         Term::App(lhs, rhs) => {
             let lhs = match *lhs {
-                Term::Force(t) => eval_term(*t, env),
+                Term::Force(t) => {
+                    let t = eval_term(*t, env);
+                
+                    match t {
+                        Term::Thunk(t) => eval_term(*t, env),
+                        _ => unreachable!()
+                    }
+                },
                 _ => unreachable!()
             };
 
-            apply(lhs, *rhs)
+            let rhs = eval_term(*rhs, env);
+
+            apply(lhs, rhs)
         },
         t => t
     }
