@@ -36,6 +36,8 @@ fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
 }
 
 fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a> {
+    println!("{:#?}", term);
+
     match term {
         Term::Var(s) => eval_term(env.get(&s).unwrap().clone(), env),
         Term::Bind { var, val, body } => {
@@ -58,9 +60,7 @@ fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a
         Term::App(lhs, rhs) => {
             let lhs = eval_term(*lhs, env);
 
-            let rhs = eval_term(*rhs, env);
-
-            eval_term(apply(lhs, rhs), env)
+            eval_term(apply(lhs, *rhs), env)
         },
         Term::Force(t) => {
             let t = eval_term(*t, env);
@@ -70,6 +70,9 @@ fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a
                 _ => unreachable!()
             }
         },
+        Term::Return(t) => Term::Return(Box::new(
+            eval_term(*t, env)
+        )),
         t => t
     }
 }
@@ -261,5 +264,23 @@ let x = 1 in const x (let x = 2 in x)";
                 Box::new(Term::Nat(1))
             )
         )
+    }
+
+    #[test]
+    fn test6() {
+        let src = "const :: a -> b -> a
+const x y = x
+
+let x = 1 in const (let x = 2 in x) x";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(
+                Box::new(Term::Nat(2))
+            )
+        );
     }
 }
