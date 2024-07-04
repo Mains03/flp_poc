@@ -9,7 +9,7 @@ pub mod term;
 mod translate;
 
 pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
-    let mut env = create_env(ast);
+    let mut env: HashMap<String, Term> = create_env(ast);
 
     let main = env.get("main").unwrap().clone();
 
@@ -37,12 +37,10 @@ fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
 
 fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a> {
     match term {
-        Term::Var(s) => {
-            env.get(&s).unwrap().clone()
-        },
+        Term::Var(s) => eval_term(env.get(&s).unwrap().clone(), env),
         Term::Bind { var, val, body } => {
-            let val = match *val {
-                Term::Return(v) => eval_term(*v, env),
+            let val = match eval_term(*val, env) {
+                Term::Return(t) => *t,
                 _ => unreachable!()
             };
 
@@ -51,21 +49,19 @@ fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a
             eval_term(*body, env)
         },
         Term::App(lhs, rhs) => {
-            let lhs = match *lhs {
-                Term::Force(t) => {
-                    let t = eval_term(*t, env);
-                
-                    match t {
-                        Term::Thunk(t) => eval_term(*t, env),
-                        _ => unreachable!()
-                    }
-                },
-                _ => unreachable!()
-            };
+            let lhs = eval_term(*lhs, env);
 
             let rhs = eval_term(*rhs, env);
 
             apply(lhs, rhs)
+        },
+        Term::Force(t) => {
+            let t = eval_term(*t, env);
+
+            match t {
+                Term::Thunk(t) => *t,
+                _ => unreachable!()
+            }
         },
         t => t
     }
@@ -80,10 +76,14 @@ fn apply<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
             if args.len() == 0 {
                 body
             } else {
-                Term::Lambda {
-                    args,
-                    body: Box::new(body)
-                }
+                Term::Return(Box::new(
+                    Term::Thunk(Box::new(
+                        Term::Lambda {
+                            args,
+                            body: Box::new(body)
+                        }
+                    ))
+                ))
             }
         },
         _ => unreachable!()
@@ -154,5 +154,48 @@ fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
             Box::new(substitute(*rhs, var, sub))
         ),
         t => t
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::parser;
+
+    use super::*;
+
+    #[test]
+    fn test1() {
+        let src = "id :: a -> a
+id x = x
+
+let x = 5 in id x";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(
+                Box::new(Term::Nat(5))
+            )
+        );
+    }
+
+    #[test]
+    fn test2() {
+        let src = "const :: a -> b -> a
+const x y = x
+
+let x = 5 in const 1 x";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(
+                Box::new(Term::Nat(1))
+            )
+        );
     }
 }
