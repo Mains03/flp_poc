@@ -1,8 +1,8 @@
 use crate::parser::syntax::r#type::Type;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term<'a> {
-    Var(&'a str),
+    Var(String),
     Nat(i64),
     If {
         cond: Box<Term<'a>>,
@@ -10,7 +10,7 @@ pub enum Term<'a> {
         r#else: Box<Term<'a>>
     },
     Bind {
-        var: &'a str,
+        var: String,
         val: Box<Term<'a>>,
         body: Box<Term<'a>>,
     },
