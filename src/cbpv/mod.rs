@@ -44,9 +44,16 @@ fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a
                 _ => unreachable!()
             };
 
-            env.insert(var, val);
+            let old = env.insert(var.clone(), val);
 
-            eval_term(*body, env)
+            let t = eval_term(*body, env);
+
+            match old {
+                Some(v) => { env.insert(var, v); },
+                None => ()
+            };
+
+            t
         },
         Term::App(lhs, rhs) => {
             let lhs = eval_term(*lhs, env);
@@ -98,10 +105,16 @@ fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
             then: Box::new(substitute(*then, var, sub)),
             r#else: Box::new(substitute(*r#else, var, sub))
         },
-        Term::Bind { var: v, val, body } => Term::Bind {
-            var: v,
-            val: Box::new(substitute(*val, var, sub)),
-            body: Box::new(substitute(*body, var, sub))
+        Term::Bind { var: v, val, body } => {
+            let flag = v == var;
+
+            Term::Bind {
+                var: v,
+                val: Box::new(substitute(*val, var, sub)),
+                body: if flag { body } else {
+                    Box::new(substitute(*body, var, sub))
+                }
+            }
         },
         Term::Exists { var: v, r#type, body } => {
             Term::Exists {
@@ -230,5 +243,23 @@ let x = 5 in f (f id) x";
                 Box::new(Term::Nat(5))
             )
         );
+    }
+
+    #[test]
+    fn test5() {
+        let src = "const :: a -> b -> a
+const x y = x
+
+let x = 1 in const x (let x = 2 in x)";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(
+                Box::new(Term::Nat(1))
+            )
+        )
     }
 }
