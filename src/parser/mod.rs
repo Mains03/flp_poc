@@ -396,4 +396,25 @@ id :: a -> a";
             ]
         );
     }
+
+    #[test]
+    fn test7() {
+        let src = "id :: a -> a
+id x = x.
+
+1 <> id 2 <> 3.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::FuncType { name: "id", r#type: Type::Arrow(Box::new(Type::Ident("a")), Box::new(Type::Ident("a"))) },
+                Decl::Func { name: "id", args: vec!["x"], body: Stm::Expr(Expr::Ident("x")) },
+                Decl::Stm(Stm::Choice(vec![
+                    Expr::Nat(1), Expr::App(Box::new(Expr::Ident("id")), Box::new(Expr::Nat(2))), Expr::Nat(3)
+                ]))
+            ]
+        )
+    }
 }

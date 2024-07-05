@@ -8,7 +8,9 @@ pub fn translate<'a>(decl: Decl<'a>) -> Term<'a> {
     let mut vars: HashSet<String> = HashSet::new();
     
     match decl {
-        Decl::Func { name: _, mut args, body } => {
+        Decl::Func { name: _, mut args, body } => if args.len() == 0 {
+            translate_stm(body, &mut vars)
+        } else {
             args.iter()
                 .for_each(|s| { vars.insert(s.to_string()); } );
 
@@ -231,6 +233,38 @@ let x = 5 in id x.";
                     })
                 })
             }
+        )
+    }
+
+    #[test]
+    fn test4() {
+        let src = "id :: a -> a
+id x = x.
+
+1 <> id 2 <> 3.";
+
+        let mut ast = parser::parse(src).unwrap();
+        
+        let cbpv = translate(ast.remove(2));
+
+        assert_eq!(
+            cbpv,
+            Term::Choice(vec![
+                Term::Return(Box::new(Term::Nat(1))),
+                Term::Bind {
+                    var: "0".to_string(),
+                    val: Box::new(Term::Return(Box::new(Term::Nat(2)))),
+                    body: Box::new(Term::Bind {
+                        var: "1".to_string(),
+                        val: Box::new(Term::Var("id".to_string())),
+                        body: Box::new(Term::App(
+                            Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
+                            Box::new(Term::Var("0".to_string()))
+                        ))
+                    })
+                },
+                Term::Return(Box::new(Term::Nat(3)))
+            ])
         )
     }
 }
