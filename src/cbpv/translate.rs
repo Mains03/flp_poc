@@ -139,7 +139,7 @@ mod test {
     #[test]
     fn test1() {
         let src = "const :: a -> b -> a
-const x y = x";
+const x y = x.";
 
         let mut ast = parser::parse(src).unwrap();
 
@@ -163,7 +163,7 @@ const x y = x";
     #[test]
     fn test2() {
         let src = "id :: Nat -> Nat
-id x = exists n :: Nat. n =:= x. n";
+id x = exists n :: Nat. n =:= x. n.";
 
         let mut ast = parser::parse(src).unwrap();
 
@@ -199,9 +199,9 @@ id x = exists n :: Nat. n =:= x. n";
     #[test]
     fn test3() {
         let src = "id :: Nat -> Nat
-id x = exists n :: Nat. n =:= x. n
+id x = exists n :: Nat. n =:= x. n.
 
-let x = 5 in id x";
+let x = 5 in id x.";
 
         let mut ast = parser::parse(src).unwrap();
 

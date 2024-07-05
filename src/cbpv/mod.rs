@@ -36,10 +36,13 @@ fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
 }
 
 fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a> {
+    println!("{:#?}", term);
+    println!("{:#?}", env);
+
     match term {
-        Term::Var(s) => eval_term(env.get(&s).unwrap().clone(), env),
+        Term::Var(s) => env.get(&s).unwrap().clone(),
         Term::Bind { var, val, body } => {
-            let val = match eval_term(*val, env) {
+            let val: Term = match eval_term(*val, env) {
                 Term::Return(t) => *t,
                 _ => unreachable!()
             };
@@ -50,18 +53,20 @@ fn eval_term<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a
 
             match old {
                 Some(v) => { env.insert(var, v); },
-                None => ()
-            };
+                None => { env.remove(&var); }
+            }
 
             t
         },
         Term::App(lhs, rhs) => {
             let lhs = eval_term(*lhs, env);
 
-            eval_term(apply(lhs, *rhs), env)
+            let rhs = eval_term(*rhs, env);
+
+            eval_term(apply(lhs, rhs), env)
         },
         Term::Force(t) => {
-            let t = eval_term(*t, env);
+            let t: Term = eval_term(*t, env);
 
             match t {
                 Term::Thunk(t) => *t,
@@ -174,9 +179,9 @@ mod tests {
     #[test]
     fn test1() {
         let src = "id :: a -> a
-id x = x
+id x = x.
 
-let x = 5 in id x";
+id 5.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -192,9 +197,9 @@ let x = 5 in id x";
     #[test]
     fn test2() {
         let src = "const :: a -> b -> a
-const x y = x
+const x y = x.
 
-let x = 5 in const 1 x";
+const 1 5.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -210,9 +215,9 @@ let x = 5 in const 1 x";
     #[test]
     fn test3() {
         let src = "const :: a -> b -> a
-const x y = x
+const x y = x.
 
-let x = 5 in const x 1";
+const 5 1.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -227,13 +232,13 @@ let x = 5 in const x 1";
 
     #[test]
     fn test4() {
-        let src = "id :: a -> a
-id x = x
+        let src: &str = "id :: a -> a
+id x = x.
 
 f :: (a -> a) -> a -> a
-f g x = g x
+f g x = g x.
 
-let x = 5 in f (f id) x";
+f (f id) 5.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -249,9 +254,9 @@ let x = 5 in f (f id) x";
     #[test]
     fn test5() {
         let src = "const :: a -> b -> a
-const x y = x
+const x y = x.
 
-let x = 1 in const x (let x = 2 in x)";
+const (let x = 1 in x) 2.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -267,9 +272,9 @@ let x = 1 in const x (let x = 2 in x)";
     #[test]
     fn test6() {
         let src = "const :: a -> b -> a
-const x y = x
+const x y = x.
 
-let x = 1 in const (let x = 2 in x) x";
+let x = 1 in const x (let x = 2 in x).";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -277,8 +282,20 @@ let x = 1 in const (let x = 2 in x) x";
         assert_eq!(
             val,
             Term::Return(
-                Box::new(Term::Nat(2))
+                Box::new(Term::Nat(1))
             )
         );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test7() {
+        let src = "const :: a -> b -> a
+const x y = x.
+
+const x (let x = 1 in x).";
+
+        let ast = parser::parse(src).unwrap();
+        eval(ast);
     }
 }

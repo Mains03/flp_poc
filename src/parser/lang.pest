@@ -1,12 +1,12 @@
 program = _{ SOI ~ decl* ~ EOI }
 
-decl = { func_type | func | stm }
+decl = { func_type | func | stm ~ "." }
 
 func_type = { ident ~ "::" ~ type }
 type = { primary_type ~ ("->" ~ type)* }
 primary_type = { ident | "(" ~ type ~ ")" }
 
-func = { ident ~ arg* ~ "=" ~ stm }
+func = { ident ~ arg* ~ "=" ~ stm ~ "." }
 arg = { ident } // currently just identifiers, potentially allow patterns in future
 
 stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
@@ -18,7 +18,7 @@ equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
 expr = { app | primary_expr }
-app = { primary_expr ~ primary_expr+ ~ !"::" }
+app = { primary_expr ~ primary_expr+ }
 primary_expr = { ident | nat | "(" ~ stm ~ ")" }
 
 ident = @{ !keywords ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }

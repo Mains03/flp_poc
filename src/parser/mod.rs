@@ -189,7 +189,7 @@ mod tests {
     #[test]
     fn test1() {
         let src = "const :: a -> b -> a
-const x y = x";
+const x y = x.";
 
         let ast = parse(src).unwrap();
 
@@ -218,10 +218,10 @@ const x y = x";
     #[test]
     fn test2() {
         let src = "const :: a -> b -> a
-const x y = x
+const x y = x.
 
 id :: a -> a
-id x = x";
+id x = x.";
 
         let ast = parse(src).unwrap();
 
@@ -262,7 +262,7 @@ id x = x";
     #[test]
     fn test3() {
         let src = "fix :: (Nat -> Nat) -> Nat
-fix f = exists n :: Nat. f n =:= n. n";
+fix f = exists n :: Nat. f n =:= n. n.";
 
         let ast = parse(src).unwrap();
 
@@ -301,7 +301,7 @@ fix f = exists n :: Nat. f n =:= n. n";
 
     #[test]
     fn test4() {
-        let src = "exists n :: Nat. n =:= 52. n";
+        let src = "exists n :: Nat. n =:= 52. n.";
 
         let ast = parse(src).unwrap();
 
@@ -324,10 +324,10 @@ fix f = exists n :: Nat. f n =:= n. n";
     #[test]
     fn test5() {
         let src: &str = "id :: Nat -> Nat
-id x = exists n :: Nat. n =:= x. n
+id x = exists n :: Nat. n =:= x. n.
 
 main :: Nat
-main = id 5";
+main = id 5.";
 
         let ast = parse(src).unwrap();
 
@@ -362,5 +362,38 @@ main = id 5";
                 }
             ]
         )
+    }
+
+    #[test]
+    fn test6() {
+        let src = "id x = x.
+
+id 5.
+
+id :: a -> a";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Func {
+                    name: "id",
+                    args: vec!["x"],
+                    body: Stm::Expr(Expr::Ident("x"))
+                },
+                Decl::Stm(Stm::Expr(Expr::App(
+                    Box::new(Expr::Ident("id")),
+                    Box::new(Expr::Nat(5))
+                ))),
+                Decl::FuncType {
+                    name: "id",
+                    r#type: Type::Arrow(
+                        Box::new(Type::Ident("a")),
+                        Box::new(Type::Ident("a"))
+                    )
+                }
+            ]
+        );
     }
 }
