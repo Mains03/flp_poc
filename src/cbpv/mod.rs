@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::stdin};
+use std::collections::HashMap;
 
 use term::Term;
 use translate::translate;
@@ -9,11 +9,11 @@ pub mod term;
 mod translate;
 
 pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
-    let mut env: HashMap<String, Term> = create_env(ast);
+    let env: HashMap<String, Term> = create_env(ast);
 
     let main = env.get("main").unwrap().clone();
 
-    eval_term(main, &mut env)
+    eval_term(main, &env)
 }
 
 fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
@@ -37,7 +37,7 @@ fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
     env
 }
 
-fn eval_term<'a>(mut term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a> {
+fn eval_term<'a>(mut term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
     loop {
         let t = eval_step(term.clone(), env);
 
@@ -51,49 +51,32 @@ fn eval_term<'a>(mut term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Ter
     term
 }
 
-fn eval_step<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a> {
+fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
     match term {
         Term::Var(s) => env.get(&s).unwrap().clone(),
-        Term::Bind { var, val, body } => match eval_step(*val, env) {
-            Term::Return(val) => {
-                let val = eval_step(*val, env);
-                let old: Option<Term<'a>> = env.insert(var.clone(), val);
-
-                let t = eval_step(*body, env);
-    
-                match old {
-                    Some(v) => { env.insert(var.clone(), v); },
-                    None => { env.remove(&var); }
-                }
-    
-                t
-            },
+        Term::Bind { var, val, body } => match eval_term(*val, env) {
+            Term::Return(val) => substitute(*body, &var, &val),
             Term::Choice(v) => Term::Choice(
                 v.into_iter()
-                    .map(|t| eval_step(
-                        Term::Bind {
-                            var: var.clone(),
-                            val: Box::new(t),
-                            body: body.clone()
-                        },
-                        env
-                    )).collect()
+                    .map(|t| Term::Bind {
+                        var: var.clone(),
+                        val: Box::new(t),
+                        body: body.clone()
+                    }).collect()
             ),
             _ => unreachable!()
         },
         Term::App(lhs, rhs) => {
-            let lhs = eval_step(*lhs, env);
-
-            let rhs = eval_step(*rhs, env);
+            let lhs = eval_term(*lhs, env);
 
             match lhs {
                 Term::Lambda { args, body } => apply(
                     Term::Lambda { args, body },
-                    rhs
+                    *rhs
                 ),
                 t => Term::App(
                     Box::new(t),
-                    Box::new(rhs)
+                    Box::new(*rhs)
                 )
             }
         },
@@ -102,49 +85,15 @@ fn eval_step<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Term<'a
                 .flat_map(|t: Term| flat_eval_step(t, env))
                 .collect()
         ),
-        Term::Lambda { args, body } => {
-            let mut old = HashMap::new();
-
-            args.iter()
-                .for_each(|a| {
-                    old.insert(
-                        a,
-                        env.insert(
-                            a.to_string(),
-                            Term::Var(a.to_string())
-                        )
-                    );
-                });
-
-            let t = Term::Lambda {
-                args: args.clone(),
-                body: Box::new(eval_step(*body, env))
-            };
-
-            old.into_iter()
-                .for_each(|(a, t)| {
-                    match t {
-                        Some(v) => env.insert(
-                            a.to_string(),
-                            v
-                        ),
-                        None => env.remove(*a)
-                    };
-                });
-
-            t
-        },
-        Term::Force(t) => match eval_step(*t, env) {
+        Term::Force(t) => match eval_term(*t, env) {
             Term::Thunk(t) => *t,
             t => Term::Force(Box::new(t))
         },
-        Term::Thunk(t) => Term::Thunk(Box::new(eval_step(*t, env))),
-        Term::Return(t) => Term::Return(Box::new(eval_step(*t, env))),
         t => t
     }
 }
 
-fn flat_eval_step<'a>(term: Term<'a>, env: &mut HashMap<String, Term<'a>>) -> Vec<Term<'a>> {
+fn flat_eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Vec<Term<'a>> {
     match term {
         Term::Choice(v) => v.into_iter()
             .flat_map(|t: Term| flat_eval_step(t, env))
@@ -216,7 +165,9 @@ fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
 
             Term::Lambda {
                 args,
-                body: if flag { body } else {
+                body: if flag { 
+                    body
+                } else {
                     Box::new(substitute(*body, var, sub))
                 }
             }
