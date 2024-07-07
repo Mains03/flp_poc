@@ -87,7 +87,7 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
         ),
         Term::Force(t) => match eval_term(*t, env) {
             Term::Thunk(t) => *t,
-            t => Term::Force(Box::new(t))
+            _ => unreachable!()
         },
         t => t
     }
