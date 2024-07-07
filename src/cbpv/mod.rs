@@ -80,11 +80,22 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
                 _ => unreachable!()
             }
         },
-        Term::Choice(v) => Term::Choice(
-            v.into_iter()
-                .flat_map(|t: Term| flat_eval_step(t, env))
-                .collect()
-        ),
+        Term::Choice(mut v) => if v.len() == 0 {
+            Term::Fail
+        } else if v.len() == 1 {
+            eval_step(v.remove(0), env)
+        } else {
+            Term::Choice(
+                v.into_iter()
+                    .flat_map(|t: Term| flat_eval_step(t, env).into_iter()
+                        .flat_map(|t| if t == Term::Fail {
+                            vec![]
+                        } else {
+                            vec![t]
+                        }))
+                    .collect()
+            )
+        },
         Term::Force(t) => match eval_term(*t, env) {
             Term::Thunk(t) => *t,
             _ => unreachable!()
@@ -578,6 +589,38 @@ exists n :: Nat. exists m :: Nat. const n m =:= 1. n.";
         assert_eq!(
             val,
             Term::Return(Box::new(Term::Nat(1)))
+        );
+    }
+
+    #[test]
+    fn test16() {
+        let src = "choose_zero :: Nat -> Nat -> Nat
+choose_zero x y = (x =:= 0. x) <> (y =:= 0. y).
+
+choose_zero 0 1.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(Box::new(Term::Nat(0)))
+        );
+    }
+
+    #[test]
+    fn test17() {
+        let src = "choose_zero :: Nat -> Nat -> Nat
+choose_zero x y = (x =:= 0. x) <> (y =:= 0. y).
+
+choose_zero 1 1.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Fail
         );
     }
 }
