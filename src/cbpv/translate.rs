@@ -77,10 +77,23 @@ fn translate_stm<'a>(stm: Stm<'a>, vars: &mut HashSet<String>) -> Term<'a> {
 
             t
         },
-        Stm::Equate { lhs, rhs, body } => Term::Equate {
-            lhs: Box::new(translate_expr(lhs, vars)),
-            rhs: Box::new(translate_expr(rhs, vars)),
-            body: Box::new(translate_stm(*body, vars))
+        Stm::Equate { lhs, rhs, body } => {
+            let var = vars.len().to_string();
+            vars.insert(var.clone());
+
+            Term::Equate {
+                lhs: Box::new(Term::Bind {
+                    var: var.clone(),
+                    val: Box::new(translate_expr(lhs, vars)),
+                    body: Box::new(Term::Var(var.clone()))
+                }),
+                rhs: Box::new(Term::Bind {
+                    var: var.clone(),
+                    val: Box::new(translate_expr(rhs, vars)),
+                    body: Box::new(Term::Var(var))
+                }),
+                body: Box::new(translate_stm(*body, vars))
+            }
         },
         Stm::Choice(exprs) => Term::Choice(
             exprs.into_iter()
@@ -93,7 +106,7 @@ fn translate_stm<'a>(stm: Stm<'a>, vars: &mut HashSet<String>) -> Term<'a> {
 fn translate_expr<'a>(expr: Expr<'a>, vars: &mut HashSet<String>) -> Term<'a> {
     match expr {
         Expr::App(lhs, rhs) => {
-            let x: String = vars.len().to_string();
+            let x = vars.len().to_string();
             vars.insert(x.clone());
             let f = vars.len().to_string();
             vars.insert(f.clone());
@@ -181,12 +194,20 @@ id x = exists n :: Nat. n =:= x. n.";
                             var: "n",
                             r#type: Type::Ident("Nat"),
                             body: Box::new(Term::Equate {
-                                lhs: Box::new(Term::Return(
-                                    Box::new(Term::Var("n".to_string()))
-                                )),
-                                rhs: Box::new(Term::Return(
-                                    Box::new(Term::Var("x".to_string()))
-                                )),
+                                lhs: Box::new(Term::Bind {
+                                    var: "2".to_string(),
+                                    val: Box::new(Term::Return(
+                                        Box::new(Term::Var("n".to_string()))
+                                    )),
+                                    body: Box::new(Term::Var("2".to_string()))
+                                }),
+                                rhs: Box::new(Term::Bind {
+                                    var: "2".to_string(),
+                                    val: Box::new(Term::Return(
+                                        Box::new(Term::Var("x".to_string()))
+                                    )),
+                                    body: Box::new(Term::Var("2".to_string()))
+                                }),
                                 body: Box::new(Term::Return(
                                     Box::new(Term::Var("n".to_string()))
                                 ))
