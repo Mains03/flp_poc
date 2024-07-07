@@ -53,7 +53,10 @@ fn eval_term<'a>(mut term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a
 
 fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
     match term {
-        Term::Var(s) => env.get(&s).unwrap().clone(),
+        Term::Var(s) => match env.get(&s) {
+            Some(v) => v.clone(),
+            None => Term::Var(s) // free variable
+        },
         Term::Bind { var, val, body } => match eval_term(*val, env) {
             Term::Return(val) => substitute(*body, &var, &val),
             Term::Choice(v) => Term::Choice(
@@ -86,8 +89,112 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
             Term::Thunk(t) => *t,
             _ => unreachable!()
         },
+        Term::Exists { var, r#type: _, body } => match eval_term(*body, env) {
+            Term::Fail => Term::Fail,
+            Term::Equate { lhs, rhs, body } => {
+                let lhs_flag = term_contains_var(&*lhs, &var.to_string());
+                let rhs_flag = term_contains_var(&*rhs, &var.to_string());
+
+                if lhs_flag || rhs_flag {
+                    unimplemented!()
+                } else {
+                    *body
+                }
+            },
+            t => if term_contains_var(&t, &var.to_string()) {
+                unimplemented!()
+            } else {
+                t
+            }
+        },
+        Term::Equate { lhs, rhs, body } => {
+            let lhs = eval_term(*lhs, env);
+            let rhs = eval_term(*rhs, env);
+
+            match lhs {
+                Term::Nat(lhs_val) => match rhs {
+                    Term::Nat(rhs_val) => if lhs_val == rhs_val {
+                        *body
+                    } else {
+                        Term::Fail
+                    },
+                    Term::Var(s) => substitute(*body, &s, &Term::Nat(lhs_val)),
+                    _ => Term::Equate {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        body
+                    }
+                },
+                Term::Var(ref s) => match rhs {
+                    Term::Nat(rhs_val) => substitute(*body, &s, &Term::Nat(rhs_val)),
+                    _ => Term::Equate {
+                        lhs: Box::new(lhs),
+                        rhs: Box::new(rhs),
+                        body
+                    }
+                },
+                _ => Term::Equate {
+                    lhs: Box::new(lhs),
+                    rhs: Box::new(rhs),
+                    body
+                }
+            }
+        },
         t => t
     }
+}
+
+fn term_contains_var(term: &Term, var: &String) -> bool {
+    fn term_contains_var_helper(term: &Term, var: &String) -> bool {
+        match term {
+            Term::Var(s) => s == var,
+            Term::If { cond, then, r#else } => {
+                term_contains_var_helper(*&cond, var)
+                || term_contains_var_helper(*&then, var)
+                || term_contains_var_helper(*&r#else, var)
+            },
+            Term::Bind { var: v, val, body } => {
+                if v == var {
+                    false
+                } else {
+                    term_contains_var_helper(*&val, var)
+                    || term_contains_var_helper(*&body, var)
+                }
+            },
+            Term::Exists { var: v, r#type: _, body } => {
+                if v == var {
+                    false
+                } else {
+                    term_contains_var_helper(*&body, var)
+                }
+            },
+            Term::Equate { lhs, rhs, body } => {
+                term_contains_var_helper(*&lhs, var)
+                || term_contains_var_helper(*&rhs, var)
+                || term_contains_var_helper(*&body, var)
+            },
+            Term::Lambda { args, body } => {
+                if args.contains(&var.as_str()) {
+                    false
+                } else {
+                    term_contains_var_helper(*&body, var)
+                }
+            },
+            Term::Choice(v) => v.iter()
+                .map(|t| term_contains_var_helper(t, var))
+                .fold(false, |v, acc| v || acc),
+            Term::Thunk(t) => term_contains_var_helper(*&t, var),
+            Term::Return(t) => term_contains_var_helper(*&t, var),
+            Term::Force(t) => term_contains_var_helper(*&t, var),
+            Term::App(lhs, rhs) => {
+                term_contains_var_helper(*&lhs, var)
+                || term_contains_var_helper(*&rhs, var)
+            },
+            _ => false
+        }
+    }
+
+    term_contains_var_helper(term, var)
 }
 
 fn flat_eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Vec<Term<'a>> {
@@ -414,5 +521,63 @@ let num = 1 <> 2 in f num num.";
                 Term::Return(Box::new(Term::Nat(2))),
             ])
         )
+    }
+
+    #[test]
+    fn test12() {
+        let src = "exists n :: Nat. n =:= 1. n.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(Box::new(Term::Nat(1)))
+        );
+    }
+
+    #[test]
+    fn test13() {
+        let src = "id :: a -> a
+id x = x.
+        
+exists n :: Nat. id n =:= 1. n.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(Box::new(Term::Nat(1)))
+        );
+    }
+
+    #[test]
+    fn test14() {
+        let src = "exists n :: Nat. 0 =:= 1. n.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Fail
+        );
+    }
+
+    #[test]
+    fn test15() {
+        let src = "const :: a -> b -> a
+const x y = x.
+        
+exists n :: Nat. exists m :: Nat. const n m =:= 1. n.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(Box::new(Term::Nat(1)))
+        );
     }
 }
