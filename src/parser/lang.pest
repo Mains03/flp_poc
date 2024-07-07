@@ -22,7 +22,7 @@ app = { primary_expr ~ primary_expr+ }
 primary_expr = { ident | nat | "(" ~ stm ~ ")" }
 
 ident = @{ !keywords ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-keywords = { "if" | "then" | "else" | "let" | "in" | "exists" }
+keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | "main" }
 nat = @{ ASCII_DIGIT+ }
 
 WHITESPACE = _{ WHITE_SPACE }

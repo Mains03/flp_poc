@@ -326,8 +326,7 @@ fix f = exists n :: Nat. f n =:= n. n.";
         let src: &str = "id :: Nat -> Nat
 id x = exists n :: Nat. n =:= x. n.
 
-main :: Nat
-main = id 5.";
+id 5.";
 
         let ast = parse(src).unwrap();
 
@@ -351,15 +350,10 @@ main = id 5.";
                         })
                     }
                 },
-                Decl::FuncType { name: "main", r#type: Type::Ident("Nat")},
-                Decl::Func {
-                    name: "main",
-                    args: vec![],
-                    body: Stm::Expr(Expr::App(
-                        Box::new(Expr::Ident("id")),
-                        Box::new(Expr::Nat(5))
-                    ))
-                }
+                Decl::Stm(Stm::Expr(Expr::App(
+                    Box::new(Expr::Ident("id")),
+                    Box::new(Expr::Nat(5))
+                )))
             ]
         )
     }
