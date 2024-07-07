@@ -74,10 +74,7 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
                     Term::Lambda { args, body },
                     *rhs
                 ),
-                t => Term::App(
-                    Box::new(t),
-                    Box::new(*rhs)
-                )
+                _ => unreachable!()
             }
         },
         Term::Choice(v) => Term::Choice(
