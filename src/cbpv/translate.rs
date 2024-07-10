@@ -105,6 +105,11 @@ fn translate_stm<'a>(stm: Stm<'a>, vars: &mut HashSet<String>) -> Term<'a> {
 
 fn translate_expr<'a>(expr: Expr<'a>, vars: &mut HashSet<String>) -> Term<'a> {
     match expr {
+        Expr::Add(lhs, rhs) => translate_expr(
+            Expr::App(Box::new(
+                Expr::App(Box::new(Expr::Ident("+")),
+                lhs
+            )), rhs), vars),
         Expr::App(lhs, rhs) => {
             let x = vars.len().to_string();
             vars.insert(x.clone());
@@ -286,6 +291,45 @@ id x = x.
                 },
                 Term::Return(Box::new(Term::Nat(3)))
             ])
+        )
+    }
+
+    #[test]
+    fn test5() {
+        let src = "addOne :: Nat -> Nat
+addOne n = n + 1.";
+
+        let mut ast = parser::parse(src).unwrap();
+        let cbpv = translate(ast.remove(1));
+
+        assert_eq!(
+            cbpv,
+            Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                args: vec!["n"],
+                body: Box::new(Term::Bind {
+                    var: "1".to_string(),
+                    val: Box::new(Term::Return(Box::new(Term::Nat(1)))),
+                    body: Box::new(Term::Bind {
+                        var: "2".to_string(),
+                        val: Box::new(Term::Bind {
+                            var: "3".to_string(),
+                            val: Box::new(Term::Return(Box::new(Term::Var("n".to_string())))),
+                            body:  Box::new(Term::Bind {
+                                var: "4".to_string(),
+                                val: Box::new(Term::Var("+".to_string())),
+                                body: Box::new(Term::App(
+                                    Box::new(Term::Force(Box::new(Term::Var("4".to_string())))),
+                                    Box::new(Term::Var("3".to_string()))
+                                ))
+                            })
+                        }),
+                        body: Box::new(Term::App(
+                            Box::new(Term::Force(Box::new(Term::Var("2".to_string())))),
+                            Box::new(Term::Var("1".to_string()))
+                        ))
+                    })
+                })
+            }))))
         )
     }
 }

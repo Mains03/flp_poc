@@ -132,13 +132,21 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
+        Rule::add => {
+            let mut pairs = pair.into_inner();
+
+            Expr::Add(
+                Box::new(parse_expr(pairs.next().unwrap().into_inner())),
+                Box::new(parse_expr(pairs))
+            )
+        },
         Rule::app => {
             let mut pairs = pair.into_inner();
 
-            let mut exprs: Vec<Expr> = vec![];
+            let mut exprs = vec![];
             loop {
                 match pairs.next() {
-                    Some(e) =>exprs.push(parse_expr(e.into_inner())),
+                    Some(e) => exprs.push(parse_expr(e.into_inner())),
                     None => break,
                 }
             }
@@ -408,6 +416,43 @@ id x = x.
                 Decl::Stm(Stm::Choice(vec![
                     Expr::Nat(1), Expr::App(Box::new(Expr::Ident("id")), Box::new(Expr::Nat(2))), Expr::Nat(3)
                 ]))
+            ]
+        )
+    }
+
+    #[test]
+    fn test8() {
+        let src = "5 + 2.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Stm(Stm::Expr(Expr::Add(
+                    Box::new(Expr::Nat(5)),
+                    Box::new(Expr::Nat(2))
+                )))
+            ]
+        );
+    }
+
+    #[test]
+    fn test9() {
+        let src = "1 + 2 + 3.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Stm(Stm::Expr(Expr::Add(
+                    Box::new(Expr::Nat(1)),
+                    Box::new(Expr::Add(
+                        Box::new(Expr::Nat(2)),
+                        Box::new(Expr::Nat(3))
+                    ))
+                )))
             ]
         )
     }

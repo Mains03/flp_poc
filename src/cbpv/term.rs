@@ -4,6 +4,7 @@ use crate::parser::syntax::r#type::Type;
 pub enum Term<'a> {
     Var(String),
     Nat(i64),
+    Add(Box<Term<'a>>, Box<Term<'a>>),
     If {
         cond: Box<Term<'a>>,
         then: Box<Term<'a>>,

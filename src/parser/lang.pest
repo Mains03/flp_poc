@@ -17,7 +17,8 @@ exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stm }
 equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
-expr = { app | primary_expr }
+expr = { add | app | primary_expr }
+add = { primary_expr ~ "+" ~ (add | primary_expr) }
 app = { primary_expr ~ primary_expr+ }
 primary_expr = { ident | nat | "(" ~ stm ~ ")" }
 
