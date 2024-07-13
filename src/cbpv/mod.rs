@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use equate::eval_equate;
 use term::Term;
 use translate::translate;
 
@@ -7,6 +8,7 @@ use crate::parser::syntax::{program::Decl, r#type::Type};
 
 pub mod term;
 mod translate;
+mod equate;
 
 pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
     let env: HashMap<String, Term> = create_env(ast);
@@ -168,9 +170,13 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
                 t => exists_enumerate(var, r#type, t)
             }
         },
-        Term::Equate { lhs, rhs, body } => simplify_equate(
-            eval_term(*lhs, env), eval_term(*rhs, env), eval_term(*body, env)
-        ),
+        Term::Equate { lhs, rhs, body } => {
+            eval_equate(
+                eval_term(*lhs, env),
+                eval_term(*rhs, env),
+                eval_term(*body, env)
+            )
+        },
         t => t
     }
 }
@@ -194,71 +200,6 @@ fn exists_enumerate<'a>(var: &'a str, r#type: Type<'a>, term: Term<'a>) -> Term<
     }
 }
 
-fn simplify_equate<'a>(lhs: Term<'a>, rhs: Term<'a>, body: Term<'a>) -> Term<'a> {
-    match body {
-        Term::Fail =>Term::Fail,
-        Term::Choice(v) => Term::Choice(v.into_iter()
-            .map(|t| Term::Equate {
-                lhs: Box::new(lhs.clone()),
-                rhs: Box::new(rhs.clone()),
-                body: Box::new(t)
-            }).collect()),
-        _ => if is_nat(&lhs) && is_nat(&rhs) {
-            if lhs == rhs {
-                body
-            } else {
-                Term::Fail
-            }
-        } else {
-            let lhs_flag = is_succ(&lhs);
-            let rhs_flag = is_succ(&rhs);
-
-            if lhs_flag && rhs_flag {
-                simplify_equate_succ(lhs, rhs, body)
-            } else if lhs_flag {
-                match rhs {
-                    Term::Nat(0) => Term::Fail,
-                    _ => Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
-                }
-            } else if rhs_flag {
-                match lhs {
-                    Term::Nat(0) => Term::Fail,
-                    _ => Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
-                }
-            } else {
-                Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
-            }
-        }
-    }
-}
-
-fn is_nat(term: &Term) -> bool {
-    match term {
-        Term::Nat(_) => true,
-        _ => false
-    }
-}
-
-fn is_succ<'a>(term: &'a Term<'a>) -> bool {
-    match term {
-        Term::Nat(_) => true,
-        Term::Add(lhs, rhs) => {
-            let lhs_flag = match **lhs {
-                Term::Nat(_) => true, // non-zero
-                _ => false
-            };
-
-            let rhs_flag = match **rhs {
-                Term::Nat(_) => true, // non-zero
-                _ => false
-            };
-
-            lhs_flag || rhs_flag
-        },
-        _ => false
-    }
-}
-
 fn is_succ_of(var: &str, term: &Term) -> bool {
     match term {
         Term::Add(lhs, rhs) => {
@@ -277,74 +218,6 @@ fn is_succ_of(var: &str, term: &Term) -> bool {
             (lhs_flag.0 && rhs_flag.1) || (lhs_flag.1 && rhs_flag.0)
         },
         _ => false
-    }
-}
-
-fn simplify_equate_succ<'a>(lhs: Term<'a>, rhs: Term<'a>, body: Term<'a>) -> Term<'a> {
-    if is_nat(&lhs) {
-        let lhs_num = match lhs {
-            Term::Nat(n) => n,
-            _ => unreachable!()
-        };
-
-        let (rhs_term, rhs_num) = match rhs {
-            Term::Add(lhs2, rhs2) => match *lhs2 {
-                Term::Nat(n) => (*rhs2, n),
-                _ => match *rhs2 {
-                    Term::Nat(n) => (*lhs2, n),
-                    _ => unreachable!()
-                }
-            },
-            _ => unreachable!()
-        };
-
-        if lhs_num >= rhs_num {
-            Term::Equate {
-                lhs: Box::new(Term::Nat(lhs_num - rhs_num)),
-                rhs: Box::new(rhs_term),
-                body: Box::new(body)
-            }
-        } else {
-            Term::Equate {
-                lhs: Box::new(Term::Nat(0)),
-                rhs: Box::new(Term::Add(Box::new(rhs_term), Box::new(Term::Nat(rhs_num - lhs_num)))),
-                body: Box::new(body)
-            }
-        }
-    } else if is_nat(&rhs) {
-        simplify_equate_succ(rhs, lhs, body)
-    } else {
-        let (lhs_term, lhs_num) = match lhs {
-            Term::Add(lhs2, rhs2) => match *lhs2 {
-                Term::Nat(n) => (*rhs2, n),
-                _ => match *rhs2 {
-                    Term::Nat(n) => (*lhs2, n),
-                    _ => unreachable!()
-                }
-            },
-            _ => unreachable!()
-        };
-
-        let (rhs_term, rhs_num) = match rhs {
-            Term::Add(lhs2, rhs2) => match *lhs2 {
-                Term::Nat(n) => (*rhs2, n),
-                _ => match *rhs2 {
-                    Term::Nat(n) => (*lhs2, n),
-                    _ => unreachable!()
-                }
-            },
-            _ => unreachable!()
-        };
-
-        let (lhs, rhs) = if lhs_num == rhs_num {
-            (lhs_term, rhs_term)
-        } else if lhs_num < rhs_num {
-            (lhs_term, Term::Add(Box::new(rhs_term), Box::new(Term::Nat(rhs_num - lhs_num))))
-        } else {
-            (Term::Add(Box::new(lhs_term), Box::new(Term::Nat(lhs_num - rhs_num))), rhs_term)
-        };
-
-        Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
     }
 }
 
@@ -792,6 +665,19 @@ id 5.";
         assert_eq!(
             val,
             Term::Return(Box::new(Term::Nat(4)))
+        );
+    }
+
+    #[test]
+    fn test20() {
+        let src = "exists n :: Nat. n + n =:= 2. n.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(Box::new(Term::Nat(2)))
         );
     }
 }

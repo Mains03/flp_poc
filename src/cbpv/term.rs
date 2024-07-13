@@ -3,7 +3,7 @@ use crate::parser::syntax::r#type::Type;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term<'a> {
     Var(String),
-    Nat(i64),
+    Nat(usize),
     Add(Box<Term<'a>>, Box<Term<'a>>),
     If {
         cond: Box<Term<'a>>,

@@ -2,27 +2,29 @@ use std::cmp;
 
 use super::term::Term;
 
-pub fn eval_equate<'a>(lhs: Term<'a>, rhs: Term<'a>, body: Box<Term<'a>>) -> Term<'a> {
-    if is_eq_equate_cycle(&lhs, &rhs) {
+pub fn eval_equate<'a>(lhs: Term<'a>, rhs: Term<'a>, body: Term<'a>) -> Term<'a> {
+    if body == Term::Fail {
+        Term::Fail
+    }  else if is_eq_equate_cycle(&lhs, &rhs) {
         Term::Fail
     } else {
         if is_succ(&lhs) {
             if is_succ(&rhs) {
                 let (lhs, rhs) = remove_succ(lhs, rhs);
-                Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body }
+                Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
             } else if is_zero(&rhs) {
                 Term::Fail
             } else {
-                Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body }
+                Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
             }
         } else if is_succ(&rhs) {
             if is_zero(&lhs) {
                 Term::Fail
             } else {
-                Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body }
+                Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
             }
         } else {
-            Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body }
+            Term::Equate { lhs: Box::new(lhs), rhs: Box::new(rhs), body: Box::new(body) }
         }
     }
 }
@@ -174,7 +176,7 @@ mod tests {
         
         let rhs = Term::Var("n".to_string());
         
-        let body = Box::new(Term::Return(Box::new(Term::Nat(1))));
+        let body = Term::Return(Box::new(Term::Nat(1)));
 
         let term = eval_equate(lhs, rhs, body);
 
@@ -205,7 +207,7 @@ mod tests {
             Box::new(Term::Nat(2))
         );
 
-        let body = Box::new(Term::Return(Box::new(Term::Nat(1))));
+        let body = Term::Return(Box::new(Term::Nat(1)));
 
         let term = eval_equate(lhs, rhs, body);
 
@@ -255,7 +257,7 @@ mod tests {
             Box::new(Term::Nat(0))
         );
 
-        let body = Box::new(Term::Return(Box::new(Term::Nat(1))));
+        let body = Term::Return(Box::new(Term::Nat(1)));
         
         let term = eval_equate(lhs, rhs, body);
 
@@ -286,7 +288,7 @@ mod tests {
             Box::new(Term::Nat(0))
         );
 
-        let body = Box::new(Term::Return(Box::new(Term::Nat(1))));
+        let body = Term::Return(Box::new(Term::Nat(1)));
         
         let term = eval_equate(lhs, rhs, body);
 
@@ -311,6 +313,22 @@ mod tests {
                 )),
                 body: Box::new(Term::Return(Box::new(Term::Nat(1))))
             }
+        );
+    }
+
+    #[test]
+    fn test5() {
+        let lhs = Term::Var("n".to_string());
+
+        let rhs = Term::Nat(1);
+
+        let body = Term::Fail;
+
+        let term = eval_equate(lhs, rhs, body);
+
+        assert_eq!(
+            term,
+            Term::Fail
         );
     }
 }
