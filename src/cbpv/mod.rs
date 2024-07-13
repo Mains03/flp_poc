@@ -1,14 +1,16 @@
 use std::collections::HashMap;
 
 use equate::eval_equate;
-use term::Term;
+use exists::eval_exists;
+use term::{substitute, Term};
 use translate::translate;
 
-use crate::parser::syntax::{program::Decl, r#type::Type};
+use crate::parser::syntax::program::Decl;
 
 pub mod term;
 mod translate;
 mod equate;
+mod exists;
 
 pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
     let env: HashMap<String, Term> = create_env(ast);
@@ -135,40 +137,11 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
             _ => unreachable!()
         },
         Term::Exists { var, r#type, body } => {
-            let body = eval_term(*body, env);
-
-            match body {
-                Term::Fail => Term::Fail,
-                Term::Equate { lhs, rhs, body } => {
-                    let lhs_flag = match *lhs {
-                        Term::Var(ref s) => if s == var { true } else { false },
-                        _ => false
-                    };
-
-                    let rhs_flag = match *rhs {
-                        Term::Var(ref s) => if s == var { true } else { false },
-                        _ => false
-                    };
-                    if lhs_flag {
-                        if is_succ_of(var, &*rhs) {
-                            Term::Fail
-                        } else {
-                            substitute(*body, var, &rhs)
-                        }
-                    } else if rhs_flag {
-                        if is_succ_of(var, &*lhs) {
-                            Term::Fail
-                        } else {
-                            substitute(*body, var, &lhs)
-                        }
-                    } else {
-                        exists_enumerate(var, r#type, Term::Equate {
-                            lhs: Box::new(*lhs), rhs: Box::new(*rhs), body
-                        })
-                    }
-                },
-                t => exists_enumerate(var, r#type, t)
-            }
+            eval_exists(
+                var,
+                r#type,
+                eval_term(*body, env)
+            )
         },
         Term::Equate { lhs, rhs, body } => {
             eval_equate(
@@ -178,46 +151,6 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
             )
         },
         t => t
-    }
-}
-
-fn exists_enumerate<'a>(var: &'a str, r#type: Type<'a>, term: Term<'a>) -> Term<'a> {
-    match r#type {
-        Type::Ident(s) => if s == "Nat" {
-            Term::Choice(vec![
-                substitute(term.clone(), var, &Term::Nat(0)),
-                Term::Exists { var, r#type,
-                    body: Box::new(substitute(term, var, &Term::Add(
-                        Box::new(Term::Var(var.to_string())),
-                        Box::new(Term::Nat(1))
-                    )))
-                }
-            ])
-        } else {
-            unimplemented!()
-        },
-        _ => unreachable!()
-    }
-}
-
-fn is_succ_of(var: &str, term: &Term) -> bool {
-    match term {
-        Term::Add(lhs, rhs) => {
-            let lhs_flag = match **lhs {
-                Term::Nat(_) => (false, true), // non-zero
-                Term::Var(ref s) => (s == var, false),
-                _ => (false, false)
-            };
-
-            let rhs_flag = match **rhs {
-                Term::Nat(_) => (false, true), // non-zero
-                Term::Var(ref s) => (s == var, false),
-                _ => (false, false)
-            };
-
-            (lhs_flag.0 && rhs_flag.1) || (lhs_flag.1 && rhs_flag.0)
-        },
-        _ => false
     }
 }
 
@@ -250,79 +183,6 @@ fn apply<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
             }
         },
         _ => unreachable!()
-    }
-}
-
-fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
-    match term {
-        Term::Var(s) => if s == var { sub.clone() } else { Term::Var(s) },
-        Term::If { cond, then, r#else } => Term::If {
-            cond: Box::new(substitute(*cond, var, sub)),
-            then: Box::new(substitute(*then, var, sub)),
-            r#else: Box::new(substitute(*r#else, var, sub))
-        },
-        Term::Bind { var: v, val, body } => {
-            let flag = v == var;
-
-            Term::Bind {
-                var: v,
-                val: Box::new(substitute(*val, var, sub)),
-                body: if flag { body } else {
-                    Box::new(substitute(*body, var, sub))
-                }
-            }
-        },
-        Term::Exists { var: v, r#type, body } => {
-            Term::Exists {
-                var: v,
-                r#type,
-                body: if v == var { body } else {
-                    Box::new(substitute(*body, var, sub))
-                }
-            }
-        },
-        Term::Equate { lhs, rhs, body } => {
-            Term::Equate {
-                lhs: Box::new(substitute(*lhs, var, sub)),
-                rhs: Box::new(substitute(*rhs, var, sub)),
-                body: Box::new(substitute(*body, var, sub))
-            }
-        },
-        Term::Lambda { args, body } => {
-            let flag = args.contains(&var);
-
-            Term::Lambda {
-                args,
-                body: if flag { 
-                    body
-                } else {
-                    Box::new(substitute(*body, var, sub))
-                }
-            }
-        },
-        Term::Choice(c) => Term::Choice(
-            c.into_iter()
-                .map(|t| substitute(t, var, sub))
-                .collect()
-        ),
-        Term::Thunk(t) => Term::Thunk(
-            Box::new(substitute(*t, var, sub))
-        ),
-        Term::Return(t) => Term::Return(
-            Box::new(substitute(*t, var, sub))
-        ),
-        Term::Force(t) => Term::Force(
-            Box::new(substitute(*t, var, sub))
-        ),
-        Term::Add(lhs, rhs) => Term::Add(
-            Box::new(substitute(*lhs, var, sub)),
-            Box::new(substitute(*rhs, var, sub))
-        ),
-        Term::App(lhs, rhs) => Term::App(
-            Box::new(substitute(*lhs, var, sub)),
-            Box::new(substitute(*rhs, var, sub))
-        ),
-        t => t
     }
 }
 

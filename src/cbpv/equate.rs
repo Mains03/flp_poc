@@ -1,6 +1,6 @@
 use std::cmp;
 
-use super::term::Term;
+use super::term::{get_var, is_var, Term};
 
 pub fn eval_equate<'a>(lhs: Term<'a>, rhs: Term<'a>, body: Term<'a>) -> Term<'a> {
     if body == Term::Fail {
@@ -48,20 +48,6 @@ fn is_eq_equate_cycle(lhs: &Term, rhs: &Term) -> bool {
         }
     } else {
         false
-    }
-}
-
-fn is_var(term: &Term) -> bool {
-    match term {
-        Term::Var(_) => true,
-        _ => false
-    }
-}
-
-fn get_var(term: &Term) -> String {
-    match term {
-        Term::Var(s) => s.clone(),
-        _ => unreachable!()
     }
 }
 
