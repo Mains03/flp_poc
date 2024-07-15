@@ -5,6 +5,7 @@ pub enum Term<'a> {
     Var(String),
     Succ(usize, Option<Box<Term<'a>>>),
     Add(Box<Term<'a>>, Box<Term<'a>>),
+    AddValue(Box<Term<'a>>, Box<Term<'a>>),
     If {
         cond: Box<Term<'a>>,
         then: Box<Term<'a>>,
@@ -103,6 +104,10 @@ pub fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
             Box::new(substitute(*t, var, sub))
         ),
         Term::Add(lhs, rhs) => Term::Add(
+            Box::new(substitute(*lhs, var, sub)),
+            Box::new(substitute(*rhs, var, sub))
+        ),
+        Term::AddValue(lhs, rhs) => Term::AddValue(
             Box::new(substitute(*lhs, var, sub)),
             Box::new(substitute(*rhs, var, sub))
         ),

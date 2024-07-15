@@ -5,7 +5,9 @@ use super::term::Term;
 pub fn eval_equate<'a>(lhs: Term<'a>, rhs: Term<'a>, body: Term<'a>) -> Term<'a> {
     if body == Term::Fail {
         Term::Fail
-    }  else if is_equate_cycle(&lhs, &rhs) {
+    } else if lhs == rhs {
+        body
+    } else if is_equate_cycle(&lhs, &rhs) {
         Term::Fail
     } else {
         if is_succ(&lhs) {

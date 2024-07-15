@@ -1,3 +1,4 @@
+use core::prelude::v1;
 use std::collections::HashMap;
 
 use equate::eval_equate;
@@ -77,11 +78,18 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
                 match eval_term(*v, env) {
                     Term::Var(v) => Term::Succ(n1, Some(Box::new(Term::Var(v)))),
                     Term::Succ(n2, v) => Term::Succ(n1+n2, v),
+                    Term::AddValue(lhs, rhs) => Term::Succ(n1, Some(Box::new(Term::AddValue(lhs, rhs)))),
                     _ => unreachable!()
                 }
             },
             None => Term::Succ(n1, None)
         },
+        Term::AddValue(lhs, rhs) => {
+            let lhs = eval_term(*lhs, env);
+            let rhs = eval_term(*rhs, env);
+
+            add_value_terms(lhs, rhs)
+        }
         Term::Bind { var, val, body } => {
             let val = eval_term(*val, env);
 
@@ -161,7 +169,7 @@ fn add_terms<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
             Term::Succ(n2, ref v2) => {
                 match v1 {
                     Some(ref v1) => match v2 {
-                        Some(_) => Term::Add(Box::new(lhs), Box::new(rhs)),
+                        Some(_) => Term::Return(Box::new(Term::AddValue(Box::new(lhs), Box::new(rhs)))),
                         None => Term::Return(Box::new(Term::Succ(n1+n2, Some(v1.clone()))))
                     },
                     None => match v2 {
@@ -170,9 +178,39 @@ fn add_terms<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
                     }
                 }
             },
-            _ => Term::Add(Box::new(lhs), Box::new(rhs))
+            _ => Term::Return(Box::new(Term::AddValue(Box::new(lhs), Box::new(rhs))))
         },
-        _ => Term::Add(Box::new(lhs), Box::new(rhs))
+        _ => Term::Return(Box::new(Term::AddValue(Box::new(lhs), Box::new(rhs))))
+    }
+}
+
+fn add_value_terms<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
+    match lhs {
+        Term::Succ(n1, v1) => match rhs {
+            Term::Succ(n2, v2) => match v1 {
+                Some(v1) => match v2 {
+                    Some(v2) => Term::Succ(n1+n2, Some(Box::new(Term::AddValue(v1, v2)))),
+                    None => Term::Succ(n1+n2, Some(v1))
+                },
+                None => match v2 {
+                    Some(v2) => Term::Succ(n1+n2, Some(v2)),
+                    None => Term::Succ(n1+n2, None)
+                }
+            },
+            Term::Var(v2) => match v1 {
+                Some(v1) => Term::Succ(n1, Some(Box::new(Term::AddValue(v1, Box::new(Term::Var(v2)))))),
+                None => Term::Succ(n1, Some(Box::new(Term::Var(v2))))
+            },
+            _ => Term::AddValue(Box::new(Term::Succ(n1, v1)), Box::new(rhs))
+        },
+        Term::Var(v1) => match rhs {
+            Term::Succ(n, v2) => match v2 {
+                Some(v2) => Term::Succ(n, Some(Box::new(Term::AddValue(Box::new(Term::Var(v1)), v2)))),
+                None => Term::Succ(n, Some(Box::new(Term::Var(v1))))
+            },
+            _ => Term::AddValue(Box::new(Term::Var(v1)), Box::new(rhs))
+        },
+        _ => Term::AddValue(Box::new(lhs), Box::new(rhs))
     }
 }
 
@@ -559,7 +597,7 @@ id 5.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(2, None))),
+            Term::Return(Box::new(Term::Succ(1, None))),
         );
     }
 }
