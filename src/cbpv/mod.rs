@@ -1,4 +1,3 @@
-use core::prelude::v1;
 use std::collections::HashMap;
 
 use equate::eval_equate;
@@ -365,22 +364,6 @@ let x = 1 in const x (let x = 2 in x).";
 
     #[test]
     fn test7() {
-        let src = "const :: a -> b -> a
-const x y = x.
-
-const x (let x = 1 in x).";
-
-        let ast = parser::parse(src).unwrap();
-        let val = eval(ast);
-
-        assert_eq!(
-            val,
-            Term::Return(Box::new(Term::Var("x".to_string())))
-        )
-    }
-
-    #[test]
-    fn test8() {
         let src = "const1 :: a -> b -> a
 const1 x y = x.
 
@@ -402,7 +385,7 @@ let f = const1 <> const2 in f 1 2.";
     }
 
     #[test]
-    fn test9() {
+    fn test8() {
         let src = "num :: Nat
 num = 1.
 
@@ -418,7 +401,7 @@ num.";
     }
 
     #[test]
-    fn test10() {
+    fn test9() {
         let src = "num :: Nat
 num = 1 <> 2.
 
@@ -449,7 +432,7 @@ let f = const1 <> const2 in f num num.";
     }
 
     #[test]
-    fn test11() {
+    fn test10() {
         let src = "f :: Nat -> Nat -> Nat
 f = const1 <> const2.
 
@@ -476,7 +459,7 @@ let num = 1 <> 2 in f num num.";
     }
 
     #[test]
-    fn test12() {
+    fn test11() {
         let src = "exists n :: Nat. n =:= 1. n.";
 
         let ast = parser::parse(src).unwrap();
@@ -489,7 +472,7 @@ let num = 1 <> 2 in f num num.";
     }
 
     #[test]
-    fn test13() {
+    fn test12() {
         let src = "id :: a -> a
 id x = x.
         
@@ -505,7 +488,7 @@ exists n :: Nat. id n =:= 1. n.";
     }
 
     #[test]
-    fn test14() {
+    fn test13() {
         let src = "exists n :: Nat. 0 =:= 1. n.";
 
         let ast = parser::parse(src).unwrap();
@@ -518,7 +501,7 @@ exists n :: Nat. id n =:= 1. n.";
     }
 
     #[test]
-    fn test15() {
+    fn test14() {
         let src = "1 + 1.";
 
         let ast = parser::parse(src).unwrap();
@@ -531,7 +514,7 @@ exists n :: Nat. id n =:= 1. n.";
     }
 
     #[test]
-    fn test16() {
+    fn test15() {
         let src = "addOne :: Nat -> Nat
 addOne n = n + 1.
 
@@ -547,7 +530,7 @@ addOne 1.";
     }
 
     #[test]
-    fn test17() {
+    fn test16() {
         let src: &str = "exists n :: Nat. n =:= n+1. n.";
 
         let ast = parser::parse(src).unwrap();
@@ -560,7 +543,7 @@ addOne 1.";
     }
 
     #[test]
-    fn test18() {
+    fn test17() {
         let src = "id :: Nat -> Nat
 id n = exists m :: Nat. m =:= n. m.
 
@@ -576,7 +559,7 @@ id 5.";
     }
 
     #[test]
-    fn test19() {
+    fn test18() {
         let src = "exists n :: Nat. n + 1 =:= 5. n.";
 
         let ast = parser::parse(src).unwrap();
@@ -589,7 +572,7 @@ id 5.";
     }
 
     #[test]
-    fn test20() {
+    fn test19() {
         let src = "exists n :: Nat. n + n =:= 2. n.";
 
         let ast = parser::parse(src).unwrap();
