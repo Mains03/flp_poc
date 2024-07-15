@@ -1,92 +1,83 @@
 use crate::parser::syntax::r#type::Type;
 
-use super::term::{get_var, is_var, substitute, Term};
+use super::term::{substitute, Term};
 
-pub fn eval_exists<'a>(var: &'a str, r#type: Type, term: Term<'a>) -> Term<'a> {
+pub fn eval_exists<'a>(var: &'a str, r#type: Type<'a>, term: Term<'a>) -> Term<'a> {
     if term == Term::Fail {
         Term::Fail
     } else {
-        match r#type {
-            Type::Ident(s) => {
-                if s == "Nat" {
-                    eval_exists_nat(var, term)
+        match term {
+            Term::Equate { lhs, rhs, body } => {
+                if lhs == rhs {
+                    *body
+                } else if is_bullseye(var, &r#type, &*lhs, &*rhs) {
+                    substitute_bullseye(*lhs, *rhs, *body).unwrap()
+                } else if is_value(&*lhs, &r#type) && is_value(&*rhs, &r#type) {
+                    Term::Fail // already checked for equality
                 } else {
-                    unimplemented!()
+                    enumerate(var, r#type, Term::Equate { lhs, rhs, body })
                 }
             },
-            _ => unreachable!()
+            _ => enumerate(var, r#type, term)
         }
     }
 }
 
-fn eval_exists_nat<'a>(var: &'a str, term: Term<'a>) -> Term<'a> {
-    if is_equate_equal(&term) {
-        get_equate_body(term)
-    } else if is_bullseye(var, &term) {
-        bullseye(var, term)
-    } else {
-        enumerate_nat(var, term)
-    }
-}
-
-fn is_equate_equal(term: &Term) -> bool {
-    match term {
-        Term::Equate { lhs, rhs, body: _ } => lhs == rhs,
-        _ => false
-    }
-}
-
-fn get_equate_body<'a>(term: Term<'a>) -> Term<'a> {
-    match term {
-        Term::Equate { lhs: _, rhs: _, body } => *body,
-        _ => unreachable!()
-    }
-}
-
-fn is_bullseye(var: &str, term: &Term) -> bool {
-    match term {
-        Term::Equate { lhs, rhs, body: _ } => {
-            if is_var(&*lhs) {
-                let s = get_var(&*lhs);
-
-                s == var
-            } else if is_var(&*rhs) {
-                let s = get_var(&*rhs);
-
-                s == var
-            } else {
-                false
-            }
-        },
-        _ => false
-    }
-}
-
-fn bullseye<'a>(var: &str, term: Term<'a>) -> Term<'a> {
-    match term {
-        Term::Equate { lhs, rhs, body } => {
-            if is_var(&*lhs) {
-                substitute(*body, var, &*rhs)
-            } else {
-                substitute(*body, var, &*lhs)
-            }
-        },
-        _ => unreachable!()
-    }
-}
-
-fn enumerate_nat<'a>(var: &'a str, term: Term<'a>) -> Term<'a> {
-    Term::Choice(vec![
-        substitute(term.clone(), var, &Term::Nat(0)),
-        Term::Exists {
-            var,
-            r#type: Type::Ident("Nat"),
-            body: Box::new(substitute(term, var, &Term::Add(
-                Box::new(Term::Var(var.to_string())),
-                Box::new(Term::Nat(1))
-            )))
+fn is_bullseye(var: &str, r#type: &Type, lhs: &Term, rhs: &Term) -> bool {
+    match lhs {
+        Term::Var(v) => v == var && is_value(rhs, r#type),
+        _ => match rhs {
+            Term::Var(v) => v == var && is_value(lhs, r#type),
+            _ => false
         }
-    ])
+    }
+}
+
+fn substitute_bullseye<'a>(lhs: Term<'a>, rhs: Term<'a>, body: Term<'a>) -> Option<Term<'a>> {
+    match lhs {
+        Term::Var(v) => Some(substitute(body, &v, &rhs)),
+        _ => match rhs {
+            Term::Var(v) => Some(substitute(body, &v, &lhs)),
+            _ => None
+        }
+    }
+}
+
+fn is_value(term: &Term, r#type: &Type) -> bool {
+    match r#type {
+        Type::Ident(t) => if *t == "Nat" {
+            match term {
+                Term::Succ(_, v) => match v {
+                    Some(_) => false,
+                    None => true
+                },
+                _ => false
+            }
+        } else {
+            unimplemented!()
+        },
+        _ => unimplemented!()
+    }
+}
+
+fn enumerate<'a>(var: &'a str, r#type: Type<'a>, term: Term<'a>) -> Term<'a> {
+    match r#type {
+        Type::Ident(t) => if t == "Nat" {
+            Term::Choice(vec![
+                substitute(term.clone(), var, &Term::Succ(0, None)),
+                Term::Exists {
+                    var,
+                    r#type,
+                    body: Box::new(substitute(term, var, 
+                            &Term::Succ(1, Some(Box::new(Term::Var(var.to_string()))))
+                        ))
+                }
+            ])
+        } else {
+            unimplemented!()
+        },
+        _ => unimplemented!()
+    }
 }
 
 #[cfg(test)]
@@ -102,14 +93,14 @@ mod tests {
         let term = Term::Equate {
             lhs: Box::new(Term::Var("n".to_string())),
             rhs: Box::new(Term::Var("n".to_string())),
-            body: Box::new(Term::Return(Box::new(Term::Nat(1))))
+            body: Box::new(Term::Return(Box::new(Term::Succ(1, None))))
         };
 
         let term = eval_exists(var, r#type, term);
 
         assert_eq!(
             term,
-            Term::Return(Box::new(Term::Nat(1)))
+            Term::Return(Box::new(Term::Succ(1, None)))
         );
     }
 
@@ -141,7 +132,7 @@ mod tests {
 
         let term = Term::Equate {
             lhs: Box::new(Term::Var("n".to_string())),
-            rhs: Box::new(Term::Nat(1)),
+            rhs: Box::new(Term::Succ(1, None)),
             body: Box::new(Term::Return(Box::new(Term::Var("n".to_string()))))
         };
 
@@ -149,7 +140,7 @@ mod tests {
 
         assert_eq!(
             term,
-            Term::Return(Box::new(Term::Nat(1)))
+            Term::Return(Box::new(Term::Succ(1, None)))
         );
     }
 
@@ -166,14 +157,14 @@ mod tests {
         assert_eq!(
             term,
             Term::Choice(vec![
-                Term::Return(Box::new(Term::Nat(0))),
+                Term::Return(Box::new(Term::Succ(0, None))),
                 Term::Exists {
                     var: "n",
                     r#type: Type::Ident("Nat"),
-                    body: Box::new(Term::Return(Box::new(Term::Add(
-                        Box::new(Term::Var("n".to_string())),
-                        Box::new(Term::Nat(1))
-                    )))) }
+                    body: Box::new(Term::Return(Box::new(
+                        Term::Succ(1, Some(Box::new(Term::Var("n".to_string()))))
+                    )))
+                }
             ])
         );
     }

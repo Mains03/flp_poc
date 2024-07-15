@@ -78,22 +78,29 @@ fn translate_stm<'a>(stm: Stm<'a>, vars: &mut HashSet<String>) -> Term<'a> {
             t
         },
         Stm::Equate { lhs, rhs, body } => {
-            let var = vars.len().to_string();
-            vars.insert(var.clone());
+            let x = vars.len().to_string();
+            vars.insert(x.clone());
+            let y = vars.len().to_string();
+            vars.insert(y.clone());
 
-            Term::Equate {
-                lhs: Box::new(Term::Bind {
-                    var: var.clone(),
-                    val: Box::new(translate_expr(lhs, vars)),
-                    body: Box::new(Term::Var(var.clone()))
-                }),
-                rhs: Box::new(Term::Bind {
-                    var: var.clone(),
+            let t = Term::Bind {
+                var: x.clone(),
+                val: Box::new(translate_expr(lhs, vars)),
+                body: Box::new(Term::Bind {
+                    var: y.clone(),
                     val: Box::new(translate_expr(rhs, vars)),
-                    body: Box::new(Term::Var(var))
-                }),
-                body: Box::new(translate_stm(*body, vars))
-            }
+                    body: Box::new(Term::Equate {
+                        lhs: Box::new(Term::Var(x.clone())),
+                        rhs: Box::new(Term::Var(y.clone())),
+                        body: Box::new(translate_stm(*body, vars))
+                    })
+                })
+            };
+
+            vars.remove(&x);
+            vars.remove(&y);
+
+            t
         },
         Stm::Choice(exprs) => Term::Choice(
             exprs.into_iter()
@@ -144,7 +151,7 @@ fn translate_expr<'a>(expr: Expr<'a>, vars: &mut HashSet<String>) -> Term<'a> {
             }
         },
         Expr::Nat(n) => Term::Return(
-            Box::new(Term::Nat(n))
+            Box::new(Term::Succ(n, None))
         ),
         Expr::Stm(s) => translate_stm(*s, vars)
     }
@@ -198,24 +205,18 @@ id x = exists n :: Nat. n =:= x. n.";
                         body: Box::new(Term::Exists {
                             var: "n",
                             r#type: Type::Ident("Nat"),
-                            body: Box::new(Term::Equate {
-                                lhs: Box::new(Term::Bind {
-                                    var: "2".to_string(),
-                                    val: Box::new(Term::Return(
-                                        Box::new(Term::Var("n".to_string()))
-                                    )),
-                                    body: Box::new(Term::Var("2".to_string()))
-                                }),
-                                rhs: Box::new(Term::Bind {
-                                    var: "2".to_string(),
-                                    val: Box::new(Term::Return(
-                                        Box::new(Term::Var("x".to_string()))
-                                    )),
-                                    body: Box::new(Term::Var("2".to_string()))
-                                }),
-                                body: Box::new(Term::Return(
-                                    Box::new(Term::Var("n".to_string()))
-                                ))
+                            body: Box::new(Term::Bind {
+                                var: "2".to_string(),
+                                val: Box::new(Term::Return(Box::new(Term::Var("n".to_string())))),
+                                body: Box::new(Term::Bind {
+                                    var: "3".to_string(),
+                                    val: Box::new(Term::Return(Box::new(Term::Var("x".to_string())))),
+                                    body: Box::new(Term::Equate {
+                                        lhs: Box::new(Term::Var("2".to_string())),
+                                        rhs: Box::new(Term::Var("3".to_string())),
+                                        body: Box::new(Term::Return(Box::new(Term::Var("n".to_string()))))
+                                    })
+                                })
                             })
                         })
                     }
@@ -240,7 +241,7 @@ let x = 5 in id x.";
             Term::Bind {
                 var: "x".to_string(),
                 val: Box::new(Term::Return(
-                    Box::new(Term::Nat(5))
+                    Box::new(Term::Succ(5, None))
                 )),
                 body: Box::new(Term::Bind {
                     var: "1".to_string(),
@@ -276,10 +277,10 @@ id x = x.
         assert_eq!(
             cbpv,
             Term::Choice(vec![
-                Term::Return(Box::new(Term::Nat(1))),
+                Term::Return(Box::new(Term::Succ(1, None))),
                 Term::Bind {
                     var: "0".to_string(),
-                    val: Box::new(Term::Return(Box::new(Term::Nat(2)))),
+                    val: Box::new(Term::Return(Box::new(Term::Succ(2, None)))),
                     body: Box::new(Term::Bind {
                         var: "1".to_string(),
                         val: Box::new(Term::Var("id".to_string())),
@@ -289,7 +290,7 @@ id x = x.
                         ))
                     })
                 },
-                Term::Return(Box::new(Term::Nat(3)))
+                Term::Return(Box::new(Term::Succ(3, None)))
             ])
         )
     }
@@ -308,7 +309,7 @@ addOne n = n + 1.";
                 args: vec!["n"],
                 body: Box::new(Term::Bind {
                     var: "1".to_string(),
-                    val: Box::new(Term::Return(Box::new(Term::Nat(1)))),
+                    val: Box::new(Term::Return(Box::new(Term::Succ(1, None)))),
                     body: Box::new(Term::Bind {
                         var: "2".to_string(),
                         val: Box::new(Term::Bind {

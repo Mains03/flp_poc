@@ -3,7 +3,7 @@ use crate::parser::syntax::r#type::Type;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term<'a> {
     Var(String),
-    Nat(usize),
+    Succ(usize, Option<Box<Term<'a>>>),
     Add(Box<Term<'a>>, Box<Term<'a>>),
     If {
         cond: Box<Term<'a>>,
@@ -37,23 +37,13 @@ pub enum Term<'a> {
     Fail
 }
 
-pub fn is_var(term: &Term) -> bool {
-    match term {
-        Term::Var(_) => true,
-        _ => false
-    }
-}
-
-pub fn get_var(term: &Term) -> String {
-    match term {
-        Term::Var(s) => s.clone(),
-        _ => unreachable!()
-    }
-}
-
 pub fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
     match term {
         Term::Var(s) => if s == var { sub.clone() } else { Term::Var(s) },
+        Term::Succ(n, t) => match t {
+            Some(t) => Term::Succ(n, Some(Box::new(substitute(*t, var, sub)))),
+            None => Term::Succ(n, None)
+        }
         Term::If { cond, then, r#else } => Term::If {
             cond: Box::new(substitute(*cond, var, sub)),
             then: Box::new(substitute(*then, var, sub)),
@@ -120,6 +110,6 @@ pub fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
             Box::new(substitute(*lhs, var, sub)),
             Box::new(substitute(*rhs, var, sub))
         ),
-        t => t
+        Term::Fail => Term::Fail
     }
 }
