@@ -153,7 +153,8 @@ fn translate_expr<'a>(expr: Expr<'a>, vars: &mut HashSet<String>) -> Term<'a> {
         Expr::Nat(n) => Term::Return(
             Box::new(Term::Succ(n, None))
         ),
-        Expr::Stm(s) => translate_stm(*s, vars)
+        Expr::Stm(s) => translate_stm(*s, vars),
+        _ => unimplemented!()
     }
 }
 

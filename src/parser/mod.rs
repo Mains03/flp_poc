@@ -1,7 +1,7 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{arg::Arg, expr::Expr, program::{Decl, Prog}, stm::Stm, r#type::Type};
+use syntax::{arg::Arg, expr::Expr, bexpr::BExpr, program::{Decl, Prog}, stm::Stm, r#type::Type};
 
 pub mod syntax;
 
@@ -163,11 +163,48 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
                 }
             }).unwrap()
         },
+        Rule::bexpr => Expr::BExpr(parse_bexpr(pair.into_inner())),
         Rule::primary_expr => parse_expr(pair.into_inner()),
         Rule::ident => Expr::Ident(pair.as_str()),
         Rule::nat => Expr::Nat(pair.as_str().parse().unwrap()),
+        Rule::bool => Expr::Bool(parse_bool(pair.as_str())),
         Rule::stm => Expr::Stm(Box::new(parse_stm(pair.into_inner()))),
         _ => unreachable!()
+    }
+}
+
+fn parse_bexpr(mut pairs: pest::iterators::Pairs<Rule>) -> BExpr {
+    let pair = pairs.next().unwrap();
+
+    let lhs = parse_expr(pair.into_inner());
+
+    let pair = pairs.next();
+    match pair {
+        Some(pair) => {
+            let op = pair.as_str();
+
+            let pair = pairs.next().unwrap();
+            let rhs  = parse_expr(pair.into_inner());
+
+            if op == "==" {
+                BExpr::Eq(Box::new(lhs), Box::new(rhs))
+            } else if op == "!=" {
+                BExpr::NEq(Box::new(lhs), Box::new(rhs))
+            } else {
+                unreachable!()
+            }
+        },
+        None => BExpr::Not(Box::new(lhs))
+    }
+}
+
+fn parse_bool(s: &str) -> bool {
+    if s == "true" {
+        true
+    } else if s == "false" {
+        false
+    } else {
+        unreachable!("{:#?}", s);
     }
 }
 
@@ -455,5 +492,59 @@ id x = x.
                 )))
             ]
         )
+    }
+
+    #[test]
+    fn test10() {
+        let src = "true.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Stm(Stm::Expr(Expr::Bool(true)))
+            ]
+        );
+    }
+
+    #[test]
+    fn test11() {
+        let src = "true == false.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Stm(Stm::Expr(Expr::BExpr(BExpr::Eq(
+                    Box::new(Expr::Bool(true)),
+                    Box::new(Expr::Bool(false))
+                ))))
+            ]
+        );
+    }
+
+    #[test]
+    fn test12() {
+        let src = "if !(1 != 2) then 1 else 0.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Stm(Stm::If {
+                    cond: Box::new(Stm::Expr(Expr::BExpr(BExpr::Not(Box::new(
+                        Expr::Stm(Box::new(Stm::Expr(Expr::BExpr(BExpr::NEq(
+                            Box::new(Expr::Nat(1)),
+                            Box::new(Expr::Nat(2))
+                        )))))
+                    ))))),
+                    then: Box::new(Stm::Expr(Expr::Nat(1))),
+                    r#else: Box::new(Stm::Expr(Expr::Nat(0)))
+                })
+            ]
+        );
     }
 }
