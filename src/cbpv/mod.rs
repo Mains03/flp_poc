@@ -187,11 +187,21 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
             )
         },
         Term::Equate { lhs, rhs, body } => {
-            eval_equate(
-                eval_term(*lhs, env),
-                eval_term(*rhs, env),
-                eval_term(*body, env)
-            )
+            let lhs = eval_term(*lhs, env);
+            let rhs = eval_term(*rhs, env);
+            let body = eval_term(*body, env);
+
+            match body  {
+                Term::Choice(v) => Term::Choice(
+                    v.into_iter()
+                        .map(|t| Term::Equate {
+                            lhs: Box::new(lhs.clone()),
+                            rhs: Box::new(rhs.clone()),
+                            body: Box::new(t)
+                        }).collect()
+                ),
+                _ => eval_equate(lhs, rhs, body)
+            }
         },
         Term::Return(t) => Term::Return(Box::new(eval_term(*t, env))),
         t => t
