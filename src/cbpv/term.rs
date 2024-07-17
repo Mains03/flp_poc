@@ -4,8 +4,12 @@ use crate::parser::syntax::r#type::Type;
 pub enum Term<'a> {
     Var(String),
     Succ(usize, Option<Box<Term<'a>>>),
+    Bool(bool),
     Add(Box<Term<'a>>, Box<Term<'a>>),
     AddValue(Box<Term<'a>>, Box<Term<'a>>),
+    Eq(Box<Term<'a>>, Box<Term<'a>>),
+    NEq(Box<Term<'a>>, Box<Term<'a>>),
+    Not(Box<Term<'a>>),
     If {
         cond: Box<Term<'a>>,
         then: Box<Term<'a>>,
@@ -44,7 +48,17 @@ pub fn substitute<'a>(term: Term<'a>, var: &str, sub: &Term<'a>) -> Term<'a> {
         Term::Succ(n, t) => match t {
             Some(t) => Term::Succ(n, Some(Box::new(substitute(*t, var, sub)))),
             None => Term::Succ(n, None)
-        }
+        },
+        Term::Bool(_) => term,
+        Term::Eq(lhs, rhs) => Term::Eq(
+            Box::new(substitute(*lhs, var, sub)),
+            Box::new(substitute(*rhs, var, sub))
+        ),
+        Term::NEq(lhs, rhs) => Term::NEq(
+            Box::new(substitute(*lhs, var, sub)),
+            Box::new(substitute(*rhs, var, sub))
+        ),
+        Term::Not(t) => Term::Not(Box::new(substitute(*t, var, sub))),
         Term::If { cond, then, r#else } => Term::If {
             cond: Box::new(substitute(*cond, var, sub)),
             then: Box::new(substitute(*then, var, sub)),

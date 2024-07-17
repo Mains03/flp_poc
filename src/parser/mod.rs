@@ -527,7 +527,7 @@ id x = x.
 
     #[test]
     fn test12() {
-        let src = "if !(1 != 2) then 1 else 0.";
+        let src = "if !(1 != 2) then 0 else 1.";
 
         let ast = parse(src).unwrap();
 
@@ -541,8 +541,8 @@ id x = x.
                             Box::new(Expr::Nat(2))
                         )))))
                     ))))),
-                    then: Box::new(Stm::Expr(Expr::Nat(1))),
-                    r#else: Box::new(Stm::Expr(Expr::Nat(0)))
+                    then: Box::new(Stm::Expr(Expr::Nat(0))),
+                    r#else: Box::new(Stm::Expr(Expr::Nat(1)))
                 })
             ]
         );

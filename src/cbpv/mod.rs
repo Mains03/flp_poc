@@ -88,7 +88,7 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
             let rhs = eval_term(*rhs, env);
 
             add_value_terms(lhs, rhs)
-        }
+        },
         Term::Bind { var, val, body } => {
             let val = eval_term(*val, env);
 
