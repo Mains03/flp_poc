@@ -89,6 +89,42 @@ fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
 
             add_value_terms(lhs, rhs)
         },
+        Term::Eq(lhs, rhs) => {
+            let lhs = eval_term(*lhs, env);
+            let rhs = eval_term(*rhs, env);
+
+            if lhs == rhs {
+                Term::Return(Box::new(Term::Bool(true)))
+            } else {
+                Term::Return(Box::new(Term::Bool(false)))
+            }
+        },
+        Term::NEq(lhs, rhs) => {
+            let lhs = eval_term(*lhs, env);
+            let rhs = eval_term(*rhs, env);
+
+            if lhs == rhs {
+                Term::Return(Box::new(Term::Bool(false)))
+            } else {
+                Term::Return(Box::new(Term::Bool(true)))
+            }
+        },
+        Term::Not(t) => {
+            let t = eval_term(*t, env);
+
+            match t {
+                Term::Bool(b) => Term::Return(Box::new(Term::Bool(!b))),
+                _ => unreachable!()
+            }
+        },
+        Term::If { cond, then, r#else } => {
+            let cond = eval_term(*cond, env);
+
+            match cond {
+                Term::Bool(b) => if b { *then } else { *r#else },
+                _ => unreachable!()
+            }
+        },
         Term::Bind { var, val, body } => {
             let val = eval_term(*val, env);
 
@@ -581,6 +617,32 @@ id 5.";
         assert_eq!(
             val,
             Term::Return(Box::new(Term::Succ(1, None))),
+        );
+    }
+
+    #[test]
+    fn test20() {
+        let src = "if true then 1 else 0.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(Box::new(Term::Succ(1, None)))
+        );
+    }
+
+    #[test]
+    fn test21() {
+        let src = "if !(1 != 2) then 0 else 1.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Return(Box::new(Term::Succ(1, None)))
         );
     }
 }
