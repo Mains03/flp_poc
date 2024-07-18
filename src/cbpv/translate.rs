@@ -157,9 +157,7 @@ fn translate_expr<'a>(expr: Expr<'a>, vars: &mut HashSet<String>) -> Term<'a> {
                 Term::Var(s.to_string())
             }
         },
-        Expr::Nat(n) => Term::Return(
-            Box::new(Term::Succ(n, None))
-        ),
+        Expr::Nat(n) => Term::Return(Box::new(translate_nat(n))),
         Expr::Bool(b) => Term::Return(Box::new(Term::Bool(b))),
         Expr::Stm(s) => translate_stm(*s, vars),
     }
@@ -225,6 +223,14 @@ fn translate_bexpr<'a>(bexpr: BExpr<'a>, vars: &mut HashSet<String>) -> Term<'a>
                 body: Box::new(Term::Not(Box::new(Term::Var(x))))
             }
         }
+    }
+}
+
+fn translate_nat<'a>(n: usize) -> Term<'a> {
+    if n == 0 {
+        Term::Zero
+    } else {
+        Term::Succ(Box::new(translate_nat(n-1)))
     }
 }
 
@@ -301,7 +307,7 @@ id x = exists n :: Nat. n =:= x. n.";
         let src = "id :: Nat -> Nat
 id x = exists n :: Nat. n =:= x. n.
 
-let x = 5 in id x.";
+let x = 1 in id x.";
 
         let mut ast = parser::parse(src).unwrap();
 
@@ -312,7 +318,7 @@ let x = 5 in id x.";
             Term::Bind {
                 var: "x".to_string(),
                 val: Box::new(Term::Return(
-                    Box::new(Term::Succ(5, None))
+                    Box::new(Term::Succ(Box::new(Term::Zero)))
                 )),
                 body: Box::new(Term::Bind {
                     var: "1".to_string(),
@@ -339,7 +345,7 @@ let x = 5 in id x.";
         let src = "id :: a -> a
 id x = x.
 
-1 <> id 2 <> 3.";
+0 <> id 1 <> 2.";
 
         let mut ast = parser::parse(src).unwrap();
         
@@ -348,10 +354,10 @@ id x = x.
         assert_eq!(
             cbpv,
             Term::Choice(vec![
-                Term::Return(Box::new(Term::Succ(1, None))),
+                Term::Return(Box::new(Term::Zero)),
                 Term::Bind {
                     var: "0".to_string(),
-                    val: Box::new(Term::Return(Box::new(Term::Succ(2, None)))),
+                    val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
                     body: Box::new(Term::Bind {
                         var: "1".to_string(),
                         val: Box::new(Term::Var("id".to_string())),
@@ -361,7 +367,7 @@ id x = x.
                         ))
                     })
                 },
-                Term::Return(Box::new(Term::Succ(3, None)))
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))
             ])
         )
     }
@@ -380,7 +386,7 @@ addOne n = n + 1.";
                 args: vec!["n"],
                 body: Box::new(Term::Bind {
                     var: "1".to_string(),
-                    val: Box::new(Term::Return(Box::new(Term::Succ(1, None)))),
+                    val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
                     body: Box::new(Term::Bind {
                         var: "2".to_string(),
                         val: Box::new(Term::Bind {
@@ -433,10 +439,10 @@ addOne n = n + 1.";
                     var: "1".to_string(),
                     val: Box::new(Term::Bind {
                         var: "2".to_string(),
-                        val: Box::new(Term::Return(Box::new(Term::Succ(1, None)))),
+                        val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
                         body: Box::new(Term::Bind {
                             var: "3".to_string(),
-                            val: Box::new(Term::Return(Box::new(Term::Succ(2, None)))),
+                            val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))),
                             body: Box::new(Term::NEq(
                                 Box::new(Term::Var("2".to_string())),
                                 Box::new(Term::Var("3".to_string()))
@@ -447,8 +453,8 @@ addOne n = n + 1.";
                 }),
                 body: Box::new(Term::If {
                     cond: Box::new(Term::Var("0".to_string())),
-                    then: Box::new(Term::Return(Box::new(Term::Succ(0, None)))),
-                    r#else: Box::new(Term::Return(Box::new(Term::Succ(1, None))))
+                    then: Box::new(Term::Return(Box::new(Term::Zero))),
+                    r#else: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))))
                 })
             }
         );

@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use equate::eval_equate;
-use exists::eval_exists;
-use term::{substitute, Term};
+use term::Term;
 use translate::translate;
 
 use crate::parser::syntax::program::Decl;
@@ -13,11 +11,11 @@ mod exists;
 mod equate;
 
 pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
-    let env: HashMap<String, Term> = create_env(ast);
+    let mut env: HashMap<String, Term> = create_env(ast);
 
-    let main = env.get("main").unwrap().clone();
+    let main = env.remove("main").unwrap();
 
-    eval_term(main, &env)
+    main.eval(&env)
 }
 
 fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
@@ -50,247 +48,6 @@ fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
     env
 }
 
-fn eval_term<'a>(mut term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
-    loop {
-        let t = eval_step(term.clone(), env);
-
-        if t == term {
-            break
-        } else {
-            term = t;
-        }
-    }
-
-    term
-}
-
-fn eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Term<'a> {
-    match term {
-        Term::Var(s) => match env.get(&s) {
-            Some(v) => v.clone(),
-            None => Term::Var(s) // free variable
-        },
-        Term::Succ(n1, v) => match v {
-            Some(v) => if n1 == 0 {
-                eval_term(*v, env)
-            } else {
-                match eval_term(*v, env) {
-                    Term::Var(v) => Term::Succ(n1, Some(Box::new(Term::Var(v)))),
-                    Term::Succ(n2, v) => Term::Succ(n1+n2, v),
-                    Term::AddValue(lhs, rhs) => Term::Succ(n1, Some(Box::new(Term::AddValue(lhs, rhs)))),
-                    _ => unreachable!()
-                }
-            },
-            None => Term::Succ(n1, None)
-        },
-        Term::AddValue(lhs, rhs) => {
-            let lhs = eval_term(*lhs, env);
-            let rhs = eval_term(*rhs, env);
-
-            add_value_terms(lhs, rhs)
-        },
-        Term::Eq(lhs, rhs) => {
-            let lhs = eval_term(*lhs, env);
-            let rhs = eval_term(*rhs, env);
-
-            if lhs == rhs {
-                Term::Return(Box::new(Term::Bool(true)))
-            } else {
-                Term::Return(Box::new(Term::Bool(false)))
-            }
-        },
-        Term::NEq(lhs, rhs) => {
-            let lhs = eval_term(*lhs, env);
-            let rhs = eval_term(*rhs, env);
-
-            if lhs == rhs {
-                Term::Return(Box::new(Term::Bool(false)))
-            } else {
-                Term::Return(Box::new(Term::Bool(true)))
-            }
-        },
-        Term::Not(t) => {
-            let t = eval_term(*t, env);
-
-            match t {
-                Term::Bool(b) => Term::Return(Box::new(Term::Bool(!b))),
-                _ => unreachable!()
-            }
-        },
-        Term::If { cond, then, r#else } => {
-            let cond = eval_term(*cond, env);
-
-            match cond {
-                Term::Bool(b) => if b { *then } else { *r#else },
-                _ => unreachable!()
-            }
-        },
-        Term::Bind { var, val, body } => {
-            let val = eval_term(*val, env);
-
-            match val {
-                Term::Return(val) => substitute(*body, &var, &val),
-                Term::Choice(v) => Term::Choice(
-                    v.into_iter()
-                        .map(|t| Term::Bind {
-                            var: var.clone(),
-                            val: Box::new(t),
-                            body: body.clone()
-                        }).collect()
-                ),
-                Term::Fail => Term::Fail,
-                _ => Term::Bind { var, val: Box::new(val), body }
-            }
-        },
-        Term::Add(lhs, rhs) => {
-            let lhs = eval_term(*lhs, env);
-            let rhs = eval_term(*rhs, env);
-
-            add_terms(lhs, rhs)
-        },
-        Term::App(lhs, rhs) => {
-            let lhs = eval_term(*lhs, env);
-
-            match lhs {
-                Term::Lambda { args, body } => apply(
-                    Term::Lambda { args, body },
-                    *rhs
-                ),
-                t => Term::App(Box::new(t), rhs)
-            }
-        },
-        Term::Choice(mut v) => if v.len() == 0 {
-            Term::Fail
-        } else if v.len() == 1 {
-            eval_step(v.remove(0), env)
-        } else {
-            Term::Choice(
-                v.into_iter()
-                    .flat_map(|t: Term| flat_eval_step(t, env).into_iter()
-                        .flat_map(|t| if t == Term::Fail {
-                            vec![]
-                        } else {
-                            vec![t]
-                        }))
-                    .collect()
-            )
-        },
-        Term::Force(t) => match eval_term(*t, env) {
-            Term::Thunk(t) => *t,
-            t => Term::Force(Box::new(t))
-        },
-        Term::Exists { var, r#type, body } => {
-            eval_exists(
-                var,
-                r#type,
-                eval_term(*body, env)
-            )
-        },
-        Term::Equate { lhs, rhs, body } => {
-            let lhs = eval_term(*lhs, env);
-            let rhs = eval_term(*rhs, env);
-            let body = eval_term(*body, env);
-
-            match body  {
-                Term::Choice(v) => Term::Choice(
-                    v.into_iter()
-                        .map(|t| Term::Equate {
-                            lhs: Box::new(lhs.clone()),
-                            rhs: Box::new(rhs.clone()),
-                            body: Box::new(t)
-                        }).collect()
-                ),
-                _ => eval_equate(lhs, rhs, body)
-            }
-        },
-        Term::Return(t) => Term::Return(Box::new(eval_term(*t, env))),
-        t => t
-    }
-}
-
-fn add_terms<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
-    match lhs {
-        Term::Succ(n1, ref v1) => match rhs {
-            Term::Succ(n2, ref v2) => {
-                match v1 {
-                    Some(ref v1) => match v2 {
-                        Some(_) => Term::Return(Box::new(Term::AddValue(Box::new(lhs), Box::new(rhs)))),
-                        None => Term::Return(Box::new(Term::Succ(n1+n2, Some(v1.clone()))))
-                    },
-                    None => match v2 {
-                        Some(ref v2) => Term::Return(Box::new(Term::Succ(n1+n2, Some(v2.clone())))),
-                        None => Term::Return(Box::new(Term::Succ(n1+n2, None)))
-                    }
-                }
-            },
-            _ => Term::Return(Box::new(Term::AddValue(Box::new(lhs), Box::new(rhs))))
-        },
-        _ => Term::Return(Box::new(Term::AddValue(Box::new(lhs), Box::new(rhs))))
-    }
-}
-
-fn add_value_terms<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
-    match lhs {
-        Term::Succ(n1, v1) => match rhs {
-            Term::Succ(n2, v2) => match v1 {
-                Some(v1) => match v2 {
-                    Some(v2) => Term::Succ(n1+n2, Some(Box::new(Term::AddValue(v1, v2)))),
-                    None => Term::Succ(n1+n2, Some(v1))
-                },
-                None => match v2 {
-                    Some(v2) => Term::Succ(n1+n2, Some(v2)),
-                    None => Term::Succ(n1+n2, None)
-                }
-            },
-            Term::Var(v2) => match v1 {
-                Some(v1) => Term::Succ(n1, Some(Box::new(Term::AddValue(v1, Box::new(Term::Var(v2)))))),
-                None => Term::Succ(n1, Some(Box::new(Term::Var(v2))))
-            },
-            _ => Term::AddValue(Box::new(Term::Succ(n1, v1)), Box::new(rhs))
-        },
-        Term::Var(v1) => match rhs {
-            Term::Succ(n, v2) => match v2 {
-                Some(v2) => Term::Succ(n, Some(Box::new(Term::AddValue(Box::new(Term::Var(v1)), v2)))),
-                None => Term::Succ(n, Some(Box::new(Term::Var(v1))))
-            },
-            _ => Term::AddValue(Box::new(Term::Var(v1)), Box::new(rhs))
-        },
-        _ => Term::AddValue(Box::new(lhs), Box::new(rhs))
-    }
-}
-
-fn flat_eval_step<'a>(term: Term<'a>, env: &HashMap<String, Term<'a>>) -> Vec<Term<'a>> {
-    match term {
-        Term::Choice(v) => v.into_iter()
-            .flat_map(|t: Term| flat_eval_step(t, env))
-            .collect(),
-        t => vec![eval_step(t, env)]
-    }
-}
-
-fn apply<'a>(lhs: Term<'a>, rhs: Term<'a>) -> Term<'a> {
-    match lhs {
-        Term::Lambda { mut args, body } => {
-            let var = args.remove(args.len()-1);
-            let body: Term = substitute(*body, var, &rhs);
-
-            if args.len() == 0 {
-                body
-            } else {
-                Term::Return(Box::new(
-                    Term::Thunk(Box::new(
-                        Term::Lambda {
-                            args,
-                            body: Box::new(body)
-                        }
-                    ))
-                ))
-            }
-        },
-        _ => unreachable!()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::parser;
@@ -302,7 +59,7 @@ mod tests {
         let src = "id :: a -> a
 id x = x.
 
-id 5.";
+id 1.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -310,7 +67,7 @@ id 5.";
         assert_eq!(
             val,
             Term::Return(
-                Box::new(Term::Succ(5, None))
+                Box::new(Term::Succ(Box::new(Term::Zero)))
             )
         );
     }
@@ -320,7 +77,7 @@ id 5.";
         let src = "const :: a -> b -> a
 const x y = x.
 
-const 1 5.";
+const 1 2.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -328,7 +85,7 @@ const 1 5.";
         assert_eq!(
             val,
             Term::Return(
-                Box::new(Term::Succ(1, None))
+                Box::new(Term::Succ(Box::new(Term::Zero)))
             )
         );
     }
@@ -338,7 +95,7 @@ const 1 5.";
         let src = "const :: a -> b -> a
 const x y = x.
 
-const 5 1.";
+const 2 1.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -346,7 +103,7 @@ const 5 1.";
         assert_eq!(
             val,
             Term::Return(
-                Box::new(Term::Succ(5, None))
+                Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero)))))
             )
         );
     }
@@ -359,7 +116,7 @@ id x = x.
 f :: (a -> a) -> a -> a
 f g x = g x.
 
-f (f id) 5.";
+f (f id) 1.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -367,7 +124,7 @@ f (f id) 5.";
         assert_eq!(
             val,
             Term::Return(
-                Box::new(Term::Succ(5, None))
+                Box::new(Term::Succ(Box::new(Term::Zero)))
             )
         );
     }
@@ -385,7 +142,7 @@ const (let x = 1 in x) 2.";
         assert_eq!(
             val,
             Term::Return(
-                Box::new(Term::Succ(1, None))
+                Box::new(Term::Succ(Box::new(Term::Zero)))
             )
         )
     }
@@ -403,7 +160,7 @@ let x = 1 in const x (let x = 2 in x).";
         assert_eq!(
             val,
             Term::Return(
-                Box::new(Term::Succ(1, None))
+                Box::new(Term::Succ(Box::new(Term::Zero)))
             )
         );
     }
@@ -416,7 +173,7 @@ const1 x y = x.
 const2 :: a -> b -> b
 const2 x y = y.
 
-let f = const1 <> const2 in f 1 2.";
+let f = const1 <> const2 in f 0 1.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -424,8 +181,8 @@ let f = const1 <> const2 in f 1 2.";
         assert_eq!(
             val,
             Term::Choice(vec![
-                Term::Return(Box::new(Term::Succ(1, None))),
-                Term::Return(Box::new(Term::Succ(2, None)))
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))
             ])
         );
     }
@@ -442,14 +199,14 @@ num.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(1, None)))
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))
         );
     }
 
     #[test]
     fn test9() {
         let src = "num :: Nat
-num = 1 <> 2.
+num = 0 <> 1.
 
 const1 :: Nat -> Nat -> Nat
 const1 x y = x.
@@ -465,14 +222,14 @@ let f = const1 <> const2 in f num num.";
         assert_eq!(
             val,
             Term::Choice(vec![
-                Term::Return(Box::new(Term::Succ(1, None))),
-                Term::Return(Box::new(Term::Succ(2, None))),
-                Term::Return(Box::new(Term::Succ(1, None))),
-                Term::Return(Box::new(Term::Succ(2, None))),
-                Term::Return(Box::new(Term::Succ(1, None))),
-                Term::Return(Box::new(Term::Succ(1, None))),
-                Term::Return(Box::new(Term::Succ(2, None))),
-                Term::Return(Box::new(Term::Succ(2, None))),
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
             ])
         )
     }
@@ -488,7 +245,7 @@ const1 x y = x.
 const2 :: Nat -> Nat -> Nat
 const2 x y = y.
 
-let num = 1 <> 2 in f num num.";
+let num = 0 <> 1 in f num num.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
@@ -496,10 +253,10 @@ let num = 1 <> 2 in f num num.";
         assert_eq!(
             val,
             Term::Choice(vec![
-                Term::Return(Box::new(Term::Succ(1, None))),
-                Term::Return(Box::new(Term::Succ(1, None))),
-                Term::Return(Box::new(Term::Succ(2, None))),
-                Term::Return(Box::new(Term::Succ(2, None))),
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
             ])
         )
     }
@@ -513,7 +270,7 @@ let num = 1 <> 2 in f num num.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(1, None))),
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
         );
     }
 
@@ -529,7 +286,7 @@ exists n :: Nat. id n =:= 1. n.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(1, None))),
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
         );
     }
 
@@ -555,7 +312,7 @@ exists n :: Nat. id n =:= 1. n.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(2, None))),
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero)))))),
         );
     }
 
@@ -571,7 +328,7 @@ addOne 1.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(2, None))),
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero)))))),
         );
     }
 
@@ -593,27 +350,27 @@ addOne 1.";
         let src = "id :: Nat -> Nat
 id n = exists m :: Nat. m =:= n. m.
 
-id 5.";
+id 1.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(5, None))),
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
         );
     }
 
     #[test]
     fn test18() {
-        let src = "exists n :: Nat. n + 1 =:= 5. n.";
+        let src = "exists n :: Nat. n + 1 =:= 2. n.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(4, None))),
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
         );
     }
 
@@ -626,7 +383,7 @@ id 5.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(1, None))),
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero)))),
         );
     }
 
@@ -639,7 +396,7 @@ id 5.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(1, None)))
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))
         );
     }
 
@@ -652,7 +409,7 @@ id 5.";
 
         assert_eq!(
             val,
-            Term::Return(Box::new(Term::Succ(1, None)))
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))
         );
     }
 }
