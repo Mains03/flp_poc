@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::stdin};
+use std::io::stdin;
 
 use crate::parser::syntax::r#type::Type;
 
@@ -47,10 +47,10 @@ pub enum Term<'a> {
 }
 
 impl<'a> Term<'a> {
-    pub fn eval(self, env: &HashMap<String, Term<'a>>) -> Term<'a> {
+    pub fn eval(self) -> Term<'a> {
         let mut term = self;
         loop {
-            let new_term = term.clone().eval_step(env);
+            let new_term = term.clone().eval_step();
 
             if new_term == term {
                 break
@@ -62,13 +62,8 @@ impl<'a> Term<'a> {
         term
     }
 
-    fn eval_step(self, env: &HashMap<String, Term<'a>>) -> Term<'a> {
-        match self {
-            Term::Var(v) => if env.contains_key(&v) {
-                env.get(&v).unwrap().clone()
-            } else {
-                Term::Var(v)
-            },
+    fn eval_step(self) -> Term<'a> {
+        match self.propogate() {
             Term::Add(lhs, rhs) => match *lhs {
                 Term::Zero => Term::Return(rhs),
                 Term::Succ(t) => {
@@ -91,7 +86,7 @@ impl<'a> Term<'a> {
                             body: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Var(var))))))
                         }
                     },
-                    _ => Term::Add(lhs, rhs)
+                    _ => unreachable!()
                 }
             },
             Term::Eq(lhs, rhs) => Term::Return(Box::new(Term::Bool(lhs == rhs))),
@@ -108,24 +103,19 @@ impl<'a> Term<'a> {
                 },
                 _ => unreachable!()
             },
-            Term::Bind { var, val, body } => match *body {
-                Term::Fail => Term::Fail,
-                body => match val.eval(env) {
-                    Term::Return(t) => body.substitute(&var, &t),
-                    Term::Choice(v) => Term::Choice(
-                        v.into_iter()
-                            .map(|t| Term::Bind { var: var.clone(), val: Box::new(t), body: Box::new(body.clone()) })
-                            .collect()
-                    ),
-                    Term::Bind { var: var2, val: val2, body: body2 } => match *body2 {
-                        Term::Return(t) => Term::Bind { var: var2, val: val2, body: Box::new(body.substitute(&var, &t)) },
-                        _ => Term::Bind { var, val: Box::new(Term::Bind { var: var2, val: val2, body: body2 }), body: Box::new(body) }
-                    },
-                    _ => unreachable!()
-                }
+            Term::Bind { var, val, body } => match val.eval() {
+                Term::Return(t) => body.substitute(&var, &t),
+                t => unreachable!("{:#?}", t)
             },
-            Term::Exists { var, r#type, body } => todo!(), // mustn't evaluate, instead propogate
-            Term::Equate { lhs, rhs, body } => eval_equate(*lhs, *rhs, *body),
+            Term::Exists { var, r#type, body } => Term::Choice(vec![
+                body.clone().substitute(var, &Term::Zero),
+                Term::Exists { var, r#type, body: Box::new(body.substitute(var, &Term::Succ(Box::new(Term::Var(var.to_string()))))) }
+            ]),
+            Term::Equate { lhs, rhs, body } => if lhs == rhs {
+                *body
+            } else {
+                Term::Fail
+            },
             Term::Choice(mut v) => if v.len() == 0 {
                 Term::Fail
             } else if v.len() == 1 {
@@ -133,7 +123,7 @@ impl<'a> Term<'a> {
             } else {
                 Term::Choice(v.into_iter()
                     .flat_map(|t|
-                        t.eval_flat(env)
+                        t.eval_flat()
                             .into_iter()
                             .filter(|t| *t != Term::Fail))
                     .collect()
@@ -143,7 +133,7 @@ impl<'a> Term<'a> {
                 Term::Thunk(t) => *t,
                 _ => unreachable!()
             },
-            Term::App(lhs, rhs) => match lhs.eval(env) {
+            Term::App(lhs, rhs) => match lhs.eval() {
                 Term::Lambda { mut args, body } => {
                     let var = args.remove(args.len() - 1);
                     let body = body.substitute(var, &rhs);
@@ -163,12 +153,97 @@ impl<'a> Term<'a> {
         }
     }
 
-    fn eval_flat(self, env: &HashMap<String, Term<'a>>) -> Vec<Term<'a>> {
+    fn eval_flat(self) -> Vec<Term<'a>> {
         match self {
             Term::Choice(v) => v.into_iter()
-                .flat_map(|t| t.eval_flat(env))
+                .flat_map(|t| t.eval_flat())
                 .collect(),
-            _ => vec![self.eval(env)]
+            _ => vec![self.eval()]
+        }
+    }
+
+    fn propogate(self) -> Term<'a> {
+        let mut term = self;
+        loop {
+            let new_term = term.clone().propogate_step();
+
+            if new_term == term {
+                break
+            } else {
+                term = new_term;
+            }
+        }
+
+        term
+    }
+    
+    fn propogate_step(self) -> Term<'a> {
+        match self {
+            Term::Add(lhs, rhs) => match *lhs {
+                Term::Zero => Term::Return(rhs),
+                Term::Succ(t) => Term::Bind {
+                    var: "".to_string(),
+                    val: Box::new(Term::Add(t, rhs)),
+                    body: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Var("".to_string()))))))
+                },
+                _ => match *rhs {
+                    Term::Zero => Term::Return(lhs),
+                    Term::Succ(t) => Term::Bind {
+                        var: "".to_string(),
+                        val: Box::new(Term::Add(lhs, t)),
+                        body: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Var("".to_string()))))))
+                    },
+                    _ => Term::Add(lhs, rhs)
+                }
+            },
+            Term::Bind { var, val, body } => match *body {
+                Term::Fail => Term::Fail,
+                body => match val.propogate() {
+                    Term::Return(t) => body.substitute(&var, &t),
+                    Term::Bind { var: var2, val: val2, body: body2 } => match *body2 {
+                        Term::Return(t) => Term::Bind { var: var2, val: val2, body: Box::new(body.substitute(&var, &t)) },
+                        _ => Term::Bind { var, val: Box::new(Term::Bind { var: var2, val: val2, body: body2 }), body: Box::new(body) }
+                    }
+                    val => Term::Bind { var, val: Box::new(val), body: Box::new(body.propogate()) }
+                }
+            },
+            Term::Force(t) => match *t {
+                Term::Thunk(t) => *t,
+                _ => Term::Force(t)
+            },
+            Term::App(lhs, rhs) => match lhs.propogate() {
+                Term::Lambda { mut args, body } => {
+                    let var = args.remove(args.len() - 1);
+                    let body = body.substitute(var, &rhs);
+
+                    if args.len() == 0 {
+                        body
+                    } else {
+                        Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                            args,
+                            body: Box::new(body)
+                        }))))
+                    }
+                },
+                lhs => Term::App(Box::new(lhs), rhs)
+            },
+            Term::Exists { var, r#type, body } => match body.propogate() {
+                Term::Fail => Term::Fail,
+                body => Term::Exists { var, r#type, body: Box::new(body) }
+            },
+            Term::Equate { lhs, rhs, body } => match *lhs {
+                Term::Zero => match *rhs {
+                    Term::Succ(_) => Term::Fail,
+                    _ => Term::Equate { lhs, rhs, body }
+                },
+                Term::Succ(t1) => match *rhs {
+                    Term::Zero => Term::Fail,
+                    Term::Succ(t2) => Term::Equate { lhs: t1, rhs: t2, body },
+                    _ => Term::Equate { lhs: Box::new(Term::Succ(t1)), rhs, body }
+                },
+                _ => Term::Equate { lhs, rhs, body }
+            }
+            t => t
         }
     }
 
@@ -255,4 +330,141 @@ impl<'a> Term<'a> {
             _ => false
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test1() {
+        let term = Term::Bind {
+            var: "0".to_string(),
+            val: Box::new(Term::Return(Box::new(Term::Zero))),
+            body: Box::new(Term::Bind {
+                var: "1".to_string(),
+                val: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                    args: vec!["x"],
+                    body: Box::new(Term::Return(Box::new(Term::Var("x".to_string()))))
+                }))))),
+                body: Box::new(Term::App(
+                    Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
+                    Box::new(Term::Var("0".to_string()))
+                ))
+            })
+        };
+
+        assert_eq!(
+            term.propogate(),
+            Term::Return(Box::new(Term::Zero))
+        );
+    }
+
+    #[test]
+    fn test2() {
+        let term = Term::Bind {
+            var: "0".to_string(),
+            val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Var("n".to_string())))))),
+            body: Box::new(Term::Bind {
+                var: "1".to_string(),
+                val: Box::new(Term::Return(Box::new(Term::Zero))),
+                body: Box::new(Term::Bind {
+                    var: "2".to_string(),
+                    val: Box::new(Term::Add(Box::new(Term::Var("0".to_string())), Box::new(Term::Var("1".to_string())))),
+                    body: Box::new(Term::Equate {
+                        lhs: Box::new(Term::Var("2".to_string())),
+                        rhs: Box::new(Term::Succ(Box::new(Term::Zero))),
+                        body: Box::new(Term::Return(Box::new(Term::Zero)))
+                    })
+                })
+            })
+        };
+
+        assert_eq!(
+            term.propogate(),
+            Term::Equate {
+                lhs: Box::new(Term::Var("n".to_string())),
+                rhs: Box::new(Term::Zero),
+                body: Box::new(Term::Return(Box::new(Term::Zero)))
+            }
+        );
+    }
+
+    #[test]
+    fn test3() {
+        let term = Term::Exists {
+            var: "n",
+            r#type: Type::Ident("Nat"),
+            body: Box::new(Term::Equate {
+                lhs: Box::new(Term::Succ(Box::new(Term::Var("n".to_string())))),
+                rhs: Box::new(Term::Zero),
+                body: Box::new(Term::Return(Box::new(Term::Zero)))
+            })
+        };
+
+        assert_eq!(
+            term.propogate(),
+            Term::Fail
+        );
+    }
+
+    #[test]
+    fn test4() {
+        let term = Term::Exists {
+            var: "n",
+            r#type: Type::Ident("Nat"),
+            body: Box::new(Term::Bind {
+                var: "1".to_string(),
+                val: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                    args: vec!["x"],
+                    body: Box::new(Term::Return(Box::new(Term::Var("x".to_string()))))
+                }))))),
+                body: Box::new(Term::Bind {
+                    var: "2".to_string(),
+                    val: Box::new(Term::App(
+                        Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
+                        Box::new(Term::Var("n".to_string()))
+                    )),
+                    body: Box::new(Term::Equate {
+                        lhs: Box::new(Term::Var("2".to_string())),
+                        rhs: Box::new(Term::Zero),
+                        body: Box::new(Term::Return(Box::new(Term::Var("n".to_string()))))
+                    })
+                })
+            })
+        };
+
+        assert_eq!(
+            term.propogate(),
+            Term::Exists {
+                var: "n",
+                r#type: Type::Ident("Nat"),
+                body: Box::new(Term::Equate {
+                    lhs: Box::new(Term::Var("n".to_string())),
+                    rhs: Box::new(Term::Zero),
+                    body: Box::new(Term::Return(Box::new(Term::Var("n".to_string()))))
+                })
+            }
+        );
+    }
+
+    #[test]
+    fn test5() { // TODO: improve test - should be for test 19 in mod
+        let term = Term::Bind {
+            var: "0".to_string(),
+            val: Box::new(Term::Add(Box::new(Term::Var("n".to_string())), Box::new(Term::Var("n".to_string())))),
+            body: Box::new(Term::Bind {
+                var: "1".to_string(),
+                val: Box::new(Term::Return(Box::new(Term::Zero))),
+                body: Box::new(Term::Fail)
+            })
+        };
+
+        assert_eq!(
+            term.propogate(),
+            Term::Fail
+        );
+    }
+
+    // test for choice
 }
