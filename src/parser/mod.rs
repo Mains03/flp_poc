@@ -1,7 +1,7 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{arg::Arg, expr::Expr, bexpr::BExpr, program::{Decl, Prog}, stm::Stm, r#type::Type};
+use syntax::{arg::Arg, expr::Expr, bexpr::BExpr, decl::{Decl, Prog}, stm::Stm, r#type::Type};
 
 pub mod syntax;
 

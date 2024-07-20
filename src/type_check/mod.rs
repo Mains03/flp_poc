@@ -1,6 +1,6 @@
 use type_error::TypeError;
 
-use crate::parser::syntax::program::*;
+use crate::parser::syntax::decl::*;
 
 pub mod type_error;
 

@@ -1,51 +1,17 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use term::Term;
-use translate::translate;
+use translate::Translate;
 
-use crate::parser::syntax::program::Decl;
+use crate::parser::syntax::decl::Decl;
 
 pub mod term;
-mod translate;
+pub mod translate;
 mod exists;
 mod equate;
 
 pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
-    let mut env: HashMap<String, Term> = create_env(ast);
-
-    let main = env.remove("main").unwrap();
-
-    main.eval(&env)
-}
-
-fn create_env<'a>(ast: Vec<Decl<'a>>) -> HashMap<String, Term<'a>> {
-    let mut env: HashMap<String, Term> = HashMap::new();
-
-    ast.into_iter()
-        .for_each(|decl| {
-            match &decl {
-                Decl::Func { name, args, body: _ } => if args.len() == 0 {
-                    env.insert(name.to_string(), translate(decl));
-                } else {
-                    env.insert(name.to_string(), translate(decl));
-                },
-                Decl::Stm(_s) => {
-                    env.insert("main".to_string(), translate(decl));
-                }
-                _ => ()
-            }
-        });
-
-    env.insert("+".to_string(),
-        Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
-            args: vec!["x", "y"],
-            body: Box::new(Term::Add(
-                Box::new(Term::Var("x".to_string())),
-                Box::new(Term::Var("y".to_string()))
-            ))
-        })))));
-
-    env
+    ast.translate(&mut HashSet::new(), &mut HashMap::new()).eval()
 }
 
 #[cfg(test)]
