@@ -40,8 +40,12 @@ impl<'a> Translate<'a> for Decl<'a> {
     fn translate(self, vars: &mut HashSet<String>, funcs: &mut HashMap<String, Decl<'a>>) -> Term<'a> {
         match self {
             Decl::Func { name: _, mut args, body } => {
+                let mut new_vars = HashSet::new();
                 args.iter()
-                    .for_each(|s| { vars.insert(s.to_string()); });
+                    .for_each(|s| {
+                        let flag = vars.insert(s.to_string());
+                        if flag { new_vars.insert(s.to_string()); }
+                    });
 
                 // reverse so that application uses variable at the end of the list
                 args.reverse();
@@ -49,7 +53,9 @@ impl<'a> Translate<'a> for Decl<'a> {
                 let body = body.translate(vars, funcs);
 
                 args.iter()
-                    .for_each(|s| { vars.remove(*s); });
+                    .for_each(|s| {
+                        if new_vars.contains(*s) { vars.remove(*s); }
+                    });
 
                 if args.len() == 0 {
                     body

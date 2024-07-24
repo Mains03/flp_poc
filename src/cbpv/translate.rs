@@ -228,4 +228,63 @@ addOne 1.";
             }
         );
     }
+    
+    #[test]
+    fn test7() {
+        let src = "id :: Nat -> Nat
+id n = n.
+
+exists n :: Nat. id n =:= id n. n.";
+
+        let cbpv = parser::parse(src).unwrap().translate(&mut HashSet::new(), &mut HashMap::new());
+
+        assert_eq!(
+            cbpv,
+            Term::Exists {
+                var: "n",
+                r#type: Type::Ident("Nat"),
+                body: Box::new(Term::Bind {
+                    var: "1".to_string(),
+                    val: Box::new(Term::Bind {
+                        var: "3".to_string(),
+                        val: Box::new(Term::Return(Box::new(Term::Var("n".to_string())))),
+                        body: Box::new(Term::Bind {
+                            var: "4".to_string(),
+                            val: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                                args: vec!["n"],
+                                body: Box::new(Term::Return(Box::new(Term::Var("n".to_string()))))
+                            }))))),
+                            body: Box::new(Term::App(
+                                Box::new(Term::Force(Box::new(Term::Var("4".to_string())))),
+                                Box::new(Term::Var("3".to_string()))
+                            ))
+                        })
+                    }),
+                    body: Box::new(Term::Bind {
+                        var: "2".to_string(),
+                        val: Box::new(Term::Bind {
+                            var: "3".to_string(),
+                            val: Box::new(Term::Return(Box::new(Term::Var("n".to_string())))),
+                            body: Box::new(Term::Bind {
+                                var: "4".to_string(),
+                                val: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                                    args: vec!["n"],
+                                    body: Box::new(Term::Return(Box::new(Term::Var("n".to_string()))))
+                                }))))),
+                                body: Box::new(Term::App(
+                                    Box::new(Term::Force(Box::new(Term::Var("4".to_string())))),
+                                    Box::new(Term::Var("3".to_string()))
+                                ))
+                            })
+                        }),
+                        body: Box::new(Term::Equate {
+                            lhs: Box::new(Term::Var("1".to_string())),
+                            rhs: Box::new(Term::Var("2".to_string())),
+                            body: Box::new(Term::Return(Box::new(Term::Var("n".to_string()))))
+                        })
+                    })
+                })
+            }
+        );
+    }
 }

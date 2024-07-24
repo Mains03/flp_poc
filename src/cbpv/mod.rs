@@ -378,4 +378,28 @@ id 1.";
             Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))
         );
     }
+
+    #[test]
+    fn test22() {
+        let src = "
+even :: Nat -> Nat
+even n = exists m :: Nat. m + m =:= n. n.
+
+le4 :: Nat -> Nat
+le4 n = exists m :: Nat. n+m =:= 4. n.
+
+exists n :: Nat. even n =:= le4 n. n.";
+
+        let ast = parser::parse(src).unwrap();
+        let val = eval(ast);
+
+        assert_eq!(
+            val,
+            Term::Choice(vec![
+                Term::Return(Box::new(Term::Zero)),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero)))))),
+                Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))))))
+            ])
+        )
+    }
 }

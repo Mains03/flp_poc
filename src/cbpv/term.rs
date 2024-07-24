@@ -104,8 +104,14 @@ impl<'a> Term<'a> {
                 _ => unreachable!()
             },
             Term::Bind { var, val, body } => match val.eval() {
+                Term::Fail => Term::Fail,
                 Term::Return(t) => body.substitute(&var, &t),
-                t => unreachable!("{:#?}", t)
+                Term::Choice(v) => Term::Choice(
+                    v.into_iter()
+                        .map(|t| Term::Bind { var: var.clone(), val: Box::new(t), body: body.clone() })
+                        .collect()
+                ),
+                _ => unreachable!()
             },
             Term::Exists { var, r#type, body } => Term::Choice(vec![
                 body.clone().substitute(var, &Term::Zero),
@@ -199,10 +205,11 @@ impl<'a> Term<'a> {
             Term::Bind { var, val, body } => match *body {
                 Term::Fail => Term::Fail,
                 body => match val.propogate() {
+                    Term::Fail => Term::Fail,
                     Term::Return(t) => body.substitute(&var, &t),
                     Term::Bind { var: var2, val: val2, body: body2 } => match *body2 {
                         Term::Return(t) => Term::Bind { var: var2, val: val2, body: Box::new(body.substitute(&var, &t)) },
-                        _ => Term::Bind { var, val: Box::new(Term::Bind { var: var2, val: val2, body: body2 }), body: Box::new(body) }
+                        _ => Term::Bind { var, val: Box::new(Term::Bind { var: var2, val: val2, body: body2 }), body: Box::new(body.propogate()) }
                     }
                     val => Term::Bind { var, val: Box::new(val), body: Box::new(body.propogate()) }
                 }
@@ -242,8 +249,27 @@ impl<'a> Term<'a> {
                     _ => Term::Equate { lhs: Box::new(Term::Succ(t1)), rhs, body }
                 },
                 _ => Term::Equate { lhs, rhs, body }
-            }
+            },
+            Term::Choice(mut v) => if v.len() == 0 {
+                Term::Fail
+            } else if v.len() == 1 {
+                v.remove(0)
+            } else {
+                Term::Choice(
+                    v.into_iter()
+                        .flat_map(|t| t.propogate_flat())
+                        .filter(|t| *t != Term::Fail)
+                        .collect()
+                )
+            },
             t => t
+        }
+    }
+
+    fn propogate_flat(self) -> Vec<Term<'a>> {
+        match self {
+            Term::Choice(v) => v.into_iter().flat_map(|t| t.propogate_flat()).collect(),
+            _ => vec![self.propogate()]
         }
     }
 
@@ -449,7 +475,7 @@ mod tests {
     }
 
     #[test]
-    fn test5() { // TODO: improve test - should be for test 19 in mod
+    fn test5() {
         let term = Term::Bind {
             var: "0".to_string(),
             val: Box::new(Term::Add(Box::new(Term::Var("n".to_string())), Box::new(Term::Var("n".to_string())))),
@@ -466,5 +492,37 @@ mod tests {
         );
     }
 
-    // test for choice
+    #[test]
+    fn test6() {
+        let term = Term::Choice(vec![
+            Term::Equate { lhs: Box::new(Term::Zero), rhs: Box::new(Term::Succ(Box::new(Term::Zero))), body: Box::new(Term::Zero) }
+        ]);
+
+        assert_eq!(
+            term.propogate(),
+            Term::Fail
+        );
+    }
+
+    #[test]
+    fn test7() {
+        let term = Term::Bind {
+            var: "0".to_string(),
+            val: Box::new(Term::Equate {
+                lhs: Box::new(Term::Succ(Box::new(Term::Var("n".to_string())))),
+                rhs: Box::new(Term::Zero),
+                body: Box::new(Term::Var("n".to_string()))
+            }),
+            body: Box::new(Term::Equate {
+                lhs: Box::new(Term::Var("n".to_string())),
+                rhs: Box::new(Term::Zero),
+                body: Box::new(Term::Zero)
+            })
+        };
+
+        assert_eq!(
+            term.propogate(),
+            Term::Fail
+        )
+    }
 }
