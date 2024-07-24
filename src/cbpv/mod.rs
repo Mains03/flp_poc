@@ -7,8 +7,6 @@ use crate::parser::syntax::decl::Decl;
 
 pub mod term;
 pub mod translate;
-mod exists;
-mod equate;
 
 pub fn eval<'a>(ast: Vec<Decl<'a>>) -> Term<'a> {
     ast.translate(&mut HashSet::new(), &mut HashMap::new()).eval()
@@ -300,7 +298,7 @@ addOne 1.";
 
     #[test]
     fn test16() {
-        let src: &str = "exists n :: Nat. n =:= n+1. n.";
+        let src = "exists n :: Nat. n =:= n+1. n.";
 
         let ast = parser::parse(src).unwrap();
         let val = eval(ast);

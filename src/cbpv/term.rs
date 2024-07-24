@@ -1,8 +1,4 @@
-use std::io::stdin;
-
 use crate::parser::syntax::r#type::Type;
-
-use super::{equate::eval_equate, exists::eval_exists};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term<'a> {
@@ -246,7 +242,17 @@ impl<'a> Term<'a> {
                 Term::Succ(t1) => match *rhs {
                     Term::Zero => Term::Fail,
                     Term::Succ(t2) => Term::Equate { lhs: t1, rhs: t2, body },
+                    Term::Var(ref v) => if t1.is_succ_of_helper(&v) {
+                        Term::Fail
+                    } else {
+                        Term::Equate { lhs: Box::new(Term::Succ(t1)), rhs, body }
+                    },
                     _ => Term::Equate { lhs: Box::new(Term::Succ(t1)), rhs, body }
+                },
+                Term::Var(ref v) => if rhs.is_succ_of(&v) {
+                    Term::Fail
+                } else {
+                    Term::Equate { lhs, rhs, body }
                 },
                 _ => Term::Equate { lhs, rhs, body }
             },
@@ -270,6 +276,21 @@ impl<'a> Term<'a> {
         match self {
             Term::Choice(v) => v.into_iter().flat_map(|t| t.propogate_flat()).collect(),
             _ => vec![self.propogate()]
+        }
+    }
+
+    fn is_succ_of(&self, var: &str) -> bool {
+        match self {
+            Term::Succ(t) => t.is_succ_of_helper(var),
+            _ => false
+        }
+    }
+
+    fn is_succ_of_helper(&self, var: &str) -> bool {
+        match self {
+            Term::Var(v) => v == var,
+            Term::Succ(t) => t.is_succ_of_helper(var),
+            _ => false
         }
     }
 
@@ -311,11 +332,11 @@ impl<'a> Term<'a> {
                     }
                 }
             },
-            Term::Equate { lhs, rhs, body } => eval_equate(
-                lhs.substitute(var, term),
-                rhs.substitute(var, term),
-                body.substitute(var, term)
-            ),
+            Term::Equate { lhs, rhs, body } => Term::Equate {
+                lhs: Box::new(lhs.substitute(var, term)),
+                rhs: Box::new(rhs.substitute(var, term)),
+                body: Box::new(body.substitute(var, term))
+            },
             Term::Lambda { args, body } => {
                 let flag = args.contains(&var);
 
@@ -345,15 +366,6 @@ impl<'a> Term<'a> {
                 Box::new(rhs.substitute(var, term))
             ),
             _ => self
-        }
-    }
-
-    // includes no successors
-    pub fn is_succ_of(&self, var: &str) -> bool {
-        match self {
-            Term::Var(v) => v == var,
-            Term::Succ(t) => t.is_succ_of(var),
-            _ => false
         }
     }
 }
