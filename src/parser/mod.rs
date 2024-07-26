@@ -1,7 +1,7 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{arg::Arg, expr::Expr, bexpr::BExpr, decl::{Decl, Prog}, stm::Stm, r#type::Type};
+use syntax::{expr::Expr, bexpr::BExpr, decl::Decl, stm::Stm, r#type::Type};
 
 pub mod syntax;
 
@@ -9,7 +9,7 @@ pub mod syntax;
 #[grammar = "parser/lang.pest"]
 struct FLPParser;
 
-pub fn parse(src: &str) -> Result<Prog, Error<Rule>> {
+pub fn parse(src: &str) -> Result<Vec<Decl>, Error<Rule>> {
     let mut prog = vec![];
 
     let pairs = FLPParser::parse(Rule::program, src)?;
@@ -25,7 +25,7 @@ pub fn parse(src: &str) -> Result<Prog, Error<Rule>> {
                         let name = pair.next().unwrap().as_str();
                         let r#type = parse_type(pair.next().unwrap().into_inner());
 
-                        Decl::FuncType { name, r#type }
+                        Decl::FuncType { name: name.to_string(), r#type }
                     },
                     Rule::func => {
                         let mut pair = pair.into_inner();
@@ -48,7 +48,7 @@ pub fn parse(src: &str) -> Result<Prog, Error<Rule>> {
 
                         let body = parse_stm(body.into_inner());
 
-                        Decl::Func { name, args, body }
+                        Decl::Func { name: name.to_string(), args, body }
                     },
                     Rule::stm => Decl::Stm(parse_stm(pair.into_inner())),
                     _ => unreachable!()
@@ -61,11 +61,11 @@ pub fn parse(src: &str) -> Result<Prog, Error<Rule>> {
     Ok(prog)
 }
 
-fn parse_arg(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
+fn parse_arg(mut pairs: pest::iterators::Pairs<Rule>) -> String {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
-        Rule::ident => pair.as_str(),
+        Rule::ident => pair.as_str().to_string(),
         _ => unreachable!()
     }
 }
@@ -90,7 +90,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
             let val = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
             let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
-            Stm::Let { var, val, body }
+            Stm::Let { var: var.to_string(), val, body }
         },
         Rule::exists_stm => {
             let mut pairs = pair.into_inner();
@@ -99,7 +99,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
             let r#type = parse_type(pairs.next().unwrap().into_inner());
             let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
 
-            Stm::Exists { var, r#type, body }
+            Stm::Exists { var: var.to_string(), r#type, body }
         },
         Rule::equate_stm => {
             let mut pairs = pair.into_inner();
@@ -165,7 +165,7 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
         },
         Rule::bexpr => Expr::BExpr(parse_bexpr(pair.into_inner())),
         Rule::primary_expr => parse_expr(pair.into_inner()),
-        Rule::ident => Expr::Ident(pair.as_str()),
+        Rule::ident => Expr::Ident(pair.as_str().to_string()),
         Rule::nat => Expr::Nat(pair.as_str().parse().unwrap()),
         Rule::bool => Expr::Bool(parse_bool(pair.as_str())),
         Rule::stm => Expr::Stm(Box::new(parse_stm(pair.into_inner()))),
@@ -212,7 +212,7 @@ fn parse_type(mut pairs: pest::iterators::Pairs<Rule>) -> Type {
     let lhs = {
         let pair = pairs.next().unwrap().into_inner().next().unwrap();
         match pair.as_rule() {
-            Rule::ident => Type::Ident(pair.as_str()),
+            Rule::ident => Type::Ident(pair.as_str().to_string()),
             Rule::r#type => parse_type(pair.into_inner()),
             _ => unreachable!()
         }
@@ -242,19 +242,19 @@ const x y = x.";
             ast,
             vec![
                 Decl::FuncType {
-                    name: "const",
+                    name: "const".to_string(),
                     r#type: Type::Arrow(
-                        Box::new(Type::Ident("a")),
+                        Box::new(Type::Ident("a".to_string())),
                         Box::new(Type::Arrow(
-                            Box::new(Type::Ident("b")),
-                            Box::new(Type::Ident("a"))
+                            Box::new(Type::Ident("b".to_string())),
+                            Box::new(Type::Ident("a".to_string()))
                         ))
                     )
                 },
                 Decl::Func {
-                    name: "const",
-                    args: vec!["x","y"],
-                    body: Stm::Expr(Expr::Ident("x"))
+                    name: "const".to_string(),
+                    args: vec!["x".to_string(), "y".to_string()],
+                    body: Stm::Expr(Expr::Ident("x".to_string()))
                 }
             ]
         )
@@ -274,31 +274,31 @@ id x = x.";
             ast,
             vec![
                 Decl::FuncType {
-                    name: "const",
+                    name: "const".to_string(),
                     r#type: Type::Arrow(
-                        Box::new(Type::Ident("a")),
+                        Box::new(Type::Ident("a".to_string())),
                         Box::new(Type::Arrow(
-                            Box::new(Type::Ident("b")),
-                            Box::new(Type::Ident("a"))
+                            Box::new(Type::Ident("b".to_string())),
+                            Box::new(Type::Ident("a".to_string()))
                         ))
                     )
                 },
                 Decl::Func {
-                    name: "const",
-                    args: vec!["x","y"],
-                    body: Stm::Expr(Expr::Ident("x"))
+                    name: "const".to_string(),
+                    args: vec!["x".to_string(), "y".to_string()],
+                    body: Stm::Expr(Expr::Ident("x".to_string()))
                 },
                 Decl::FuncType {
-                    name: "id",
+                    name: "id".to_string(),
                     r#type: Type::Arrow(
-                        Box::new(Type::Ident("a")),
-                        Box::new(Type::Ident("a"))
+                        Box::new(Type::Ident("a".to_string())),
+                        Box::new(Type::Ident("a".to_string()))
                     )
                 },
                 Decl::Func {
-                    name: "id",
-                    args: vec!["x"],
-                    body: Stm::Expr(Expr::Ident("x"))
+                    name: "id".to_string(),
+                    args: vec!["x".to_string()],
+                    body: Stm::Expr(Expr::Ident("x".to_string()))
                 }
             ]
         )
@@ -315,28 +315,28 @@ fix f = exists n :: Nat. f n =:= n. n.";
             ast,
             vec![
                 Decl::FuncType {
-                    name: "fix",
+                    name: "fix".to_string(),
                     r#type: Type::Arrow(
                         Box::new(Type::Arrow(
-                            Box::new(Type::Ident("Nat")),
-                            Box::new(Type::Ident("Nat"))
+                            Box::new(Type::Ident("Nat".to_string())),
+                            Box::new(Type::Ident("Nat".to_string()))
                         )),
-                        Box::new(Type::Ident("Nat"))
+                        Box::new(Type::Ident("Nat".to_string()))
                     )
                 },
                 Decl::Func {
-                    name: "fix",
-                    args: vec!["f"],
+                    name: "fix".to_string(),
+                    args: vec!["f".to_string()],
                     body: Stm::Exists {
-                        var: "n",
-                        r#type: Type::Ident("Nat"),
+                        var: "n".to_string(),
+                        r#type: Type::Ident("Nat".to_string()),
                         body: Box::new(Stm::Equate {
                             lhs: Expr::App(
-                                Box::new(Expr::Ident("f")),
-                                Box::new(Expr::Ident("n"))
+                                Box::new(Expr::Ident("f".to_string())),
+                                Box::new(Expr::Ident("n".to_string()))
                             ),
-                            rhs: Expr::Ident("n"),
-                            body: Box::new(Stm::Expr(Expr::Ident("n")))
+                            rhs: Expr::Ident("n".to_string()),
+                            body: Box::new(Stm::Expr(Expr::Ident("n".to_string())))
                         })
                     }
                 }
@@ -354,12 +354,12 @@ fix f = exists n :: Nat. f n =:= n. n.";
             ast,
             vec![
                 Decl::Stm(Stm::Exists {
-                    var: "n",
-                    r#type: Type::Ident("Nat"),
+                    var: "n".to_string(),
+                    r#type: Type::Ident("Nat".to_string()),
                     body: Box::new(Stm::Equate {
-                        lhs: Expr::Ident("n"),
+                        lhs: Expr::Ident("n".to_string()),
                         rhs: Expr::Nat(52),
-                        body: Box::new(Stm::Expr(Expr::Ident("n")))
+                        body: Box::new(Stm::Expr(Expr::Ident("n".to_string())))
                     })
                 })
             ]
@@ -378,25 +378,25 @@ id 5.";
         assert_eq!(
             ast,
             vec![
-                Decl::FuncType { name: "id", r#type: Type::Arrow(
-                    Box::new(Type::Ident("Nat")),
-                    Box::new(Type::Ident("Nat")))
+                Decl::FuncType { name: "id".to_string(), r#type: Type::Arrow(
+                    Box::new(Type::Ident("Nat".to_string())),
+                    Box::new(Type::Ident("Nat".to_string())))
                 },
                 Decl::Func {
-                    name: "id",
-                    args: vec!["x"],
+                    name: "id".to_string(),
+                    args: vec!["x".to_string()],
                     body: Stm::Exists {
-                        var: "n",
-                        r#type: Type::Ident("Nat"),
+                        var: "n".to_string(),
+                        r#type: Type::Ident("Nat".to_string()),
                         body: Box::new(Stm::Equate {
-                            lhs: Expr::Ident("n"),
-                            rhs: Expr::Ident("x"),
-                            body: Box::new(Stm::Expr(Expr::Ident("n")))
+                            lhs: Expr::Ident("n".to_string()),
+                            rhs: Expr::Ident("x".to_string()),
+                            body: Box::new(Stm::Expr(Expr::Ident("n".to_string())))
                         })
                     }
                 },
                 Decl::Stm(Stm::Expr(Expr::App(
-                    Box::new(Expr::Ident("id")),
+                    Box::new(Expr::Ident("id".to_string())),
                     Box::new(Expr::Nat(5))
                 )))
             ]
@@ -417,19 +417,19 @@ id :: a -> a";
             ast,
             vec![
                 Decl::Func {
-                    name: "id",
-                    args: vec!["x"],
-                    body: Stm::Expr(Expr::Ident("x"))
+                    name: "id".to_string(),
+                    args: vec!["x".to_string()],
+                    body: Stm::Expr(Expr::Ident("x".to_string()))
                 },
                 Decl::Stm(Stm::Expr(Expr::App(
-                    Box::new(Expr::Ident("id")),
+                    Box::new(Expr::Ident("id".to_string())),
                     Box::new(Expr::Nat(5))
                 ))),
                 Decl::FuncType {
-                    name: "id",
+                    name: "id".to_string(),
                     r#type: Type::Arrow(
-                        Box::new(Type::Ident("a")),
-                        Box::new(Type::Ident("a"))
+                        Box::new(Type::Ident("a".to_string())),
+                        Box::new(Type::Ident("a".to_string()))
                     )
                 }
             ]
@@ -448,10 +448,19 @@ id x = x.
         assert_eq!(
             ast,
             vec![
-                Decl::FuncType { name: "id", r#type: Type::Arrow(Box::new(Type::Ident("a")), Box::new(Type::Ident("a"))) },
-                Decl::Func { name: "id", args: vec!["x"], body: Stm::Expr(Expr::Ident("x")) },
+                Decl::FuncType {
+                    name: "id".to_string(),
+                    r#type: Type::Arrow(
+                        Box::new(Type::Ident("a".to_string())),
+                        Box::new(Type::Ident("a".to_string())))
+                    },
+                Decl::Func {
+                    name: "id".to_string(),
+                    args: vec!["x".to_string()],
+                    body: Stm::Expr(Expr::Ident("x".to_string()))
+                },
                 Decl::Stm(Stm::Choice(vec![
-                    Expr::Nat(1), Expr::App(Box::new(Expr::Ident("id")), Box::new(Expr::Nat(2))), Expr::Nat(3)
+                    Expr::Nat(1), Expr::App(Box::new(Expr::Ident("id".to_string())), Box::new(Expr::Nat(2))), Expr::Nat(3)
                 ]))
             ]
         )

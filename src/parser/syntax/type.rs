@@ -1,5 +1,5 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Type<'a> {
-    Arrow(Box<Type<'a>>, Box<Type<'a>>),
-    Ident(&'a str),
+pub enum Type {
+    Arrow(Box<Type>, Box<Type>),
+    Ident(String),
 }
