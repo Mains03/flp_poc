@@ -6,11 +6,7 @@ mod cbpv;
 mod eval;
 
 fn main() {
-    let src = "
-add :: Nat -> Nat -> Nat
-add n m = n + m.
-    
-let n = 1 in (let m = 2 in add n m).";
+    let src = "let n = 1 in (let n = 2 in n) + n.";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);
@@ -37,5 +33,17 @@ mod tests {
         );
     }
 
-    
+    #[test]
+    fn test2() {
+        let src = "let n = 1 in (let n = 2 in n) + n.";
+
+        let ast = parser::parse(src).unwrap();
+        let cbpv = translate(ast);
+        let term = eval::eval(cbpv);
+
+        assert_eq!(
+            term,
+            Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))))
+        );
+    }
 }

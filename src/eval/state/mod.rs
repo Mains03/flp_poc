@@ -40,27 +40,39 @@ impl State {
                 match self.stack.pop() {
                     Some(term) => match term {
                         StackTerm::Cont(var, term) => {
-                            let mut frame = Frame::push(self.frame);
-                            frame.store(var, val);
+                            self.frame.store(var, val);
 
                             vec![State {
-                                frame, term, stack: self.stack
+                                frame: self.frame, term, stack: self.stack
                             }]
                         },
-                        _ => unreachable!()
+                        StackTerm::Term(term) => match term {
+                            Term::Lambda { var, body } => vec![State {
+                                frame: self.frame,
+                                term: Term::Bind { var, val: Box::new(val), body },
+                                stack: self.stack
+                            }],
+                            _ => unreachable!()
+                        },
+                        StackTerm::PopFrame => vec![State {
+                            frame: self.frame.pop(),
+                            term: Term::Return(Box::new(val)),
+                            stack: self.stack
+                        }]
                     },
                     None => vec![State {
-                        frame: self.frame.pop(),
+                        frame: self.frame,
                         term: Term::Return(Box::new(val)),
                         stack: self.stack
                     }]
                 }
             },
             Term::Bind { var, val, body } => {
+                self.stack.push(StackTerm::PopFrame);
                 self.stack.push(StackTerm::Cont(var, *body));
 
                 vec![State {
-                    frame: self.frame, term: *val, stack: self.stack
+                    frame: Frame::push(self.frame), term: *val, stack: self.stack
                 }]
             },
             Term::Add(lhs, rhs) => {
@@ -68,7 +80,7 @@ impl State {
                 let rhs = self.lookup_value(*rhs);
 
                 vec![State {
-                    frame: self.frame.pop().pop(),
+                    frame: self.frame,
                     term: add_terms(lhs, rhs),
                     stack: self.stack
                 }]
@@ -125,7 +137,7 @@ impl State {
 
                 match term {
                     Term::Thunk(term) => vec![State {
-                        frame: self.frame,
+                        frame: self.frame.pop(),
                         term: *term,
                         stack: self.stack
                     }],
@@ -133,24 +145,13 @@ impl State {
                 }
             },
             Term::App(lhs, rhs) => {
-                self.stack.push(StackTerm::Term(*rhs));
+                self.stack.push(StackTerm::Term(*lhs));
 
                 vec![State {
                     frame: self.frame,
-                    term: *lhs,
+                    term: *rhs,
                     stack: self.stack
                 }]
-            },
-            Term::Lambda { var, body } => match self.stack.pop() {
-                Some(term) => match term {
-                    StackTerm::Term(term) => vec![State {
-                        frame: self.frame,
-                        term: Term::Bind { var, val: Box::new(term), body },
-                        stack: self.stack
-                    }],
-                    _ => unreachable!()
-                },
-                _ => unreachable!()
             },
             Term::Exists { var, r#type, body } => {
                 let mut frame = Frame::push(self.frame);
@@ -167,6 +168,10 @@ impl State {
                 stack: self.stack
             }]
         }
+    }
+
+    pub fn is_value(&self) -> bool {
+        self.stack.is_empty()
     }
 
     pub fn as_term(self) -> Term {

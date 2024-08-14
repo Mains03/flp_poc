@@ -8,7 +8,8 @@ pub struct Stack {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StackTerm {
     Cont(String, Term),
-    Term(Term)
+    Term(Term),
+    PopFrame
 }
 
 impl Stack {
@@ -26,5 +27,9 @@ impl Stack {
         } else {
             Some(self.stack.remove(self.stack.len()-1))
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stack.is_empty()
     }
 }
