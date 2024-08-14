@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::stdin};
 
 use state::State;
 
@@ -10,21 +10,20 @@ pub fn eval(cbpv: HashMap<String, Term>) -> Term {
     let mut states = vec![State::new(cbpv)];
 
     loop {
-        println!("{:#?}", states);
-        let flag = states.iter()
-                    .fold(true, |acc, x| acc && x.is_value());
+        let old_states = states.clone();
+        states = states.into_iter()
+            .flat_map(|s| s.step())
+            .collect();
 
-        if flag {
+        if old_states == states {
             break;
-        } else {
-            states = states.into_iter()
-                        .flat_map(|s| s.step())
-                        .collect();
         }
     }
 
     if states.len() == 0 {
         Term::Fail
+    } else if states.len() == 1 {
+        states.remove(0).as_term()
     } else {
         Term::Choice(
             states.into_iter()

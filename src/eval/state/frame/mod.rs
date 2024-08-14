@@ -7,7 +7,7 @@ mod env;
 
 mod vars;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Frame {
     vars: Vars,
     env: Env,
@@ -37,7 +37,10 @@ impl Frame {
     }
 
     pub fn pop(self) -> Self {
-        *self.prev.unwrap()
+        match self.prev {
+            Some(prev) => *prev,
+            None => self
+        }
     }
 
     pub fn bind(&mut self, var: String, r#type: Type) {

@@ -1,11 +1,11 @@
 use crate::cbpv::Term;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Stack {
     stack: Vec<StackTerm>
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StackTerm {
     Cont(String, Term),
     Term(Term)
@@ -17,10 +17,14 @@ impl Stack {
     }
 
     pub fn push(&mut self, term: StackTerm) {
-        todo!()
+        self.stack.push(term);
     }
 
     pub fn pop(&mut self) -> Option<StackTerm> {
-        todo!()
+        if self.stack.len() == 0 {
+            None
+        } else {
+            Some(self.stack.remove(self.stack.len()-1))
+        }
     }
 }

@@ -8,7 +8,7 @@ use crate::{cbpv::Term, parser::syntax::r#type::Type};
 mod frame;
 mod stack;
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
     frame: Frame,
     term: Term,
@@ -34,29 +34,24 @@ impl State {
 
     pub fn step(mut self) -> Vec<State> {
         match self.term.clone() {
-            Term::Return(val) => match self.stack.pop() {
-                Some(term) => match term {
-                    StackTerm::Cont(var, term) => {
-                        self.frame.store(var, *val);
+            Term::Return(val) => {
+                let val = self.lookup_value(*val);
 
-                        vec![State {
-                            frame: self.frame, term, stack: self.stack
-                        }]
+                match self.stack.pop() {
+                    Some(term) => match term {
+                        StackTerm::Cont(var, term) => {
+                            let mut frame = Frame::push(self.frame);
+                            frame.store(var, val);
+
+                            vec![State {
+                                frame, term, stack: self.stack
+                            }]
+                        },
+                        _ => unreachable!()
                     },
-                    _ => unreachable!()
-                },
-                None => match *val {
-                    Term::Var(var) => match self.frame.lookup(&var) {
-                        LookupResult::Term(term) => vec![State {
-                            frame: self.frame.pop(),
-                            term: Term::Return(Box::new(term)),
-                            stack: self.stack
-                        }],
-                        LookupResult::Type(_) => todo!(),
-                    },
-                    _ => vec![State {
+                    None => vec![State {
                         frame: self.frame.pop(),
-                        term: Term::Return(val),
+                        term: Term::Return(Box::new(val)),
                         stack: self.stack
                     }]
                 }
@@ -65,7 +60,7 @@ impl State {
                 self.stack.push(StackTerm::Cont(var, *body));
 
                 vec![State {
-                    frame: Frame::push(self.frame), term: *val, stack: self.stack
+                    frame: self.frame, term: *val, stack: self.stack
                 }]
             },
             Term::Add(lhs, rhs) => {
@@ -73,7 +68,7 @@ impl State {
                 let rhs = self.lookup_value(*rhs);
 
                 vec![State {
-                    frame: self.frame,
+                    frame: self.frame.pop().pop(),
                     term: add_terms(lhs, rhs),
                     stack: self.stack
                 }]
@@ -174,20 +169,17 @@ impl State {
         }
     }
 
-    pub fn is_value(&self) -> bool {
-        todo!()
-    }
-
     pub fn as_term(self) -> Term {
-        todo!()
+        self.term
     }
 
     fn lookup_value(&self, term: Term) -> Term {
         match term {
             Term::Var(var) => match self.frame.lookup(&var) {
                 LookupResult::Term(term) => term,
-                LookupResult::Type(_) => unreachable!()
+                LookupResult::Type(_) => todo!()
             },
+            Term::Succ(term) => Term::Succ(Box::new(self.lookup_value(*term))),
             _ => term
         }
     }
@@ -195,13 +187,21 @@ impl State {
 
 fn add_terms(lhs: Term, rhs: Term) -> Term {
     match lhs {
-        Term::Zero => rhs,
+        Term::Zero => Term::Return(Box::new(rhs)),
         Term::Succ(lhs) => match rhs {
-            Term::Zero => Term::Succ(lhs),
+            Term::Zero => Term::Return(Box::new(Term::Succ(lhs))),
             Term::Succ(rhs) => Term::Bind {
-                var: "n".to_string(),
-                val: Box::new(Term::Add(lhs, rhs)),
-                body: Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Var("n".to_string()))))))
+                var: "0".to_string(),
+                val: Box::new(Term::Return(lhs)),
+                body: Box::new(Term::Bind {
+                    var: "1".to_string(),
+                    val: Box::new(Term::Return(rhs)),
+                    body: Box::new(Term::Bind {
+                        var: "2".to_string(),
+                        val: Box::new(Term::Add(Box::new(Term::Var("0".to_string())), Box::new(Term::Var("1".to_string())))),
+                        body: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Var("2".to_string()))))))))
+                    })
+                })
             },
             _ => unreachable!()
         },
