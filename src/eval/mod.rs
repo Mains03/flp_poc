@@ -10,15 +10,17 @@ pub fn eval(cbpv: HashMap<String, Term>) -> Term {
     let mut states = vec![State::new(cbpv)];
 
     loop {
+        println!("{:#?}", states);
+        let mut buf = String::new();
+        stdin().read_line(&mut buf);
+
+        let old = states.clone();
+
         states = states.into_iter()
             .flat_map(|s| s.step())
             .collect();
 
-        let flag = states.iter()
-            .fold(true, |acc, s| {
-                acc && s.is_value()
-            });
-        if flag {
+        if old == states {
             break;
         }
     }

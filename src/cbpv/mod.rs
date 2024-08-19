@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::parser::syntax::r#type::Type;
 
 pub mod translate;

@@ -6,7 +6,7 @@ mod cbpv;
 mod eval;
 
 fn main() {
-    let src = "let n = 1 in (let n = 2 in n) + n.";
+    let src = "id x = x. const x y = id x. const (const 1 2) (id 2).";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);
