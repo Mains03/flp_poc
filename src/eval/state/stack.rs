@@ -1,4 +1,4 @@
-use crate::cbpv::Term;
+use super::StateTerm;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Stack {
@@ -7,8 +7,8 @@ pub struct Stack {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StackTerm {
-    Cont(String, Term),
-    Term(Term),
+    Cont(String, StateTerm),
+    Term(StateTerm),
     PopEnv,
 }
 

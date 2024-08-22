@@ -1,20 +1,19 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{cbpv::Term, parser::syntax::r#type::Type};
+use crate::parser::syntax::r#type::Type;
 
-use super::State;
+use super::state_term::StateTerm;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Env {
     env: HashMap<String, EnvValue>,
-    prev: Option<Box<Env>>
+    prev: Option<Rc<RefCell<Env>>>
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EnvValue {
-    Term(Term),
+    Term(StateTerm),
     Type(Type),
-    Closure(Term, Env)
 }
 
 impl Env {
@@ -22,19 +21,22 @@ impl Env {
         Env { env: HashMap::new(), prev: None }
     }
 
-    pub fn push(old: Env) -> Self {
-        Env { env: HashMap::new(), prev: Some(Box::new(old)) }
+    pub fn push(old: &Rc<RefCell<Env>>) -> Self {
+        Env { env: HashMap::new(), prev: Some(Rc::clone(old)) }
     }
 
-    pub fn pop(self) -> Option<Box<Env>> {
-        self.prev
+    pub fn pop(&self) -> Option<Rc<RefCell<Env>>> {
+        match &self.prev {
+            Some(prev) => Some(Rc::clone(prev)),
+            None => None
+        }
     }
 
     pub fn in_scope(&self, var: &String) -> bool {
         self.env.contains_key(var)
     }
 
-    pub fn store(&mut self, var: String, val: Term) {
+    pub fn store(&mut self, var: String, val: StateTerm) {
         self.env.insert(var, EnvValue::Term(val));
     }
 
@@ -42,15 +44,11 @@ impl Env {
         self.env.insert(var, EnvValue::Type(r#type));
     }
 
-    pub fn store_closure(&mut self, var: String, term: Term, env: Env) {
-        self.env.insert(var, EnvValue::Closure(term, env));
-    }
-
     pub fn lookup(&self, var: &String) -> Option<EnvValue> {
         match self.env.get(var) {
             Some(term) => Some(term.clone()),
             None => match &self.prev {
-                Some(prev) => prev.lookup(var),
+                Some(prev) => prev.borrow().lookup(var),
                 None => None
             }
         }

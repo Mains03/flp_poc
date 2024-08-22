@@ -1,24 +1,22 @@
-use std::{borrow::BorrowMut, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use closure::Closure;
 use env::{Env, EnvValue};
 use stack::{Stack, StackTerm};
+use state_term::StateTerm;
 
 use crate::cbpv::Term;
 
+mod state_term;
 mod env;
 mod stack;
+mod closure;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct State {
-    env: Env,
+    env: Rc<RefCell<Env>>,
     term: StateTerm,
     stack: Stack
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum StateTerm {
-    Term(Term),
-    Closure(Box<State>)
 }
 
 impl State {
@@ -28,125 +26,86 @@ impl State {
         let mut env = Env::new();
         cbpv.into_iter()
             .for_each(|(var, val)| {
-                env.store(var, val);
+                env.store(var, StateTerm::Term(val));
             });
 
-        let mut stack = Stack::new();
-        stack.push(StackTerm::PopEnv);
-
         State {
-            env: Env::push(env), term: StateTerm::Term(term), stack
+            env: Rc::new(RefCell::new(env)),
+            term: StateTerm::Term(term),
+            stack: Stack::new()
         }
     }
 
     pub fn step(mut self) -> Vec<State> {
-        match self.term.clone() {
+        match self.term {
             StateTerm::Term(term) => match term {
-                Term::Return(val) => {
-                    let val = match *val {
-                        Term::Var(var) => match self.env.lookup(&var).unwrap() {
-                            EnvValue::Term(term) => term,
-                            EnvValue::Type(_) => todo!(),
-                            EnvValue::Closure(_, _) => unreachable!()
-                        },
-                        _ => *val
-                    };
+                Term::Return(term) => match self.stack.pop() {
+                    Some(s) => match s {
+                        StackTerm::Cont(var, body) => {
+                            let env = if self.env.borrow().in_scope(&var) {
+                                self.stack.push(StackTerm::PopEnv);
+                                Rc::new(RefCell::new(Env::push(&self.env)))
+                            } else {
+                                self.env
+                            };
 
-                    match self.stack.pop() {
-                        Some(term) => match term {
-                            StackTerm::Cont(var, term) => {
-                                let mut env = if self.env.in_scope(&var) {
-                                    self.stack.push(StackTerm::PopEnv);
-                                    Env::push(self.env)
-                                } else {
-                                    self.env
-                                };
+                            env.borrow_mut().store(var, StateTerm::Closure(Closure::new(
+                                *term, &env
+                            )));
 
-                                env.borrow_mut().store(var, val);
-
-                                vec![State {
-                                    env, term: StateTerm::Term(term), stack: self.stack
-                                }]
-                            },
-                            StackTerm::PopEnv => vec![State {
-                                env: *self.env.pop().unwrap(),
-                                term: StateTerm::Term(Term::Return(Box::new(val))),
+                            vec![State {
+                                env,
+                                term: body,
                                 stack: self.stack
-                            }],
-                            _ => unreachable!()
+                            }]
                         },
-                        None => vec![State {
-                            env: self.env,
-                            term: StateTerm::Term(Term::Return(Box::new(val))),
-                            stack: self.stack
-                        }]
-                    }
-                },
-                Term::Bind { var, val, body } => {
-                    self.stack.push(StackTerm::Cont(var, *body));
+                        StackTerm::PopEnv => match *term {
+                            Term::Var(var) => {
+                                let term = self.env.borrow().lookup(&var).unwrap();
 
-                    vec![State {
-                        env: self.env, term: StateTerm::Term(*val), stack: self.stack
-                    }]
-                },
-                Term::Add(lhs, rhs) => {
-                    let lhs = match *lhs {
-                        Term::Var(var) => match self.env.lookup(&var).unwrap() {
-                            EnvValue::Term(term) => term,
-                            EnvValue::Type(_) => todo!(),
-                            EnvValue::Closure(_, _) => unreachable!()
+                                match term {
+                                    EnvValue::Term(term) => match term {
+                                        StateTerm::Term(term) => vec![State {
+                                            env: self.env,
+                                            term: StateTerm::Term(Term::Return(Box::new(term))),
+                                            stack: self.stack
+                                        }],
+                                        StateTerm::Closure(closure) => vec![State {
+                                            env: self.env,
+                                            term: StateTerm::Closure(Closure::new(
+                                                Term::Return(Box::new(closure.term)), &closure.env
+                                            )),
+                                            stack: self.stack
+                                        }]
+                                    },
+                                    EnvValue::Type(_) => todo!()
+                                }
+                            },
+                            term => vec![State {
+                                env: self.env,
+                                term: StateTerm::Term(Term::Return(Box::new(term))),
+                                stack: self.stack
+                            }]
                         },
-                        _ => *lhs
-                    };
-
-                    let rhs = match *rhs {
-                        Term::Var(var) => match self.env.lookup(&var).unwrap() {
-                            EnvValue::Term(term) => term,
-                            EnvValue::Type(_) => todo!(),
-                            EnvValue::Closure(_, _) => unreachable!()
-                        },
-                        _ => *rhs
-                    };
-
-                    vec![State {
+                        StackTerm::Term(_) => unreachable!()
+                    },
+                    None => vec![State {
                         env: self.env,
-                        term: StateTerm::Term(add_terms(lhs, rhs)),
+                        term: StateTerm::Term(Term::Return(term)),
                         stack: self.stack
                     }]
                 },
-                Term::Force(term) => {
-                    match *term {
-                        Term::Var(var) => match self.env.lookup(&var).unwrap() {
-                            EnvValue::Term(term) => match term {
-                                Term::Thunk(term) => vec![State {
-                                    env: self.env,
-                                    term: StateTerm::Term(*term),
-                                    stack: self.stack
-                                }],
-                                _ => unreachable!()
-                            },
-                            EnvValue::Closure(term, env) => match term {
-                                Term::Thunk(term) => vec![State {
-                                    env: self.env,
-                                    term: StateTerm::Closure(Box::new(State {
-                                        env, term: StateTerm::Term(*term), stack: Stack::new()
-                                    })),
-                                    stack: self.stack
-                                }],
-                                _ => unreachable!()
-                            }
-                            _ => unreachable!()
-                        },
-                        Term::Thunk(term) => vec![State {
-                            env: self.env,
-                            term: StateTerm::Term(*term),
-                            stack: self.stack
-                        }],
-                        _ => unreachable!()
-                    }
+                Term::Bind { var, val, body } => {
+                    self.stack.push(StackTerm::Cont(var, StateTerm::Term(*body)));
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Term(*val),
+                        stack: self.stack
+                    }]
                 },
                 Term::App(lhs, rhs) => {
-                    self.stack.push(StackTerm::Term(*rhs));
+                    self.stack.push(StackTerm::Term(StateTerm::Term(*rhs)));
 
                     vec![State {
                         env: self.env,
@@ -154,76 +113,65 @@ impl State {
                         stack: self.stack
                     }]
                 },
-                Term::Lambda { var, body } => match self.stack.pop() {
-                    Some(term) => match term {
-                        StackTerm::Term(term) => {
-                            let term = match term {
-                                Term::Var(var) => match self.env.lookup(&var).unwrap() {
-                                    EnvValue::Term(term) => term,
-                                    EnvValue::Type(_) => todo!(),
-                                    EnvValue::Closure(_, _) => unreachable!()
-                                },
-                                _ => term
-                            };
-
-                            let env = self.env.clone();
-                            let mut env = if env.in_scope(&var) {
-                                Env::push(env)
-                            } else {
-                                env
-                            };
-
-                            env.store(var, term);
-
-                            vec![State {
-                                env: self.env,
-                                term: StateTerm::Closure(Box::new(State {
-                                    env, term: StateTerm::Term(*body), stack: Stack::new()
-                                })),
-                                stack: self.stack
-                            }]
+                Term::Force(term) => {
+                    let term = match *term {
+                        Term::Var(var) => match self.env.borrow().lookup(&var).unwrap() {
+                            EnvValue::Term(term) => term,
+                            EnvValue::Type(_) => unreachable!()
                         },
                         _ => unreachable!()
-                    },
-                    _ => unreachable!()
-                },
-                _ => vec![State {
-                    env: self.env,
-                    term: self.term,
-                    stack: self.stack
-                }]
-            },
-            StateTerm::Closure(mut state) => match state.term {
-                StateTerm::Term(term) => match term {
-                    Term::Return(term) => match *term {
-                        Term::Var(var) => match state.env.lookup(&var).unwrap() {
-                            EnvValue::Term(term) => vec![State {
+                    };
+
+                    match term {
+                        StateTerm::Term(term) => match term {
+                            Term::Thunk(term) => vec![State {
                                 env: self.env,
-                                term: StateTerm::Term(term),
+                                term: StateTerm::Term(*term),
                                 stack: self.stack
                             }],
-                            EnvValue::Type(_) => todo!(),
-                            EnvValue::Closure(term, env) => vec![State {
-                                env: self.env,
-                                term: StateTerm::Closure(Box::new(State {
-                                    env,
-                                    term: StateTerm::Term(term),
-                                    stack: Stack::new()
-                                })),
-                                stack: self.stack
-                            }]
+                            _ => unreachable!()
                         },
-                        Term::Thunk(_) => match self.stack.pop() {
-                            Some(t) => match t {
-                                StackTerm::Cont(var, body) => {
-                                    let mut env = if self.env.in_scope(&var) {
+                        StateTerm::Closure(closure) => match closure.term {
+                            Term::Thunk(term) => vec![State {
+                                env: self.env,
+                                term: StateTerm::Closure(Closure::new(
+                                    *term, &closure.env
+                                )),
+                                stack: self.stack
+                            }],
+                            _ => unreachable!()
+                        }
+                    }
+                },
+                _ => unreachable!()
+            },
+            StateTerm::Closure(closure) => match closure.term {
+                Term::Return(term) => {
+                    let term = match *term {
+                        Term::Var(var) => match closure.env.borrow().lookup(&var).unwrap() {
+                            EnvValue::Term(term) => match term {
+                                StateTerm::Term(term) => term,
+                                StateTerm::Closure(_) => unreachable!()
+                            },
+                            EnvValue::Type(_) => todo!()
+                        },
+                        _ => *term
+                    };
+
+                    match self.stack.pop() {
+                        Some(s) => match s {
+                            StackTerm::Cont(var, body) => match body {
+                                StateTerm::Term(body) => {
+                                    let env = if self.env.borrow().in_scope(&var) {
                                         self.stack.push(StackTerm::PopEnv);
-                                        Env::push(self.env)
+                                        Rc::new(RefCell::new(Env::push(&self.env)))
                                     } else {
                                         self.env
                                     };
 
-                                    env.store_closure(var, *term, state.env);
+                                    env.borrow_mut().store(var, StateTerm::Closure(Closure::new(
+                                        term, &closure.env
+                                    )));
 
                                     vec![State {
                                         env,
@@ -231,69 +179,102 @@ impl State {
                                         stack: self.stack
                                     }]
                                 },
-                                StackTerm::PopEnv => vec![State {
-                                    env: *self.env.pop().unwrap(),
-                                    term: StateTerm::Closure(Box::new(State {
-                                        env: state.env,
-                                        term: StateTerm::Term(Term::Return(term)),
-                                        stack: state.stack
-                                    })),
-                                    stack: self.stack
-                                }],
-                                _ => unreachable!()
+                                StateTerm::Closure(body) => {
+                                    let env = if body.env.borrow().in_scope(&var) {
+                                        self.stack.push(StackTerm::PopEnv);
+                                        Rc::new(RefCell::new(Env::push(&closure.env)))
+                                    } else {
+                                        body.env
+                                    };
+
+                                    env.borrow_mut().store(var, StateTerm::Closure(Closure::new(
+                                        term, &closure.env
+                                    )));
+
+                                    vec![State {
+                                        env: self.env,
+                                        term: StateTerm::Closure(Closure::new(
+                                            body.term, &env
+                                        )),
+                                        stack: self.stack
+                                    }]
+                                }
                             },
-                            None => unreachable!()
+                            StackTerm::PopEnv => match closure.term {
+                                Term::Var(var) => match closure.env.borrow().lookup(&var).unwrap() {
+                                    EnvValue::Term(term) => match term {
+                                        StateTerm::Term(term) => vec![State {
+                                            env: self.env,
+                                            term: StateTerm::Closure(Closure::new(
+                                                Term::Return(Box::new(term)), &closure.env.borrow().pop().unwrap()
+                                            )),
+                                            stack: self.stack
+                                        }],
+                                        _ => todo!()
+                                    },
+                                    EnvValue::Type(_) => todo!()
+                                },
+                                _ => todo!()
+                            }
+                            StackTerm::Term(_) => unreachable!()
                         },
-                        term => vec![State {
+                        None => vec![State {
                             env: self.env,
-                            term: StateTerm::Term(term),
+                            term: StateTerm::Term(Term::Return(Box::new(term))),
                             stack: self.stack
                         }]
-                    },
-                    Term::Lambda { var, body } => match self.stack.pop().unwrap() {
-                        StackTerm::Term(term) => {
-                            let mut env = if state.env.in_scope(&var) {
-                                state.stack.push(StackTerm::PopEnv);
-                                Env::push(state.env)
-                            } else {
-                                state.env
-                            };
-
-                            env.store(var, term);
-
-                            vec![State {
-                                env: self.env,
-                                term: StateTerm::Closure(Box::new(State {
-                                    env,
-                                    term: StateTerm::Term(*body),
-                                    stack: state.stack
-                                })),
-                                stack: self.stack
-                            }]
-                        },
-                        _ => unreachable!()
-                    },
-                    _ => {
-                        let states = State {
-                            env: state.env,
-                            term: StateTerm::Term(term),
-                            stack: state.stack
-                        }.step();
-
-                        states.into_iter()
-                            .map(|state| State {
-                                env: self.env.clone(),
-                                term: StateTerm::Closure(Box::new(state)),
-                                stack: self.stack.clone()
-                            }).collect()
                     }
                 },
-                _ => state.step().into_iter()
-                    .map(|state| State {
-                        env: self.env.clone(),
-                        term: StateTerm::Closure(Box::new(state)),
-                        stack: self.stack.clone()
-                    }).collect()
+                Term::Bind { var, val, body } => {
+                    self.stack.push(StackTerm::Cont(var, StateTerm::Closure(Closure::new(
+                        *body, &closure.env
+                    ))));
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Closure(Closure::new(
+                            *val, &closure.env
+                        )),
+                        stack: self.stack
+                    }]
+                },
+                Term::Add(lhs, rhs) => {
+                    self.stack.push(StackTerm::Term(StateTerm::Closure(Closure::new(
+                        *rhs, &closure.env
+                    ))));
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Closure(Closure::new(
+                            *lhs, &closure.env
+                        )),
+                        stack: self.stack
+                    }]
+                },
+                Term::Force(term) => {
+                    let term = match *term {
+                        Term::Var(var) => match closure.env.borrow().lookup(&var).unwrap() {
+                            EnvValue::Term(term) => term,
+                            EnvValue::Type(_) => unreachable!()
+                        },
+                        _ => unreachable!()
+                    };
+
+                    match term {
+                        StateTerm::Term(term) => match term {
+                            Term::Thunk(term) => vec![State {
+                                env: self.env,
+                                term: StateTerm::Closure(Closure::new(
+                                    *term, &closure.env
+                                )),
+                                stack: self.stack
+                            }],
+                            _ => unreachable!()
+                        },
+                        _ => todo!()
+                    }
+                }
+                _ => unreachable!()
             }
         }
     }
