@@ -4,13 +4,13 @@ use crate::{cbpv::Term, parser::syntax::r#type::Type};
 
 use super::state_term::StateTerm;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Env {
     env: HashMap<String, EnvValue>,
     prev: Option<Rc<RefCell<Env>>>
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum EnvValue {
     Term(StateTerm),
     Type(Type),
@@ -37,6 +37,10 @@ impl Env {
     }
 
     pub fn store(&mut self, var: String, val: StateTerm) {
+        let val = match val {
+            StateTerm::Closure(closure) => StateTerm::Closure(closure.fix_cycle(self)),
+            _ => val
+        };
         self.env.insert(var, EnvValue::Term(val));
     }
 

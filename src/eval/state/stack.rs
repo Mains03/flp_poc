@@ -1,11 +1,11 @@
 use super::StateTerm;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub struct Stack {
     stack: Vec<StackTerm>
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub enum StackTerm {
     Cont(String, StateTerm),
     Term(StateTerm),
@@ -27,5 +27,9 @@ impl Stack {
         } else {
             Some(self.stack.remove(self.stack.len()-1))
         }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.stack.len() == 0
     }
 }
