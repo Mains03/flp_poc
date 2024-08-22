@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::stdin};
+use std::collections::HashMap;
 
 use state::State;
 
@@ -10,10 +10,6 @@ pub fn eval(cbpv: HashMap<String, Term>) -> Term {
     let mut states = vec![State::new(cbpv)];
 
     loop {
-        println!("{:#?}", states);
-        let mut buf = String::new();
-        stdin().read_line(&mut buf);
-
         let old = states.clone();
 
         states = states.into_iter()

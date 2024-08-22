@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::parser::syntax::r#type::Type;
+use crate::{cbpv::Term, parser::syntax::r#type::Type};
 
 use super::state_term::StateTerm;
 
@@ -46,7 +46,16 @@ impl Env {
 
     pub fn lookup(&self, var: &String) -> Option<EnvValue> {
         match self.env.get(var) {
-            Some(term) => Some(term.clone()),
+            Some(term) => match term {
+                EnvValue::Term(term) => match term {
+                    StateTerm::Term(term) => match term {
+                        Term::Var(var) => self.lookup(var),
+                        _ => Some(EnvValue::Term(StateTerm::Term(term.clone())))
+                    },
+                    StateTerm::Closure(_) => Some(EnvValue::Term(term.clone()))
+                },
+                EnvValue::Type(_) => Some(term.clone())
+            },
             None => match &self.prev {
                 Some(prev) => prev.borrow().lookup(var),
                 None => None
