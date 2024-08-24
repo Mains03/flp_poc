@@ -9,7 +9,7 @@ pub struct Stack {
 pub enum StackTerm {
     Cont(String, StateTerm),
     Term(StateTerm),
-    PopEnv,
+    Release(String),
 }
 
 impl Stack {

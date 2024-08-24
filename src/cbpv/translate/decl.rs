@@ -15,9 +15,16 @@ fn translate_func(mut args: Vec<String>, body: Stm) -> Term {
     args.reverse();
 
     if args.len() > 0 {
+        let var = args.remove(args.len()-1);
+        let body = translate_func_helper(args, body);
+
+        let mut free_vars = body.free_vars();
+        free_vars.remove(&var);
+
         Term::Thunk(Box::new(Term::Lambda {
-            var: args.remove(args.len()-1),
-            body: Box::new(translate_func_helper(args, body))
+            var,
+            free_vars,
+            body: Box::new(body)
         }))
     } else {
         translate_func_helper(args, body)
@@ -28,9 +35,16 @@ fn translate_func_helper(mut args: Vec<String>, body: Stm) -> Term {
     if args.len() == 0 {
         body.translate()
     } else {
+        let var = args.remove(args.len()-1);
+        let body = translate_func_helper(args, body);
+
+        let mut free_vars = body.free_vars();
+        free_vars.remove(&var);
+
         Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
-            var: args.remove(args.len()-1),
-            body: Box::new(translate_func_helper(args, body))
+            var,
+            free_vars,
+            body: Box::new(body)
         }))))
     }
 }

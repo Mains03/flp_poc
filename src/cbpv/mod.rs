@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::collections::HashSet;
 
 use crate::parser::syntax::r#type::Type;
 
@@ -36,6 +36,7 @@ pub enum Term {
     },
     Lambda {
         var: String,
+        free_vars: HashSet<String>,
         body: Box<Term>
     },
     Choice(Vec<Term>),
@@ -44,4 +45,44 @@ pub enum Term {
     Force(Box<Term>),
     App(Box<Term>, Box<Term>),
     Fail
+}
+
+impl Term {
+    pub fn free_vars(&self) -> HashSet<String> {
+        match self {
+            Term::Var(var) => HashSet::from_iter(vec![var.to_string()]),
+            Term::If { cond: _, then, r#else } => {
+                let mut free_vars = then.free_vars();
+                free_vars.extend(r#else.free_vars());
+                free_vars
+            },
+            Term::Bind { var, val, body } => {
+                let mut free_vars = val.free_vars();
+                free_vars.extend(body.free_vars());
+                free_vars.remove(var);
+                free_vars
+            },
+            Term::Exists { var, r#type: _, body } => {
+                let mut free_vars = body.free_vars();
+                free_vars.remove(var);
+                free_vars
+            },
+            Term::Equate { lhs: _, rhs: _, body } => body.free_vars(),
+            Term::Lambda { var: _, free_vars, body: _ } => free_vars.clone(),
+            Term::Choice(v) => v.iter()
+                .fold(HashSet::new(), |mut acc, x| {
+                    acc.extend(x.free_vars());
+                    acc
+                }),
+            Term::Thunk(term) => term.free_vars(),
+            Term::Return(term) => term.free_vars(),
+            Term::Force(term) => term.free_vars(),
+            Term::App(lhs, rhs) => {
+                let mut free_vars = lhs.free_vars();
+                free_vars.extend(rhs.free_vars());
+                free_vars
+            },
+            _ => HashSet::new(),
+        }
+    }
 }

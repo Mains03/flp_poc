@@ -35,6 +35,8 @@ trait Translate {
 
 #[cfg(test)]
 mod test {
+    use std::collections::HashSet;
+
     use crate::parser;
 
     use super::*;
@@ -146,10 +148,59 @@ const x y = x.";
             term,
             Term::Thunk(Box::new(Term::Lambda {
                 var: "x".to_string(),
+                free_vars: HashSet::new(),
                 body: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
                     var: "y".to_string(),
+                    free_vars: HashSet::from_iter(vec!["x".to_string()]),
                     body: Box::new(Term::Return(Box::new(Term::Var("x".to_string()))))
                 })))))
+            }))
+        )
+    }
+
+    #[test]
+    fn test5() {
+        let src = "const :: a -> b -> a
+const x y = x.
+        
+id :: a -> a
+id x = let f = const x in f 1.";
+
+        let mut cbpv = translate(parser::parse(src).unwrap());
+        let term = cbpv.remove("id").unwrap();
+
+        assert_eq!(
+            term,
+            Term::Thunk(Box::new(Term::Lambda {
+                var: "x".to_string(),
+                free_vars: HashSet::from_iter(vec!["const".to_string()]),
+                body: Box::new(Term::Bind {
+                    var: "f".to_string(),
+                    val: Box::new(Term::Bind {
+                        var: "0".to_string(),
+                        val: Box::new(Term::Return(Box::new(Term::Var("x".to_string())))),
+                        body: Box::new(Term::Bind {
+                            var: "1".to_string(),
+                            val: Box::new(Term::Return(Box::new(Term::Var("const".to_string())))),
+                            body: Box::new(Term::App(
+                                Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
+                                Box::new(Term::Var("0".to_string()))
+                            ))
+                        })
+                    }),
+                    body: Box::new(Term::Bind {
+                        var: "0".to_string(),
+                        val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
+                        body: Box::new(Term::Bind {
+                            var: "1".to_string(),
+                            val: Box::new(Term::Return(Box::new(Term::Var("f".to_string())))),
+                            body: Box::new(Term::App(
+                                Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
+                                Box::new(Term::Var("0".to_string()))
+                            ))
+                        })
+                    })
+                })
             }))
         )
     }
