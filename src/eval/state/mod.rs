@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use closure::Closure;
+use closure::{Closure, ClosureVars};
 use env::{env::Env, env_value::EnvValue};
 use stack::{Stack, StackTerm};
 use state_term::StateTerm;
@@ -72,7 +72,7 @@ impl State {
                                     }]
                                 },
                                 StateTerm::Closure(mut body) => {
-                                    body.vars.insert(var, EnvValue::Term(StateTerm::Term(*term)));
+                                    body.vars.store(var, EnvValue::Term(StateTerm::Term(*term)));
 
                                     vec![State {
                                         env: self.env,
@@ -153,14 +153,14 @@ impl State {
                 },
                 Term::Lambda { var, free_vars, body } => match self.stack.pop().unwrap() {
                     StackTerm::Term(term) => {
-                        let mut vars = HashMap::new();
-                        vars.insert(var, EnvValue::Term(term));
+                        let mut vars = ClosureVars::new();
+                        vars.store(var, EnvValue::Term(term));
 
                         free_vars.into_iter()
                             .for_each(|var| {
                                 let val = self.env.lookup(&var).unwrap();
 
-                                vars.insert(var, val);
+                                vars.store(var, val);
                             });
 
                         vec![State {
@@ -175,9 +175,9 @@ impl State {
                 }
                 _ => unreachable!()
             },
-            StateTerm::Closure(closure) => match closure.term.clone() {
+            StateTerm::Closure(closure) => match closure.term {
                 Term::Return(term) => match *term {
-                    Term::Var(var) => match closure.lookup(&var).unwrap() {
+                    Term::Var(var) => match closure.vars.lookup(&var).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => vec![State {
                                 env: self.env,
@@ -211,7 +211,7 @@ impl State {
                                     }]
                                 },
                                 StateTerm::Closure(mut body) => {
-                                    body.vars.insert(var, EnvValue::Term(StateTerm::Closure(Closure {
+                                    body.vars.store(var, EnvValue::Term(StateTerm::Closure(Closure {
                                         term: *term, vars: closure.vars
                                     })));
 
@@ -228,7 +228,7 @@ impl State {
                                 vec![State {
                                     env: self.env,
                                     term: StateTerm::Closure(Closure {
-                                        term: closure.term, vars: closure.vars
+                                        term: Term::Return(term), vars: closure.vars
                                     }),
                                     stack: self.stack
                                 }]
@@ -253,7 +253,7 @@ impl State {
                 }
                 Term::App(lhs, rhs) => {
                     let rhs = match *rhs {
-                        Term::Var(var) => match closure.lookup(&var).unwrap() {
+                        Term::Var(var) => match closure.vars.lookup(&var).unwrap() {
                             EnvValue::Term(term) => term,
                             EnvValue::Type(_) => todo!()
                         },
@@ -271,7 +271,7 @@ impl State {
                     }]
                 }
                 Term::Force(term) => match *term {
-                    Term::Var(var) => match closure.lookup(&var).unwrap() {
+                    Term::Var(var) => match closure.vars.lookup(&var).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => match term {
                                 Term::Thunk(term) => vec![State {
@@ -298,14 +298,14 @@ impl State {
                 },
                 Term::Lambda { var, free_vars,  body } => match self.stack.pop().unwrap() {
                     StackTerm::Term(term) => {
-                        let mut vars = HashMap::new();
-                        vars.insert(var, EnvValue::Term(term));
+                        let mut vars = ClosureVars::new();
+                        vars.store(var, EnvValue::Term(term));
 
                         free_vars.iter()
                             .for_each(|var| {
-                                let val = closure.lookup(var).unwrap();
+                                let val = closure.vars.lookup(var).unwrap();
 
-                                vars.insert(var.clone(), val);
+                                vars.store(var.clone(), val);
                             });
 
                         vec![State {
