@@ -6,7 +6,7 @@ mod cbpv;
 mod eval;
 
 fn main() {
-    let src = "const x y = x. id x = let f = const x in f 2. id 1.";
+    let src = "const x y = x. id x = let f = const x in f 10. const (id 1) (id 2).";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);

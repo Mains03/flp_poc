@@ -6,31 +6,24 @@ use super::env_value::EnvValue;
 
 #[derive(Debug)]
 pub struct Env {
-    env: HashMap<String, EnvValue>,
-    prev: Option<Box<Env>>
+    envs: Vec<HashMap<String, EnvValue>>
 }
 
 impl Env {
     pub fn new() -> Self {
-        Env { env: HashMap::new(), prev: None }
+        Env { envs: vec![HashMap::new()] }
     }
 
-    pub fn store(self, var: String, val: StateTerm) -> Self {
+    pub fn store(&mut self, var: String, val: StateTerm) {
         let val = EnvValue::Term(val);
 
-        if self.env.contains_key(&var) {
-            let prev = Some(Box::new(Env { env: self.env, prev: self.prev }));
+        if self.envs.get(self.envs.len()-1).unwrap().contains_key(&var) {
+            self.envs.push(HashMap::new());
+        };
 
-            let mut env = HashMap::new();
-            env.insert(var, val);
-
-            Env { env, prev }
-        } else {
-            let mut env = self.env;
-            env.insert(var, val);
-
-            Env { env, prev: self.prev }
-        }
+        let i = self.envs.len()-1;
+        let env = self.envs.get_mut(i).unwrap();
+        env.insert(var, val);
     }
 
     pub fn bind(&mut self, _: String, _: Type) {
@@ -38,27 +31,50 @@ impl Env {
     }
 
     pub fn lookup(&self, var: &String) -> Option<EnvValue> {
-        match self.env.get(var) {
-            Some(val) => Some(val.clone()),
-            None => match &self.prev {
-                Some(prev) => prev.lookup(var),
-                None => None
+        let mut i = self.envs.len()-1;
+        let ret;
+        loop {
+            let env = self.envs.get(i).unwrap();
+            match env.get(var) {
+                Some(val) => {
+                    ret = Some(val.clone());
+                    break;
+                },
+                None => if i == 0 {
+                    ret = None;
+                    break;
+                } else {
+                    i -= 1;
+                }
             }
         }
+
+        ret
     }
 
-    pub fn release(mut self, var: &String) -> Self {
-        if self.env.contains_key(var) {
-            self.env.remove(var);
-            if self.env.is_empty() {
-                *self.prev.unwrap()
+    pub fn release(&mut self, var: &String) {
+        let mut i = self.envs.len()-1;
+        loop {
+            let env = self.envs.get_mut(i).unwrap();
+
+            if env.contains_key(var) {
+                env.remove(var);
+                break;
             } else {
-                self
+                if i == 0 {
+                    break;
+                } else {
+                    i -= 1;
+                }
             }
-        } else {
-            let prev = self.prev.unwrap().release(var);
-            
-            Env { env: self.env, prev: Some(Box::new(prev)) }
+        }
+
+        loop {
+            if self.envs.get(self.envs.len()-1).unwrap().is_empty() {
+                self.envs.remove(self.envs.len()-1);
+            } else {
+                break;
+            }
         }
     }
 }

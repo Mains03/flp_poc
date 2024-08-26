@@ -23,8 +23,11 @@ impl State {
     pub fn new(mut cbpv: HashMap<String, Term>) -> Self {
         let term = cbpv.remove("main").unwrap();
 
-        let env = cbpv.into_iter()
-            .fold(Env::new(), |env, (var, val)| env.store(var, StateTerm::Term(val)));
+        let mut env = Env::new();
+        cbpv.into_iter()
+            .for_each(|(var, val)| {
+                env.store(var, StateTerm::Term(val))
+            });
 
         State {
             env,
@@ -59,11 +62,11 @@ impl State {
                         Some(s) => match s {
                             StackTerm::Cont(var, body) => match body {
                                 StateTerm::Term(_) => {
-                                    let env = self.env.store(var.clone(), StateTerm::Term(*term));
+                                    self.env.store(var.clone(), StateTerm::Term(*term));
                                     self.stack.push(StackTerm::Release(var));
 
                                     vec![State {
-                                        env,
+                                        env: self.env,
                                         term: body,
                                         stack: self.stack
                                     }]
@@ -79,10 +82,10 @@ impl State {
                                 }
                             },
                             StackTerm::Release(var) => {
-                                let env = self.env.release(&var);
+                                self.env.release(&var);
 
                                 vec![State {
-                                    env,
+                                    env: self.env,
                                     term: StateTerm::Term(Term::Return(term)),
                                     stack: self.stack
                                 }]
@@ -195,14 +198,14 @@ impl State {
                         Some(s) => match s {
                             StackTerm::Cont(var, body) => match body {
                                 StateTerm::Term(_) => {
-                                    let env = self.env.store(var.clone(), StateTerm::Closure(Closure {
+                                    self.env.store(var.clone(), StateTerm::Closure(Closure {
                                         term: *term, vars: closure.vars
                                     }));
 
                                     self.stack.push(StackTerm::Release(var));
 
                                     vec![State {
-                                        env,
+                                        env: self.env,
                                         term: body,
                                         stack: self.stack
                                     }]
@@ -220,10 +223,10 @@ impl State {
                                 }
                             },
                             StackTerm::Release(var) => {
-                                let env = self.env.release(&var);
+                                self.env.release(&var);
 
                                 vec![State {
-                                    env,
+                                    env: self.env,
                                     term: StateTerm::Closure(Closure {
                                         term: closure.term, vars: closure.vars
                                     }),
