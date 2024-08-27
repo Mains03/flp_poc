@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::{eval::state::state_term::StateTerm, parser::syntax::r#type::Type};
+use crate::{eval::state::{env_lookup::EnvLookup, state_term::StateTerm}, parser::syntax::r#type::Type};
 
 use super::env_value::EnvValue;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Env {
     envs: Vec<HashMap<String, EnvValue>>
 }
@@ -30,28 +30,6 @@ impl Env {
         todo!()
     }
 
-    pub fn lookup(&self, var: &String) -> Option<EnvValue> {
-        let mut i = self.envs.len()-1;
-        let ret;
-        loop {
-            let env = self.envs.get(i).unwrap();
-            match env.get(var) {
-                Some(val) => {
-                    ret = Some(val.clone());
-                    break;
-                },
-                None => if i == 0 {
-                    ret = None;
-                    break;
-                } else {
-                    i -= 1;
-                }
-            }
-        }
-
-        ret
-    }
-
     pub fn release(&mut self, var: &String) {
         let mut i = self.envs.len()-1;
         loop {
@@ -71,10 +49,38 @@ impl Env {
 
         loop {
             if self.envs.get(self.envs.len()-1).unwrap().is_empty() {
-                self.envs.remove(self.envs.len()-1);
+                if self.envs.len() > 1 {
+                    self.envs.remove(self.envs.len()-1);
+                } else {
+                    break;
+                }
             } else {
                 break;
             }
         }
+    }
+}
+
+impl EnvLookup for Env {
+    fn lookup(&self, var: &String) -> Option<EnvValue> {
+        let mut i = self.envs.len()-1;
+        let ret;
+        loop {
+            let env = self.envs.get(i).unwrap();
+            match env.get(var) {
+                Some(val) => {
+                    ret = Some(val.clone());
+                    break;
+                },
+                None => if i == 0 {
+                    ret = None;
+                    break;
+                } else {
+                    i -= 1;
+                }
+            }
+        }
+
+        ret
     }
 }

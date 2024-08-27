@@ -1,11 +1,11 @@
 use super::StateTerm;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Stack {
     stack: Vec<StackTerm>
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum StackTerm {
     Cont(String, StateTerm),
     Term(StateTerm),
