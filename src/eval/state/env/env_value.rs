@@ -32,4 +32,18 @@ impl TypeVal {
             None => None
         }
     }
+
+    pub fn set_shape(&mut self, shape: &Term)  {
+        self.val = Some(TypeVal::set_shape_helper(shape));
+    }
+
+    fn set_shape_helper(shape: &Term) -> Shape {
+        match shape {
+            Term::Succ(succ) => Shape::Succ(Rc::new(RefCell::new(TypeVal {
+                val: Some(TypeVal::set_shape_helper(succ))
+            }))),
+            Term::Zero => Shape::Zero,
+            _ => unreachable!()
+        }
+    }
 }

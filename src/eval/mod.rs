@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::stdin};
+use std::collections::HashMap;
 
 use state::State;
 

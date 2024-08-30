@@ -34,28 +34,6 @@ impl Env {
         env.insert(var, val);
     }
 
-    pub fn set_shape(&mut self, var: String, shape: Shape) {
-        let mut i = self.envs.len()-1;
-        loop {
-            let env = self.envs.get(i).unwrap();
-            match env.get(&var) {
-                Some(val) => {
-                    match val {
-                        EnvValue::Type(r#type) => r#type.borrow_mut().val = Some(shape),
-                        EnvValue::Term(_) => unreachable!()
-                    }
-
-                    break;
-                },
-                None => if i == 0 {
-                    unreachable!();
-                } else {
-                    i -= 1;
-                }
-            }
-        }
-    }
-
     pub fn release(&mut self, var: &String) {
         let mut i = self.envs.len()-1;
         loop {
