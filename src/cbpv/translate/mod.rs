@@ -64,14 +64,14 @@ mod test {
                             var: "1".to_string(),
                             val: Box::new(Term::Return(Box::new(Term::Var("const".to_string())))),
                             body: Box::new(Term::App(
-                                Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
-                                Box::new(Term::Var("0".to_string()))
+                                Box::new(Term::Force("1".to_string())),
+                                "0".to_string()
                             ))
                         })
                     }),
                     body: Box::new(Term::App(
-                        Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
-                        Box::new(Term::Var("0".to_string()))
+                        Box::new(Term::Force("1".to_string())),
+                        "0".to_string()
                     ))
                 })
             }
@@ -99,8 +99,8 @@ mod test {
                         var: "1".to_string(),
                         val: Box::new(Term::Return(Box::new(Term::Var("id".to_string())))),
                         body: Box::new(Term::App(
-                            Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
-                            Box::new(Term::Var("0".to_string()))
+                            Box::new(Term::Force("1".to_string())),
+                            "0".to_string()
                         ))
                     })
                 })
@@ -126,8 +126,8 @@ mod test {
                         var: "1".to_string(),
                         val: Box::new(Term::Return(Box::new(Term::Var("id".to_string())))),
                         body: Box::new(Term::App(
-                            Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
-                            Box::new(Term::Var("0".to_string()))
+                            Box::new(Term::Force("1".to_string())),
+                            "0".to_string()
                         ))
                     })
                 },
@@ -183,8 +183,8 @@ id x = let f = const x in f 1.";
                             var: "1".to_string(),
                             val: Box::new(Term::Return(Box::new(Term::Var("const".to_string())))),
                             body: Box::new(Term::App(
-                                Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
-                                Box::new(Term::Var("0".to_string()))
+                                Box::new(Term::Force("1".to_string())),
+                                "0".to_string()
                             ))
                         })
                     }),
@@ -195,8 +195,8 @@ id x = let f = const x in f 1.";
                             var: "1".to_string(),
                             val: Box::new(Term::Return(Box::new(Term::Var("f".to_string())))),
                             body: Box::new(Term::App(
-                                Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
-                                Box::new(Term::Var("0".to_string()))
+                                Box::new(Term::Force("1".to_string())),
+                                "0".to_string()
                             ))
                         })
                     })

@@ -12,8 +12,8 @@ impl Translate for Expr {
                     var: "1".to_string(),
                     val: Box::new(rhs.translate()),
                     body: Box::new(Term::Add(
-                        Box::new(Term::Var("0".to_string())),
-                        Box::new(Term::Var("1".to_string()))
+                        "0".to_string(),
+                        "1".to_string()
                     ))
                 })
             },
@@ -24,8 +24,8 @@ impl Translate for Expr {
                     var: "1".to_string(),
                     val: Box::new(lhs.translate()),
                     body: Box::new(Term::App(
-                        Box::new(Term::Force(Box::new(Term::Var("1".to_string())))),
-                        Box::new(Term::Var("0".to_string()))
+                        Box::new(Term::Force("1".to_string())),
+                        "0".to_string()
                     ))
                 })
             },

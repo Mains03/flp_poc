@@ -6,12 +6,7 @@ mod cbpv;
 mod eval;
 
 fn main() {
-    let src = "
-subtract n m = exists z :: Nat. z+m =:= n. z.
-
-subtract_one m = subtract 1 m.
-
-subtract_one 2.";
+    let src = "exists n :: Nat. n+n =:= 2. n.";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);

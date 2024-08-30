@@ -9,7 +9,7 @@ impl Translate for Stm {
                 var: "".to_string(),
                 val: Box::new(cond.translate()),
                 body: Box::new(Term::If {
-                    cond: Box::new(Term::Var("".to_string())),
+                    cond: "".to_string(),
                     then: Box::new(then.translate()),
                     r#else: Box::new(r#else.translate())
                 })
@@ -31,8 +31,8 @@ impl Translate for Stm {
                     var: "1".to_string(),
                     val: Box::new(rhs.translate()),
                     body: Box::new(Term::Equate {
-                        lhs: Box::new(Term::Var("0".to_string())),
-                        rhs: Box::new(Term::Var("1".to_string())),
+                        lhs: "0".to_string(),
+                        rhs: "1".to_string(),
                         body: Box::new(body.translate())
                     })
                 })

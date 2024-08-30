@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{cbpv::Term, parser::syntax::r#type::Type};
+use crate::cbpv::Term;
 
 use super::{env::env_value::{EnvValue, TypeVal}, env_lookup::EnvLookup, state_term::StateTerm};
 

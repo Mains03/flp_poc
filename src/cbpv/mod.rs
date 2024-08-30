@@ -10,12 +10,12 @@ pub enum Term {
     Zero,
     Succ(Box<Term>),
     Bool(bool),
-    Add(Box<Term>, Box<Term>),
-    Eq(Box<Term>, Box<Term>),
-    NEq(Box<Term>, Box<Term>),
-    Not(Box<Term>),
+    Add(String, String),
+    Eq(String, String),
+    NEq(String, String),
+    Not(String),
     If {
-        cond: Box<Term>,
+        cond: String,
         then: Box<Term>,
         r#else: Box<Term>
     },
@@ -30,8 +30,8 @@ pub enum Term {
         body: Box<Term>
     },
     Equate {
-        lhs: Box<Term>,
-        rhs: Box<Term>,
+        lhs: String,
+        rhs: String,
         body: Box<Term>
     },
     Lambda {
@@ -47,8 +47,8 @@ pub enum Term {
     Choice(Vec<Term>),
     Thunk(Box<Term>),
     Return(Box<Term>),
-    Force(Box<Term>),
-    App(Box<Term>, Box<Term>),
+    Force(String),
+    App(Box<Term>, String),
     Fail
 }
 
@@ -62,8 +62,13 @@ impl Term {
     pub fn free_vars(&self) -> HashSet<String> {
         match self {
             Term::Var(var) => HashSet::from_iter(vec![var.to_string()]),
-            Term::If { cond: _, then, r#else } => {
-                let mut free_vars = then.free_vars();
+            Term::Add(lhs, rhs) => HashSet::from_iter(vec![lhs.clone(), rhs.clone()]),
+            Term::Eq(lhs, rhs) => HashSet::from_iter(vec![lhs.clone(), rhs.clone()]),
+            Term::NEq(lhs, rhs) => HashSet::from_iter(vec![lhs.clone(), rhs.clone()]),
+            Term::Not(term) => HashSet::from_iter(vec![term.clone()]),
+            Term::If { cond, then, r#else } => {
+                let mut free_vars = HashSet::from_iter(vec![cond.clone()]);
+                free_vars.extend(then.free_vars());
                 free_vars.extend(r#else.free_vars());
                 free_vars
             },
@@ -87,10 +92,10 @@ impl Term {
                 }),
             Term::Thunk(term) => term.free_vars(),
             Term::Return(term) => term.free_vars(),
-            Term::Force(term) => term.free_vars(),
+            Term::Force(term) => HashSet::from_iter(vec![term.clone()]),
             Term::App(lhs, rhs) => {
                 let mut free_vars = lhs.free_vars();
-                free_vars.extend(rhs.free_vars());
+                free_vars.insert(rhs.clone());
                 free_vars
             },
             _ => HashSet::new(),

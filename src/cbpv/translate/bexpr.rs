@@ -12,8 +12,8 @@ impl Translate for BExpr {
                     var: "1".to_string(),
                     val: Box::new(rhs.translate()),
                     body: Box::new(Term::Eq(
-                        Box::new(Term::Var("0".to_string())),
-                        Box::new(Term::Var("1".to_string()))
+                        "0".to_string(),
+                        "1".to_string()
                     ))
                 })
             },
@@ -24,15 +24,15 @@ impl Translate for BExpr {
                     var: "1".to_string(),
                     val: Box::new(rhs.translate()),
                     body: Box::new(Term::NEq(
-                        Box::new(Term::Var("0".to_string())),
-                        Box::new(Term::Var("1".to_string()))
+                        "0".to_string(),
+                        "1".to_string()
                     ))
                 })
             },
             BExpr::Not(e) => Term::Bind {
                 var: "".to_string(),
                 val: Box::new(e.translate()),
-                body: Box::new(Term::Not(Box::new(Term::Var("".to_string()))))
+                body: Box::new(Term::Not("".to_string()))
             }
         }
     }
