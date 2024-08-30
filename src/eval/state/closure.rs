@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{cbpv::Term, parser::syntax::r#type::Type};
 
-use super::{env::env_value::EnvValue, env_lookup::EnvLookup, state_term::StateTerm};
+use super::{env::env_value::{EnvValue, TypeVal}, env_lookup::EnvLookup, state_term::StateTerm};
 
 #[derive(Clone, Debug)]
 pub struct Closure {
@@ -24,8 +24,8 @@ impl ClosureVars {
         self.vars.insert(var, EnvValue::Term(val));
     }
 
-    pub fn bind(&mut self, var: String, r#type: Type) {
-        todo!()
+    pub fn bind(&mut self, var: String, val: &Rc<RefCell<TypeVal>>) {
+        self.vars.insert(var, EnvValue::Type(Rc::clone(val)));
     }
 }
 
