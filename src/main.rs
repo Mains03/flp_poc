@@ -6,7 +6,7 @@ mod cbpv;
 mod eval;
 
 fn main() {
-    let src = "is_zero x = x == 0. id x = if is_zero x then 0 else x. id 0.";
+    let src = "exists n :: Nat. exists m :: Nat. n+m =:= 5. n.";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);

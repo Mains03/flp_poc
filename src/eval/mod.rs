@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::stdin};
 
 use state::State;
 
@@ -12,13 +12,20 @@ pub fn eval(cbpv: HashMap<String, Term>) -> Term {
     loop {
         states = states.into_iter()
             .flat_map(|s| s.step())
+            .filter(|s| !s.is_fail())
             .collect();
 
         let flag = states.iter()
-            .fold(true, |acc, x| acc && x.is_value());
+            .fold(false, |acc, x| acc || x.is_value());
 
         if flag {
-            break
+            states = states.into_iter()
+                .filter(|s| s.is_value())
+                .collect();
+
+            break;
+        } else if states.len() == 0 {
+            break;
         }
     }
 

@@ -39,12 +39,23 @@ pub enum Term {
         free_vars: HashSet<String>,
         body: Box<Term>
     },
+    PM {
+        var: String,
+        zero: Box<Term>,
+        succ: PMSucc
+    },
     Choice(Vec<Term>),
     Thunk(Box<Term>),
     Return(Box<Term>),
     Force(Box<Term>),
     App(Box<Term>, Box<Term>),
     Fail
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PMSucc {
+    pub var: String,
+    pub body: Box<Term>
 }
 
 impl Term {
