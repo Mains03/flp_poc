@@ -1,40 +1,36 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use closure::{Closure, ClosureVars};
-use env::{env::Env, env_value::{EnvValue, Shape, TypeVal}};
 use env_lookup::EnvLookup;
-use stack::{Stack, StackTerm};
+use frame::{env::env_value::{EnvValue, Shape, TypeVal}, stack::StackTerm, Frame};
 use state_term::StateTerm;
 
 use crate::cbpv::{PMSucc, Term};
 
 mod state_term;
-mod env;
 mod env_lookup;
-mod stack;
 mod closure;
+mod frame;
 
 #[derive(Debug)]
 pub struct State {
-    env: Env,
-    term: StateTerm,
-    stack: Stack
+    frame: Frame,
+    term: StateTerm
 }
 
 impl State {
     pub fn new(mut cbpv: HashMap<String, Term>) -> Self {
         let term = cbpv.remove("main").unwrap();
 
-        let mut env = Env::new();
+        let mut frame = Frame::new();
         cbpv.into_iter()
             .for_each(|(var, val)| {
-                env.store(var, StateTerm::Term(val))
+                frame.env().store(var, StateTerm::Term(val))
             });
 
         State {
-            env,
+            frame,
             term: StateTerm::Term(term),
-            stack: Stack::new()
         }
     }
 
@@ -42,98 +38,93 @@ impl State {
         match self.term {
             StateTerm::Term(term) => match term {
                 Term::Return(term) => {
-                    let val = expand_value(*term, &self.env);
+                    let val = expand_value(*term, self.frame.env());
 
-                    match self.stack.pop() {
+                    match self.frame.stack().pop() {
                         Some(s) => match s {
                             StackTerm::Cont(var, body) => match body {
                                 StateTerm::Term(_) => {
                                     match &val {
                                         StateTerm::Term(term) => match term {
-                                            Term::Var(v) => match self.env.lookup(v).unwrap() {
-                                                EnvValue::Type(r#type) => self.env.bind(var.clone(), &r#type),
+                                            Term::Var(v) => match self.frame.env().lookup(v).unwrap() {
+                                                EnvValue::Type(r#type) => self.frame.env().bind(var.clone(), &r#type),
                                                 EnvValue::Term(_) => unreachable!()
                                             },
-                                            _ => self.env.store(var.clone(), val)
+                                            _ => self.frame.env().store(var.clone(), val)
                                         },
-                                        StateTerm::Closure(_) => self.env.store(var.clone(), val)
+                                        StateTerm::Closure(_) => self.frame.env().store(var.clone(), val)
                                     }
 
-                                    self.stack.push(StackTerm::Release(var));
+                                    self.frame.stack().push(StackTerm::Release(var));
 
                                     vec![State {
-                                        env: self.env,
-                                        term: body,
-                                        stack: self.stack
+                                        frame: self.frame,
+                                        term: body
                                     }]
                                 },
                                 StateTerm::Closure(mut body) => {
                                     body.vars.store(var, val);
 
                                     vec![State {
-                                        env: self.env,
+                                        frame: self.frame,
                                         term: StateTerm::Closure(body),
-                                        stack: self.stack
                                     }]
                                 }
                             },
                             StackTerm::Release(var) => {
-                                self.env.release(&var);
+                                self.frame.env().release(&var);
 
                                 vec![State {
-                                    env: self.env,
+                                    frame: self.frame,
                                     term: match val {
                                         StateTerm::Term(term) => StateTerm::Term(Term::Return(Box::new(term))),
                                         StateTerm::Closure(closure) => StateTerm::Closure(Closure {
                                             term: Term::Return(Box::new(closure.term)), vars: closure.vars
                                         })
                                     },
-                                    stack: self.stack
                                 }]
                             },
                             StackTerm::Term(_) => unreachable!()
                         },
                         None => vec![State {
-                            env: self.env,
+                            frame: self.frame,
                             term: match val {
                                 StateTerm::Term(term) => StateTerm::Term(Term::Return(Box::new(term))),
                                 StateTerm::Closure(closure) => StateTerm::Closure(Closure {
                                     term: Term::Return(Box::new(closure.term)), vars: closure.vars
                                 })
                             },
-                            stack: self.stack
                         }]
                     }
                 }
                 Term::Bind { var, val, body } => {
-                    self.stack.push(StackTerm::Cont(var, StateTerm::Term(*body)));
+                    self.frame.stack().push(StackTerm::Cont(var, StateTerm::Term(*body)));
 
                     vec![State {
-                        env: self.env,
+                        frame: self.frame,
                         term: StateTerm::Term(*val),
-                        stack: self.stack
                     }]
                 },
                 Term::Add(lhs, rhs) => {
-                    self.stack.push(StackTerm::Release("x".to_string()));
-                    self.stack.push(StackTerm::Release("y".to_string()));
+                    self.frame.stack().push(StackTerm::Release("x".to_string()));
+                    self.frame.stack().push(StackTerm::Release("y".to_string()));
 
-                    match self.env.lookup(&lhs).unwrap() {
+                    match self.frame.env().lookup(&lhs).unwrap() {
                         EnvValue::Term(term) => {
-                            self.env.store("x".to_string(), term);
+                            self.frame.env().store("x".to_string(), term);
                         },
-                        EnvValue::Type(r#type) => self.env.bind("x".to_string(), &r#type)
+                        EnvValue::Type(r#type) => self.frame.env().bind("x".to_string(), &r#type)
                     }
 
-                    match self.env.lookup(&rhs).unwrap() {
+                    match self.frame.env().lookup(&rhs).unwrap() {
                         EnvValue::Term(term) => {
-                            self.env.store("y".to_string(), term);
+                            self.frame.env().store("y".to_string(), term);
                         },
-                        EnvValue::Type(r#type) => self.env.bind("y".to_string(), &r#type)
+                        EnvValue::Type(r#type) => self.frame.env().bind("y".to_string(), &r#type)
                     }
 
                     vec![State {
-                        env: self.env,
+                        frame: self.frame,
                         term: StateTerm::Term(Term::PM {
                             var: "x".to_string(),
                             zero: Box::new(Term::Return(Box::new(Term::Var("y".to_string())))),
@@ -162,12 +153,11 @@ impl State {
                                     }
                                 })
                             }
-                        }),
-                        stack: self.stack
+                        })
                     }]
                 },
                 Term::Eq(lhs, rhs) => {
-                    let lhs = match self.env.lookup(&lhs).unwrap() {
+                    let lhs = match self.frame.env().lookup(&lhs).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => term,
                             StateTerm::Closure(_) => unreachable!()
@@ -175,7 +165,7 @@ impl State {
                         EnvValue::Type(_) => todo!()
                     };
 
-                    let rhs = match self.env.lookup(&rhs).unwrap() {
+                    let rhs = match self.frame.env().lookup(&rhs).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => term,
                             StateTerm::Closure(_) => unreachable!()
@@ -184,13 +174,12 @@ impl State {
                     };
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs == rhs)))),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs == rhs))))
                     }]
                 },
                 Term::NEq(lhs, rhs) => {
-                    let lhs = match self.env.lookup(&lhs).unwrap() {
+                    let lhs = match self.frame.env().lookup(&lhs).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => term,
                             StateTerm::Closure(_) => unreachable!()
@@ -198,7 +187,7 @@ impl State {
                         EnvValue::Type(_) => todo!()
                     };
 
-                    let rhs = match self.env.lookup(&rhs).unwrap() {
+                    let rhs = match self.frame.env().lookup(&rhs).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => term,
                             StateTerm::Closure(_) => unreachable!()
@@ -207,18 +196,16 @@ impl State {
                     };
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs != rhs)))),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs != rhs))))
                     }]
                 },
-                Term::Not(term) => match self.env.lookup(&term).unwrap() {
+                Term::Not(term) => match self.frame.env().lookup(&term).unwrap() {
                     EnvValue::Term(term) => match term {
                         StateTerm::Term(term) => match term {
                             Term::Bool(bool) => vec![State {
-                                env: self.env,
-                                term: StateTerm::Term(Term::Return(Box::new(Term::Bool(!bool)))),
-                                stack: self.stack
+                                frame: self.frame,
+                                term: StateTerm::Term(Term::Return(Box::new(Term::Bool(!bool))))
                             }],
                             _ => unreachable!()
                         },
@@ -227,7 +214,7 @@ impl State {
                     EnvValue::Type(_) => unreachable!()
                 },
                 Term::If { cond, then, r#else } => {
-                    let term = match self.env.lookup(&cond).unwrap() {
+                    let term = match self.frame.env().lookup(&cond).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => match term {
                                 Term::Bool(bool) => if bool { *then } else { *r#else },
@@ -239,87 +226,80 @@ impl State {
                     };
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(term),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(term)
                     }]
                 },
                 Term::App(lhs, rhs) => {
-                    let rhs = match self.env.lookup(&rhs).unwrap() {
+                    let rhs = match self.frame.env().lookup(&rhs).unwrap() {
                         EnvValue::Term(term) => term,
                         EnvValue::Type(_) => todo!()
                     };
 
-                    self.stack.push(StackTerm::Term(rhs));
+                    self.frame.stack().push(StackTerm::Term(rhs));
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(*lhs),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(*lhs)
                     }]
                 },
-                Term::Force(term) => match self.env.lookup(&term).unwrap() {
+                Term::Force(term) => match self.frame.env().lookup(&term).unwrap() {
                     EnvValue::Term(term) => match term {
                         StateTerm::Term(term) => match term {
                             Term::Thunk(term) => vec![State {
-                                env: self.env,
+                                frame: self.frame,
                                 term: StateTerm::Term(*term),
-                                stack: self.stack
                             }],
                             _ => unreachable!()
                         },
                         StateTerm::Closure(closure) => match closure.term {
                             Term::Thunk(term) => vec![State {
-                                env: self.env,
+                                frame: self.frame,
                                 term: StateTerm::Closure(Closure {
                                     term: *term, vars: closure.vars
-                                }),
-                                stack: self.stack
+                                })
                             }],
                             _ => unreachable!()
                         }
                     },
                     EnvValue::Type(_) => unreachable!()
                 },
-                Term::Lambda { var, free_vars, body } => match self.stack.pop().unwrap() {
+                Term::Lambda { var, free_vars, body } => match self.frame.stack().pop().unwrap() {
                     StackTerm::Term(term) => {
                         let mut vars = ClosureVars::new();
                         vars.store(var, term);
 
                         free_vars.into_iter()
                             .for_each(|var| {
-                                match self.env.lookup(&var).unwrap() {
+                                match self.frame.env().lookup(&var).unwrap() {
                                     EnvValue::Term(term) => vars.store(var, term),
                                     EnvValue::Type(_) => todo!()
                                 }
                             });
 
                         vec![State {
-                            env: self.env,
+                            frame: self.frame,
                             term: StateTerm::Closure(Closure {
                                 term: *body, vars
-                            }),
-                            stack: self.stack
+                            })
                         }]
                     },
                     _ => unreachable!()
                 },
-                Term::PM { var, zero, succ } => match self.env.lookup(&var).unwrap() {
+                Term::PM { var, zero, succ } => match self.frame.env().lookup(&var).unwrap() {
                     EnvValue::Term(term) => match term {
                         StateTerm::Term(term) => match term {
                             Term::Zero => vec![State {
-                                env: self.env,
-                                term: StateTerm::Term(*zero),
-                                stack: self.stack
+                                frame: self.frame,
+                                term: StateTerm::Term(*zero)
                             }],
                             Term::Succ(term) => {
-                                self.env.store(succ.var.clone(), StateTerm::Term(*term));
-                                self.stack.push(StackTerm::Release(succ.var));
+                                self.frame.env().store(succ.var.clone(), StateTerm::Term(*term));
+                                self.frame.stack().push(StackTerm::Release(succ.var));
 
                                 vec![State {
-                                    env: self.env,
-                                    term: StateTerm::Term(*succ.body),
-                                    stack: self.stack
+                                    frame: self.frame,
+                                    term: StateTerm::Term(*succ.body)
                                 }]
                             },
                             _ => unreachable!()
@@ -330,18 +310,16 @@ impl State {
                         match &r#type.borrow().val {
                             Some(shape) => match shape {
                                 Shape::Zero => vec![State {
-                                    env: self.env,
-                                    term: StateTerm::Term(*zero),
-                                    stack: self.stack
+                                    frame: self.frame,
+                                    term: StateTerm::Term(*zero)
                                 }],
                                 Shape::Succ(s) => {
-                                    self.stack.push(StackTerm::Release(succ.var.clone()));
-                                    self.env.bind(succ.var, &s);
+                                    self.frame.stack().push(StackTerm::Release(succ.var.clone()));
+                                    self.frame.env().bind(succ.var, &s);
 
                                     vec![State {
-                                        env: self.env,
-                                        term: StateTerm::Term(*succ.body),
-                                        stack: self.stack
+                                        frame: self.frame,
+                                        term: StateTerm::Term(*succ.body)
                                     }]
                                 }
                             },
@@ -351,25 +329,23 @@ impl State {
                         vec![
                             {
                                 r#type.borrow_mut().val = Some(Shape::Zero);
-                                let env = self.env.clone();
+                                let frame = self.frame.clone();
                                 
                                 State {
-                                    env,
-                                    term: StateTerm::Term(*zero),
-                                    stack: self.stack.clone()
+                                    frame,
+                                    term: StateTerm::Term(*zero)
                                 }
                             },
                             {
                                 let type_val = Rc::new(RefCell::new(TypeVal { val: None }));
                                 r#type.borrow_mut().val = Some(Shape::Succ(Rc::clone(&type_val)));
 
-                                self.stack.push(StackTerm::Release(succ.var.clone()));
-                                self.env.bind(succ.var, &type_val);
+                                self.frame.stack().push(StackTerm::Release(succ.var.clone()));
+                                self.frame.env().bind(succ.var, &type_val);
 
                                 State {
-                                    env: self.env,
-                                    term: StateTerm::Term(*succ.body),
-                                    stack: self.stack
+                                    frame: self.frame,
+                                    term: StateTerm::Term(*succ.body)
                                 }
                             }
                         ]
@@ -377,32 +353,29 @@ impl State {
                 },
                 Term::Choice(choices) => choices.into_iter()
                     .map(|choice| State {
-                        env: self.env.clone(),
-                        term: StateTerm::Term(choice),
-                        stack: self.stack.clone()
+                        frame: self.frame.clone(),
+                        term: StateTerm::Term(choice)
                     }).collect(),
                 Term::Exists { var, r#type: _, body } => {
-                    self.env.bind(var.clone(), &Rc::new(RefCell::new(TypeVal { val: None })));
-                    self.stack.push(StackTerm::Release(var));
+                    self.frame.env().bind(var.clone(), &Rc::new(RefCell::new(TypeVal { val: None })));
+                    self.frame.stack().push(StackTerm::Release(var));
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(*body),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(*body)
                     }]
                 },
-                Term::Equate { lhs, rhs, body } => match self.env.lookup(&lhs).unwrap() {
+                Term::Equate { lhs, rhs, body } => match self.frame.env().lookup(&lhs).unwrap() {
                     EnvValue::Term(term) => match term {
-                        StateTerm::Term(lhs_term) => match self.env.lookup(&rhs).unwrap() {
+                        StateTerm::Term(lhs_term) => match self.frame.env().lookup(&rhs).unwrap() {
                             EnvValue::Term(term) => match term {
                                 StateTerm::Term(rhs_term) => vec![State {
-                                    env: self.env,
+                                    frame: self.frame,
                                     term: StateTerm::Term(if lhs_term == rhs_term {
                                         *body
                                     } else {
                                         Term::Fail
-                                    }),
-                                    stack: self.stack
+                                    })
                                 }],
                                 StateTerm::Closure(_) => unreachable!()
                             },
@@ -410,38 +383,34 @@ impl State {
                                 r#type.borrow_mut().set_shape(&lhs_term);
 
                                 vec![State {
-                                    env: self.env,
-                                    term: StateTerm::Term(*body),
-                                    stack: self.stack
+                                    frame: self.frame,
+                                    term: StateTerm::Term(*body)
                                 }]
                             }
                         },
                         StateTerm::Closure(_) => unreachable!()
                     },
-                    EnvValue::Type(r#type) => match self.env.lookup(&rhs).unwrap() {
+                    EnvValue::Type(r#type) => match self.frame.env().lookup(&rhs).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => {
                                 r#type.borrow_mut().set_shape(&term);
 
                                 vec![State {
-                                    env: self.env,
-                                    term: StateTerm::Term(*body),
-                                    stack: self.stack
+                                    frame: self.frame,
+                                    term: StateTerm::Term(*body)
                                 }]
                             },
                             StateTerm::Closure(_) => unreachable!()
                         },
                         EnvValue::Type(_) => vec![State {
-                            env: self.env,
-                            term: StateTerm::Term(*body),
-                            stack: self.stack
+                            frame: self.frame,
+                            term: StateTerm::Term(*body)
                         }]
                     }
                 },
                 Term::Fail => vec![State {
-                    env: self.env,
-                    term: StateTerm::Term(Term::Fail),
-                    stack: self.stack
+                    frame: self.frame,
+                    term: StateTerm::Term(Term::Fail)
                 }],
                 _ => unreachable!(),
             },
@@ -449,27 +418,26 @@ impl State {
                 Term::Return(term) => {
                     let val = expand_closure_value(*term, &closure.vars);
 
-                    match self.stack.pop() {
+                    match self.frame.stack().pop() {
                         Some(s) => match s {
                             StackTerm::Cont(var, body) => match body {
                                 StateTerm::Term(_) => {
                                     match &val {
                                         StateTerm::Term(term) => match term {
                                             Term::Var(v) => match closure.vars.lookup(&v).unwrap() {
-                                                EnvValue::Type(r#type) => self.env.bind(var.clone(), &r#type),
+                                                EnvValue::Type(r#type) => self.frame.env().bind(var.clone(), &r#type),
                                                 EnvValue::Term(_) => unreachable!()
                                             },
-                                            _ => self.env.store(var.clone(), val)
+                                            _ => self.frame.env().store(var.clone(), val)
                                         },
-                                        StateTerm::Closure(_) => self.env.store(var.clone(), val)
+                                        StateTerm::Closure(_) => self.frame.env().store(var.clone(), val)
                                     }
 
-                                    self.stack.push(StackTerm::Release(var));
+                                    self.frame.stack().push(StackTerm::Release(var));
 
                                     vec![State {
-                                        env: self.env,
-                                        term: body,
-                                        stack: self.stack
+                                        frame: self.frame,
+                                        term: body
                                     }]
                                 },
                                 StateTerm::Closure(mut body) => {
@@ -485,24 +453,22 @@ impl State {
                                     }
 
                                     vec![State {
-                                        env: self.env,
-                                        term: StateTerm::Closure(body),
-                                        stack: self.stack
+                                        frame: self.frame,
+                                        term: StateTerm::Closure(body)
                                     }]
                                 }
                             },
                             StackTerm::Release(var) => {
-                                self.env.release(&var);
+                                self.frame.env().release(&var);
 
                                 vec![State {
-                                    env: self.env,
+                                    frame: self.frame,
                                     term: match val {
                                         StateTerm::Term(term) => StateTerm::Term(Term::Return(Box::new(term))),
                                         StateTerm::Closure(val) => StateTerm::Closure(Closure {
                                             term: Term::Return(Box::new(val.term)), vars: val.vars
                                         })
-                                    },
-                                    stack: self.stack
+                                    }
                                 }]
                             },
                             StackTerm::Term(_) => unreachable!()
@@ -511,50 +477,48 @@ impl State {
                     }
                 },
                 Term::Bind { var, val, body } => {
-                    self.stack.push(StackTerm::Cont(var, StateTerm::Closure(Closure {
+                    self.frame.stack().push(StackTerm::Cont(var, StateTerm::Closure(Closure {
                         term: *body, vars: closure.vars.clone()
                     })));
 
                     vec![State {
-                        env: self.env,
+                        frame: self.frame,
                         term: StateTerm::Closure(Closure {
                             term: *val, vars: closure.vars
-                        }),
-                        stack: self.stack
+                        })
                     }]
                 },
                 Term::Add(lhs, rhs) => {
-                    self.stack.push(StackTerm::Release("x".to_string()));
-                    self.stack.push(StackTerm::Release("y".to_string()));
+                    self.frame.stack().push(StackTerm::Release("x".to_string()));
+                    self.frame.stack().push(StackTerm::Release("y".to_string()));
 
                     match closure.vars.lookup(&lhs).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => {
-                                self.env.store("x".to_string(), StateTerm::Term(term));
+                                self.frame.env().store("x".to_string(), StateTerm::Term(term));
                             },
                             StateTerm::Closure(_) => unreachable!()
                         },
                         EnvValue::Type(r#type) => {
-                            self.env.bind("x".to_string(), &r#type);
+                            self.frame.env().bind("x".to_string(), &r#type);
                         }
                     }
 
                     match closure.vars.lookup(&rhs).unwrap() {
                         EnvValue::Term(term) => match term {
                             StateTerm::Term(term) => {
-                                self.env.store("y".to_string(), StateTerm::Term(term));
+                                self.frame.env().store("y".to_string(), StateTerm::Term(term));
                             },
                             StateTerm::Closure(_) => unreachable!()
                         },
                         EnvValue::Type(r#type) => {
-                            self.env.bind("y".to_string(), &r#type);
+                            self.frame.env().bind("y".to_string(), &r#type);
                         }
                     }
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(Term::Add("x".to_string(), "y".to_string())),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(Term::Add("x".to_string(), "y".to_string()))
                     }]
                 },
                 Term::Eq(lhs, rhs) => {
@@ -575,9 +539,8 @@ impl State {
                     };
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs == rhs)))),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs == rhs))))
                     }]
                 },
                 Term::NEq(lhs, rhs) => {
@@ -598,18 +561,16 @@ impl State {
                     };
 
                     vec![State {
-                        env: self.env,
-                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs != rhs)))),
-                        stack: self.stack
+                        frame: self.frame,
+                        term: StateTerm::Term(Term::Return(Box::new(Term::Bool(lhs != rhs))))
                     }]
                 },
                 Term::Not(term) => match closure.vars.lookup(&term).unwrap() {
                     EnvValue::Term(term) => match term {
                         StateTerm::Term(term) => match term {
                             Term::Bool(bool) => vec![State {
-                                env: self.env,
-                                term: StateTerm::Term(Term::Return(Box::new(Term::Bool(!bool)))),
-                                stack: self.stack
+                                frame: self.frame,
+                                term: StateTerm::Term(Term::Return(Box::new(Term::Bool(!bool))))
                             }],
                             _ => unreachable!()
                         },
@@ -630,11 +591,10 @@ impl State {
                     };
 
                     vec![State {
-                        env: self.env,
+                        frame: self.frame,
                         term: StateTerm::Closure(Closure {
                             term, vars: closure.vars
-                        }),
-                        stack: self.stack
+                        })
                     }]
                 },
                 Term::App(lhs, rhs) => {
@@ -643,40 +603,37 @@ impl State {
                         EnvValue::Type(_) => todo!()
                     };
 
-                    self.stack.push(StackTerm::Term(rhs));
+                    self.frame.stack().push(StackTerm::Term(rhs));
 
                     vec![State {
-                        env: self.env,
+                        frame: self.frame,
                         term: StateTerm::Closure(Closure {
                             term: *lhs, vars: closure.vars
-                        }),
-                        stack: self.stack
+                        })
                     }]
                 },
                 Term::Force(term) => match closure.vars.lookup(&term).unwrap() {
                     EnvValue::Term(term) => match term {
                         StateTerm::Term(term) => match term {
                             Term::Thunk(term) => vec![State {
-                                env: self.env,
-                                term: StateTerm::Term(*term),
-                                stack: self.stack
+                                frame: self.frame,
+                                term: StateTerm::Term(*term)
                             }],
                             _ => unreachable!()
                         },
                         StateTerm::Closure(closure) => match closure.term {
                             Term::Thunk(term) => vec![State {
-                                env: self.env,
+                                frame: self.frame,
                                 term: StateTerm::Closure(Closure {
                                     term: *term, vars: closure.vars
-                                }),
-                                stack: self.stack
+                                })
                             }],
                             _ => unreachable!()
                         }
                     },
                     EnvValue::Type(_) => unreachable!()
                 },
-                Term::Lambda { var, free_vars,  body } => match self.stack.pop().unwrap() {
+                Term::Lambda { var, free_vars,  body } => match self.frame.stack().pop().unwrap() {
                     StackTerm::Term(term) => {
                         let mut vars = ClosureVars::new();
                         vars.store(var, term);
@@ -690,11 +647,10 @@ impl State {
                             });
 
                         vec![State {
-                            env: self.env,
+                            frame: self.frame,
                             term: StateTerm::Closure(Closure {
                                 term: *body, vars
-                            }),
-                            stack: self.stack
+                            })
                         }]
                     },
                     _ => unreachable!()
@@ -705,33 +661,32 @@ impl State {
                     })));
                     
                     vec![State {
-                        env: self.env,
+                        frame: self.frame,
                         term: StateTerm::Closure(Closure {
                             term: *body, vars: closure.vars
-                        }),
-                        stack: self.stack
+                        })
                     }]
                 },
                 Term::Equate { lhs, rhs, body } => {
-                    self.stack.push(StackTerm::Release("0".to_string()));
-                    self.stack.push(StackTerm::Release("1".to_string()));
+                    self.frame.stack().push(StackTerm::Release("0".to_string()));
+                    self.frame.stack().push(StackTerm::Release("1".to_string()));
 
                     match closure.vars.lookup(&lhs).unwrap() {
-                        EnvValue::Term(term) => self.env.store("0".to_string(), term),
-                        EnvValue::Type(r#type) => self.env.bind("0".to_string(), &r#type)
+                        EnvValue::Term(term) => self.frame.env().store("0".to_string(), term),
+                        EnvValue::Type(r#type) => self.frame.env().bind("0".to_string(), &r#type)
                     }
 
                     match closure.vars.lookup(&rhs).unwrap() {
-                        EnvValue::Term(term) => self.env.store("1".to_string(), term),
-                        EnvValue::Type(r#type) => self.env.bind("1".to_string(), &r#type)
+                        EnvValue::Term(term) => self.frame.env().store("1".to_string(), term),
+                        EnvValue::Type(r#type) => self.frame.env().bind("1".to_string(), &r#type)
                     }
 
-                    self.stack.push(StackTerm::Term(StateTerm::Closure(Closure {
+                    self.frame.stack().push(StackTerm::Term(StateTerm::Closure(Closure {
                         term: *body, vars: closure.vars
                     })));
 
                     vec![State {
-                        env: self.env,
+                        frame: self.frame,
                         term: StateTerm::Term(Term::Equate {
                             lhs: "0".to_string(),
                             rhs: "1".to_string(),
@@ -740,8 +695,7 @@ impl State {
                                 free_vars: HashSet::new(),
                                 body: Box::new(Term::Return(Box::new(Term::Var("x".to_string()))))
                             })
-                        }),
-                        stack: self.stack
+                        })
                     }]
                 },
                 _ => unreachable!()
@@ -760,7 +714,7 @@ impl State {
     }
 
     pub fn is_value(&self) -> bool {
-        if self.stack.is_empty() {
+        if self.frame.stack_ref().is_empty() {
             match &self.term {
                 StateTerm::Term(term) => match term {
                     Term::Return(term) => match **term {

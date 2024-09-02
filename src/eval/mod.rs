@@ -10,6 +10,8 @@ pub fn eval(cbpv: HashMap<String, Term>) -> Term {
     let mut states = vec![State::new(cbpv)];
 
     loop {
+        println!("{:#?}", states);
+        
         states = states.into_iter()
             .flat_map(|s| s.step())
             .filter(|s| !s.is_fail())

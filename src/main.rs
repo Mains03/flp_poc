@@ -6,7 +6,8 @@ mod cbpv;
 mod eval;
 
 fn main() {
-    let src = "exists n :: Nat. n+n =:= 2. n.";
+    let src = "
+exists n :: Nat. 1 + n =:= 2. n.";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);
