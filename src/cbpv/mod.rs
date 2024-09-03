@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use crate::parser::syntax::r#type::Type;
 
@@ -7,6 +7,7 @@ pub mod translate;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
     Var(String),
+    TypedVar(Rc<RefCell<Option<Term>>>),
     Zero,
     Succ(Box<Term>),
     Bool(bool),
@@ -99,6 +100,34 @@ impl Term {
                 free_vars
             },
             _ => HashSet::new(),
+        }
+    }
+
+    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
+        match self {
+            Term::TypedVar(location) => match new_locations.get(&location.as_ptr()) {
+                Some(new_location) => Term::TypedVar(Rc::clone(new_location)),
+                None => match location.borrow().clone() {
+                    Some(shape) => {
+                        let new_location = Rc::new(RefCell::new(
+                            Some(shape.clone_with_locations(new_locations))
+                        ));
+
+                        new_locations.insert(location.as_ptr(), Rc::clone(&new_location));
+
+                        Term::TypedVar(new_location)
+                    },
+                    None => {
+                        let new_location = Rc::new(RefCell::new(None));
+
+                        new_locations.insert(location.as_ptr(), Rc::clone(&new_location));
+
+                        Term::TypedVar(new_location)
+                    }
+                }
+            },
+            Term::Succ(term) => Term::Succ(Box::new(term.clone_with_locations(new_locations))),
+            _ => self.clone()
         }
     }
 }

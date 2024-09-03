@@ -1,8 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::eval::state::state_term::StateTerm;
-
-use super::env::env_value::TypeVal;
+use crate::{cbpv::Term, eval::state::state_term::StateTerm};
 
 #[derive(Debug)]
 pub struct Stack {
@@ -21,16 +19,6 @@ impl Stack {
         Stack { stack: vec![] }
     }
 
-    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut TypeVal, Rc<RefCell<TypeVal>>>) -> Self {
-        let stack = self.stack.iter()
-            .fold(vec![], |mut acc , term| {
-                acc.push(term.clone_with_locations(new_locations));
-                acc
-            });
-
-        Stack { stack }
-    }
-
     pub fn push(&mut self, term: StackTerm) {
         self.stack.push(term);
     }
@@ -46,10 +34,20 @@ impl Stack {
     pub fn is_empty(&self) -> bool {
         self.stack.len() == 0
     }
+
+    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
+        let stack = self.stack.iter()
+            .fold(vec![], |mut acc , term| {
+                acc.push(term.clone_with_locations(new_locations));
+                acc
+            });
+
+        Stack { stack }
+    }
 }
 
 impl StackTerm {
-    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut TypeVal, Rc<RefCell<TypeVal>>>) -> Self     {
+    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self     {
         match self {
             StackTerm::Cont(var, term) => StackTerm::Cont(var.clone(), term.clone_with_locations(new_locations)),
             StackTerm::Term(term) => StackTerm::Term(term.clone_with_locations(new_locations)),
