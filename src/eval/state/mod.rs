@@ -2,15 +2,17 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use closure::{Closure, ClosureVars};
 use env::Env;
+use equate::equate;
 use stack::{Stack, StackTerm};
 use state_term::StateTerm;
 
 use crate::cbpv::{PMSucc, Term};
 
+mod closure;
 mod env;
+mod equate;
 mod stack;
 mod state_term;
-mod closure;
 
 #[derive(Debug)]
 pub struct State {
@@ -37,7 +39,7 @@ impl State {
     }
 
     pub fn step(mut self) -> Vec<State> {
-        match self.term.clone() {
+        match self.term {
             StateTerm::Term(term) => match term {
                 Term::Return(term) => {
                     let val = self.env.expand_value(*term);
@@ -262,156 +264,17 @@ impl State {
                     }]
                 },
                 Term::Equate { lhs, rhs, body } => {
-                    let mut lhs = match self.env.lookup(&lhs).unwrap() {
+                    let lhs = match self.env.lookup(&lhs).unwrap() {
                         StateTerm::Term(term) => term,
                         StateTerm::Closure(_) => unreachable!()
                     };
 
-                    let mut rhs = match self.env.lookup(&rhs).unwrap() {
+                    let rhs = match self.env.lookup(&rhs).unwrap() {
                         StateTerm::Term(term) => term,
                         StateTerm::Closure(_) => unreachable!()
                     };
 
-                    let flag;
-                    loop {
-                        match lhs {
-                            Term::Zero =>{
-                                flag = match rhs {
-                                    Term::Zero => true,
-                                    Term::TypedVar(shape) => if shape.borrow().is_some() {
-                                        match shape.borrow().clone().unwrap() {
-                                            Term::Zero => true,
-                                            _ => false
-                                        }
-                                    } else {
-                                        shape.replace(Some(Term::Zero));
-
-                                        true
-                                    },
-                                    _ => false
-                                };
-
-                                break;
-                            },
-                            Term::Succ(lhs_term) => match rhs {
-                                Term::Succ(rhs_term) => {
-                                    lhs = *lhs_term;
-                                    rhs = *rhs_term;
-                                },
-                                Term::TypedVar(shape) => if shape.borrow().is_some() {
-                                    match shape.borrow().clone().unwrap() {
-                                        Term::Succ(rhs_term) => {
-                                            lhs = *lhs_term;
-                                            rhs = *rhs_term;
-                                        },
-                                        _ => {
-                                            flag = false;
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    rhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                                    shape.replace(Some(Term::Succ(Box::new(rhs.clone()))));
-
-                                    lhs = *lhs_term;
-                                },
-                                _ => {
-                                    flag = false;
-                                    break;
-                                }
-                            },
-                            Term::TypedVar(lhs_shape) => match rhs {
-                                Term::Zero => if lhs_shape.borrow().is_some() {
-                                    flag = match lhs_shape.borrow().clone().unwrap() {
-                                        Term::Zero => true,
-                                        _ => false
-                                    };
-
-                                    break;
-                                } else {
-                                    lhs_shape.replace(Some(Term::Zero));
-
-                                    flag = true;
-                                    break;
-                                },
-                                Term::Succ(rhs_term) => if lhs_shape.borrow().is_some() {
-                                    match lhs_shape.borrow().clone().unwrap() {
-                                        Term::Succ(lhs_term) => {
-                                            lhs = *lhs_term;
-                                            rhs = *rhs_term;
-                                        },
-                                        _ => {
-                                            flag = false;
-                                            break;
-                                        }
-                                    }
-                                } else {
-                                    lhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                                    lhs_shape.replace(Some(Term::Succ(Box::new(lhs.clone()))));
-
-                                    rhs = *rhs_term;
-                                },
-                                Term::TypedVar(rhs_shape) => if lhs_shape.borrow().is_some() {
-                                    match lhs_shape.borrow().clone().unwrap() {
-                                        Term::Zero => if rhs_shape.borrow().is_some() {
-                                            flag = match rhs_shape.borrow().clone().unwrap() {
-                                                Term::Zero => true,
-                                                _ => false
-                                            };
-
-                                            break;
-                                        } else {
-                                            rhs_shape.replace(Some(Term::Zero));
-
-                                            flag = true;
-                                            break;
-                                        },
-                                        Term::Succ(lhs_term) => if rhs_shape.borrow().is_some() {
-                                            match rhs_shape.borrow().clone().unwrap() {
-                                                Term::Succ(rhs_term) => {
-                                                    lhs = *lhs_term;
-                                                    rhs = *rhs_term;
-                                                },
-                                                _ => {
-                                                    flag = false;
-                                                    break;
-                                                }
-                                            }
-                                        } else {
-                                            rhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                                            rhs_shape.replace(Some(Term::Succ(Box::new(rhs.clone()))));
-
-                                            lhs = *lhs_term;
-                                        },
-                                        _ => unreachable!()
-                                    }
-                                } else {
-                                    if rhs_shape.borrow().is_some() {
-                                        match rhs_shape.borrow().clone().unwrap() {
-                                            Term::Zero => {
-                                                lhs_shape.replace(Some(Term::Zero));
-
-                                                flag = true;
-                                                break;
-                                            },
-                                            Term::Succ(rhs_term) => {
-                                                lhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                                                lhs_shape.replace(Some(Term::Succ(Box::new(lhs.clone()))));
-
-                                                rhs = *rhs_term;
-                                            },
-                                            _ => unreachable!()
-                                        }
-                                    } else {
-                                        flag = true;
-                                        break;
-                                    }
-                                },
-                                _ => unreachable!()
-                            },
-                            _ => unreachable!()
-                        }
-                    }
+                    let flag = equate(lhs, rhs);
 
                     vec![State {
                         env: self.env,
