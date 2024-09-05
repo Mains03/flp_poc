@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use closure::{Closure, ClosureVars};
+use closure::Closure;
 use env::Env;
 use equate::equate;
 use stack::{Stack, StackTerm};
@@ -58,7 +58,7 @@ impl State {
                                     }]
                                 },
                                 StateTerm::Closure(mut body) => {
-                                    body.vars.store(var, val);
+                                    body.store(var, val);
 
                                     vec![State {
                                         env: self.env,
@@ -166,20 +166,18 @@ impl State {
                 },
                 Term::Lambda { var, free_vars, body } => match self.stack.pop().unwrap() {
                     StackTerm::Term(term) => {
-                        let mut vars = ClosureVars::new();
-                        vars.store(var, term);
+                        let mut closure = Closure::new(*body);
+                        closure.store(var, term);
 
                         free_vars.into_iter()
                             .for_each(|var| {
                                 let val = self.env.lookup(&var).unwrap();
-                                vars.store(var, val);
+                                closure.store(var, val);
                             });
 
                         vec![State {
                             env: self.env,
-                            term: StateTerm::Closure(Closure {
-                                term: *body, vars
-                            }),
+                            term: StateTerm::Closure(closure),
                             stack: self.stack
                         }]
                     },
@@ -253,7 +251,16 @@ impl State {
                     },
                     StateTerm::Closure(_) => unreachable!()
                 },
-                Term::Choice(choices) => todo!(),
+                Term::Choice(choices) => choices.into_iter()
+                    .map(|choice| {
+                        let mut new_locations = HashMap::new();
+
+                        State {
+                            env: self.env.clone_with_locations(&mut new_locations),
+                            term: StateTerm::Term(choice),
+                            stack: self.stack.clone_with_locations(&mut new_locations)
+                        }
+                    }).collect(),
                 Term::Exists { var, r#type: _, body } => {
                     self.env.store(var, StateTerm::Term(Term::TypedVar(Rc::new(RefCell::new(None)))));
 
@@ -293,7 +300,175 @@ impl State {
                 }],
                 _ => unreachable!(),
             },
-            StateTerm::Closure(_) => todo!()
+            StateTerm::Closure(mut closure) => match closure.term.clone() {
+                Term::Return(term) => {
+                    let val = closure.expand_value(*term);
+
+                    match self.stack.pop() {
+                        Some(s) => match s {
+                            StackTerm::Cont(var, body) => match body {
+                                StateTerm::Term(_) => {
+                                    self.env.store(var.clone(), val);
+                                    self.stack.push(StackTerm::Release(var));
+
+                                    vec![State {
+                                        env: self.env,
+                                        term: body,
+                                        stack: self.stack
+                                    }]
+                                },
+                                StateTerm::Closure(mut body) => {
+                                    body.store(var, val);
+
+                                    vec![State {
+                                        env: self.env,
+                                        term: StateTerm::Closure(body),
+                                        stack: self.stack
+                                    }]
+                                }
+                            },
+                            StackTerm::Release(var) => {
+                                self.env.release(&var);
+
+                                vec![State {
+                                    env: self.env,
+                                    term: match val {
+                                        StateTerm::Term(term) => StateTerm::Term(Term::Return(Box::new(term))),
+                                        StateTerm::Closure(closure) => StateTerm::Closure(Closure {
+                                            term: Term::Return(Box::new(closure.term)), vars: closure.vars
+                                        })
+                                    },
+                                    stack: self.stack
+                                }]
+                            },
+                            StackTerm::Term(_) => unreachable!()
+                        },
+                        None => unreachable!()
+                    }
+                },
+                Term::Bind { var, val, body } => {
+                    self.stack.push(StackTerm::Cont(var, StateTerm::Closure(Closure {
+                        term: *body, vars: closure.vars.clone()
+                    })));
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Closure(Closure {
+                            term: *val, vars: closure.vars
+                        }),
+                        stack: self.stack
+                    }]
+                },
+                Term::Add(lhs, rhs) => {
+                    self.stack.push(StackTerm::Release("x".to_string()));
+                    self.stack.push(StackTerm::Release("y".to_string()));
+
+                    self.env.store("x".to_string(), closure.lookup(&lhs).unwrap());
+                    self.env.store("y".to_string(), closure.lookup(&rhs).unwrap());
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Term(Term::Add("x".to_string(), "y".to_string())),
+                        stack: self.stack
+                    }]
+                },
+                Term::Eq(lhs, rhs) => todo!(),
+                Term::NEq(lhs, rhs) => todo!(),
+                Term::Not(term) => todo!(),
+                Term::If { cond, then, r#else } => todo!(),
+                Term::App(lhs, rhs) => {
+                    self.stack.push(StackTerm::Term(
+                        closure.lookup(&rhs).unwrap()
+                    ));
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Closure(Closure {
+                            term: *lhs, vars: closure.vars
+                        }),
+                        stack: self.stack
+                    }]
+                },
+                Term::Force(term) => match closure.lookup(&term).unwrap() {
+                    StateTerm::Term(term) => match term {
+                        Term::Thunk(term) => vec![State {
+                            env: self.env,
+                            term: StateTerm::Term(*term),
+                            stack: self.stack
+                        }],
+                        _ => unreachable!()
+                    },
+                    StateTerm::Closure(closure) => match closure.term {
+                        Term::Thunk(term) => vec![State {
+                            env: self.env,
+                            term: StateTerm::Closure(Closure {
+                                term: *term, vars: closure.vars
+                            }),
+                            stack: self.stack
+                        }],
+                        _ => unreachable!()
+                    }
+                },
+                Term::Lambda { var, free_vars,  body } => match self.stack.pop().unwrap() {
+                    StackTerm::Term(term) => {
+                        let mut state = Closure::new(*body);
+                        state.store(var, term);
+
+                        free_vars.into_iter()
+                            .for_each(|var| {
+                                let val = closure.lookup(&var).unwrap();
+                                state.store(var, val);
+                            });
+
+                        vec![State {
+                            env: self.env,
+                            term: StateTerm::Closure(state),
+                            stack: self.stack
+                        }]
+                    },
+                    _ => unreachable!()
+                },
+                Term::Exists { var, r#type: _, body } => {
+                    closure.store(
+                        var,
+                        StateTerm::Term(Term::TypedVar(Rc::new(RefCell::new(None))))
+                    );
+                    
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Closure(Closure {
+                            term: *body, vars: closure.vars
+                        }),
+                        stack: self.stack
+                    }]
+                },
+                Term::Equate { lhs, rhs, body } => {
+                    let lhs = match closure.lookup(&lhs).unwrap() {
+                        StateTerm::Term(term) => term,
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    let rhs = match closure.lookup(&rhs).unwrap() {
+                        StateTerm::Term(term) => term,
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    let flag = equate(lhs, rhs);
+
+                    vec![State {
+                        env: self.env,
+                        term: if flag {
+                            StateTerm::Closure(Closure {
+                                term: *body, vars: closure.vars
+                            })
+                        } else {
+                            StateTerm::Term(Term::Fail)
+                        },
+                        stack: self.stack
+                    }]
+                },
+                _ => unreachable!()
+            }
         }
     }
 

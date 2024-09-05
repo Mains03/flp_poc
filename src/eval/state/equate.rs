@@ -152,15 +152,15 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
 }
 
 fn is_cyle(lhs: &Rc<RefCell<Option<Term>>>, rhs: &Rc<RefCell<Option<Term>>>) -> bool {
-    vec![lhs, rhs].into_iter()
-        .fold(false, |acc, x| {
+    vec![(lhs, rhs), (rhs, lhs)].into_iter()
+        .fold(false, |acc, (lhs, rhs)| {
             if acc {
                 true
             } else {
-                let mut tmp = Rc::clone(x);
+                let mut tmp = Rc::clone(lhs);
 
                 loop {
-                    if tmp.as_ptr() == rhs.as_ptr() {
+                    if Rc::ptr_eq(&tmp, rhs) {
                         return true;
                     } else {
                         match tmp.clone().borrow().clone() {
