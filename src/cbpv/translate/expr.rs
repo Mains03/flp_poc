@@ -30,6 +30,7 @@ impl Translate for Expr {
                 })
             },
             Expr::BExpr(bexpr) => bexpr.translate(),
+            Expr::List(_) => todo!(),
             Expr::Ident(s) => Term::Return(Box::new(Term::Var(s.clone()))),
             Expr::Nat(n) => Term::Return(Box::new(translate_nat(n))),
             Expr::Bool(b) => Term::Return(Box::new(Term::Bool(b))),

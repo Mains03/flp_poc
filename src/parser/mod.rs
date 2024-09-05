@@ -164,6 +164,7 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
             }).unwrap()
         },
         Rule::bexpr => Expr::BExpr(parse_bexpr(pair.into_inner())),
+        Rule::list => Expr::List(parse_list(pair.into_inner())),
         Rule::primary_expr => parse_expr(pair.into_inner()),
         Rule::ident => Expr::Ident(pair.as_str().to_string()),
         Rule::nat => Expr::Nat(pair.as_str().parse().unwrap()),
@@ -198,6 +199,19 @@ fn parse_bexpr(mut pairs: pest::iterators::Pairs<Rule>) -> BExpr {
     }
 }
 
+fn parse_list(mut pairs: pest::iterators::Pairs<Rule>) -> Vec<Expr> {
+    let mut list = vec![];
+
+    loop {
+        match pairs.next() {
+            Some(pair) => list.push(parse_expr(pair.into_inner())),
+            None => break
+        }
+    }
+
+    list
+}
+
 fn parse_bool(s: &str) -> bool {
     if s == "true" {
         true
@@ -213,6 +227,7 @@ fn parse_type(mut pairs: pest::iterators::Pairs<Rule>) -> Type {
         let pair = pairs.next().unwrap().into_inner().next().unwrap();
         match pair.as_rule() {
             Rule::ident => Type::Ident(pair.as_str().to_string()),
+            Rule::list_type => Type::List(Box::new(parse_type(pair.into_inner()))),
             Rule::r#type => parse_type(pair.into_inner()),
             _ => unreachable!()
         }
@@ -555,5 +570,27 @@ id x = x.
                 })
             ]
         );
+    }
+    
+    #[test]
+    fn test13() {
+        let src = "exists xs :: [Nat]. xs =:= [1,2,3]. xs.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Stm(Stm::Exists {
+                    var: "xs".to_string(),
+                    r#type: Type::List(Box::new(Type::Ident("Nat".to_string()))),
+                    body: Box::new(Stm::Equate {
+                        lhs: Expr::Ident("xs".to_string()),
+                        rhs: Expr::List(vec![Expr::Nat(1), Expr::Nat(2), Expr::Nat(3)]),
+                        body: Box::new(Stm::Expr(Expr::Ident("xs".to_string())))
+                    })
+                })
+            ]
+        )
     }
 }

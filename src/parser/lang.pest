@@ -4,10 +4,11 @@ decl = { func_type | func | stm ~ "." }
 
 func_type = { ident ~ "::" ~ type }
 type = { primary_type ~ ("->" ~ type)* }
-primary_type = { ident | "(" ~ type ~ ")" }
+primary_type = { ident | list_type | "(" ~ type ~ ")" }
+list_type = { "[" ~ primary_type ~ "]"}
 
 func = { ident ~ arg* ~ "=" ~ stm ~ "." }
-arg = { ident } // currently just identifiers, potentially allow patterns in future
+arg = { ident }
 
 stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
 
@@ -17,10 +18,11 @@ exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stm }
 equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
-expr = { add | app | bexpr | primary_expr }
+expr = { add | app | bexpr | list | primary_expr }
 add = { primary_expr ~ "+" ~ (add | primary_expr) }
 app = { primary_expr ~ primary_expr+ }
 bexpr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
+list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)? ~ "]" }
 primary_expr = { ident | nat | bool | "(" ~ stm ~ ")" }
 
 bexpr_op = { "==" | "!=" }

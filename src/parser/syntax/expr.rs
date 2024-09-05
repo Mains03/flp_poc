@@ -5,6 +5,7 @@ pub enum Expr {
     Add(Box<Expr>, Box<Expr>),
     App(Box<Expr>, Box<Expr>),
     BExpr(BExpr),
+    List(Vec<Expr>),
     Ident(String),
     Nat(usize),
     Bool(bool),
