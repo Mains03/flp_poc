@@ -10,6 +10,8 @@ pub enum Term {
     TypedVar(Rc<RefCell<Option<Term>>>),
     Zero,
     Succ(Box<Term>),
+    Nil,
+    Cons(Box<Term>, Box<Term>),
     Bool(bool),
     Add(String, String),
     Eq(String, String),

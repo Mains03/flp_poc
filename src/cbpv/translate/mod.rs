@@ -204,4 +204,40 @@ id x = let f = const x in f 1.";
             }))
         )
     }
+
+    #[test]
+    fn test6() {
+        let src = "[1, 2, 3].";
+
+        let mut cbpv = translate(parser::parse(src).unwrap());
+        let term = cbpv.remove("main").unwrap();
+
+        assert_eq!(
+            term,
+            Term::Bind {
+                var: "0".to_string(),
+                val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
+                body: Box::new(Term::Bind {
+                    var: "1".to_string(),
+                    val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))),
+                    body: Box::new(Term::Bind {
+                        var: "2".to_string(),
+                        val: Box::new(Term::Return(Box::new(
+                            Term::Succ(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))
+                        ))),
+                        body: Box::new(Term::Return(Box::new(Term::Cons(
+                            Box::new(Term::Var("0".to_string())),
+                            Box::new(Term::Cons(
+                                Box::new(Term::Var("1".to_string())),
+                                Box::new(Term::Cons(
+                                    Box::new(Term::Var("2".to_string())),
+                                    Box::new(Term::Nil)
+                                ))
+                            ))
+                        ))))
+                    })
+                })
+            }
+        )
+    }
 }
