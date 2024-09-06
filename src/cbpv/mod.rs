@@ -12,6 +12,7 @@ pub enum Term {
     Cons(Box<Term>, Box<Term>),
     Bool(bool),
     Add(String, String),
+    Fold,
     Eq(String, String),
     NEq(String, String),
     Not(String),
@@ -76,7 +77,8 @@ pub struct PMList {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PMListCons {
-    pub var: String,
+    pub x: String,
+    pub xs: String,
     pub body: Box<Term>
 }
 
@@ -154,6 +156,10 @@ impl Term {
                 }
             },
             Term::Succ(term) => Term::Succ(Box::new(term.clone_with_locations(new_locations))),
+            Term::Cons(x, xs) => Term::Cons(
+                Box::new(x.clone_with_locations(new_locations)),
+                Box::new(xs.clone_with_locations(new_locations))
+            ),
             _ => self.clone()
         }
     }

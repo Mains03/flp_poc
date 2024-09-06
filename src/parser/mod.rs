@@ -165,10 +165,18 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
         },
         Rule::bexpr => Expr::BExpr(parse_bexpr(pair.into_inner())),
         Rule::list => Expr::List(parse_list(pair.into_inner())),
+        Rule::lambda => {
+            let mut pairs = pair.into_inner();
+            Expr::Lambda(
+                pairs.next().unwrap().as_str().to_string(),
+                Box::new(parse_stm(pairs.next().unwrap().into_inner()))
+            )
+        },
         Rule::primary_expr => parse_expr(pair.into_inner()),
         Rule::ident => Expr::Ident(pair.as_str().to_string()),
         Rule::nat => Expr::Nat(pair.as_str().parse().unwrap()),
         Rule::bool => Expr::Bool(parse_bool(pair.as_str())),
+        Rule::fold => Expr::Fold,
         Rule::stm => Expr::Stm(Box::new(parse_stm(pair.into_inner()))),
         _ => unreachable!()
     }
@@ -590,6 +598,42 @@ id x = x.
                         body: Box::new(Stm::Expr(Expr::Ident("xs".to_string())))
                     })
                 })
+            ]
+        )
+    }
+
+    #[test]
+    fn test14() {
+        let src = "sum xs = fold (\\s. \\x. x+s) 0 xs.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![
+                Decl::Func {
+                    name: "sum".to_string(),
+                    args: vec!["xs".to_string()],
+                    body: Stm::Expr(Expr::App(
+                        Box::new(Expr::App(
+                            Box::new(Expr::App(
+                                Box::new(Expr::Fold),
+                                Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::Lambda(
+                                    "s".to_string(),
+                                    Box::new(Stm::Expr(Expr::Lambda(
+                                        "x".to_string(),
+                                        Box::new(Stm::Expr(Expr::Add(
+                                            Box::new(Expr::Ident("x".to_string())),
+                                            Box::new(Expr::Ident("s".to_string()))
+                                        )))
+                                    )))
+                                )))))
+                            )),
+                            Box::new(Expr::Nat(0))
+                        )),
+                        Box::new(Expr::Ident("xs".to_string()))
+                    ))
+                }
             ]
         )
     }

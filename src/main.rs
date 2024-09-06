@@ -6,7 +6,11 @@ mod cbpv;
 mod eval;
 
 fn main() {
-    let src = "exists xs :: [Nat]. xs =:= [xs]. xs.";
+    let src = "
+length :: [Nat] -> Nat
+length xs = fold (\\x. \\y. x+1) 0 xs.
+
+exists xs :: [Nat]. length xs =:= 2. xs.";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);

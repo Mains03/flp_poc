@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use closure::Closure;
 use env::Env;
@@ -6,7 +6,7 @@ use equate::equate;
 use stack::{Stack, StackTerm};
 use state_term::StateTerm;
 
-use crate::cbpv::{PMNat, PMNatSucc, Term, PM};
+use crate::cbpv::{PMList, PMListCons, PMNat, PMNatSucc, Term, PM};
 
 mod closure;
 mod env;
@@ -127,6 +127,86 @@ impl State {
                             })))
                         }
                     }))),
+                    stack: self.stack
+                }],
+                Term::Fold => vec![State {
+                    env: self.env,
+                    term: StateTerm::Term(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                        var: "f".to_string(),
+                        free_vars: HashSet::new(),
+                        body: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                            var: "z".to_string(),
+                            free_vars: HashSet::from_iter(vec!["f".to_string()]),
+                            body: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                                var: "xs".to_string(),
+                                free_vars: HashSet::from_iter(vec!["f".to_string(), "z".to_string()]),
+                                body: Box::new(Term::PM(PM::PMList(PMList {
+                                    var: "xs".to_string(),
+                                    nil: Box::new(Term::Return(Box::new(Term::Var("z".to_string())))),
+                                    cons: PMListCons {
+                                        x: "y".to_string(),
+                                        xs: "ys".to_string(),
+                                        body: Box::new(Term::Bind {
+                                            var: "0".to_string(),
+                                            val: Box::new(Term::Return(Box::new(Term::Var("ys".to_string())))),
+                                            body: Box::new(Term::Bind {
+                                                var: "1".to_string(),
+                                                val: Box::new(Term::Bind {
+                                                    var: "0".to_string(),
+                                                    val: Box::new(Term::Bind {
+                                                        var: "0".to_string(),
+                                                        val: Box::new(Term::Return(Box::new(Term::Var("y".to_string())))),
+                                                        body: Box::new(Term::Bind {
+                                                            var: "1".to_string(),
+                                                            val: Box::new(Term::Bind {
+                                                                var: "0".to_string(),
+                                                                val: Box::new(Term::Return(Box::new(Term::Var("z".to_string())))),
+                                                                body: Box::new(Term::Bind {
+                                                                    var: "1".to_string(),
+                                                                    val: Box::new(Term::Return(Box::new(Term::Var("f".to_string())))),
+                                                                    body: Box::new(Term::App(
+                                                                        Box::new(Term::Force("1".to_string())),
+                                                                        "0".to_string()
+                                                                    ))
+                                                                })
+                                                            }),
+                                                            body: Box::new(Term::App(
+                                                                Box::new(Term::Force("1".to_string())),
+                                                                "0".to_string()
+                                                            ))
+                                                        })
+                                                    }),
+                                                    body: Box::new(Term::Bind {
+                                                        var: "1".to_string(),
+                                                        val: Box::new(Term::Bind {
+                                                            var: "0".to_string(),
+                                                            val: Box::new(Term::Return(Box::new(Term::Var("f".to_string())))),
+                                                            body: Box::new(Term::Bind {
+                                                                var: "1".to_string(),
+                                                                val: Box::new(Term::Fold),
+                                                                body: Box::new(Term::App(
+                                                                    Box::new(Term::Force("1".to_string())),
+                                                                    "0".to_string()
+                                                                ))
+                                                            })
+                                                        }),
+                                                        body: Box::new(Term::App(
+                                                            Box::new(Term::Force("1".to_string())),
+                                                            "0".to_string()
+                                                        ))
+                                                    })
+                                                }),
+                                                body: Box::new(Term::App(
+                                                    Box::new(Term::Force("1".to_string())),
+                                                    "0".to_string()
+                                                ))
+                                            })
+                                        })
+                                    }
+                                })))
+                            })))))
+                        })))))
+                    }))))),
                     stack: self.stack
                 }],
                 Term::Eq(lhs, rhs) => todo!(),
@@ -252,7 +332,7 @@ impl State {
                         },
                         StateTerm::Closure(_) => unreachable!()
                     },
-                    PM::PMList(_) => todo!()
+                    PM::PMList(_) => unreachable!()
                 },
                 Term::Choice(choices) => choices.into_iter()
                     .map(|choice| {
@@ -375,6 +455,11 @@ impl State {
                         stack: self.stack
                     }]
                 },
+                Term::Fold => vec![State {
+                    env: self.env,
+                    term: StateTerm::Term(Term::Fold),
+                    stack: self.stack
+                }],
                 Term::Eq(lhs, rhs) => todo!(),
                 Term::NEq(lhs, rhs) => todo!(),
                 Term::Not(term) => todo!(),
@@ -430,6 +515,93 @@ impl State {
                         }]
                     },
                     _ => unreachable!()
+                },
+                Term::PM(pm) => match pm {
+                    PM::PMList(pm_list) => match closure.lookup(&pm_list.var).unwrap() {
+                        StateTerm::Term(term) => match term {
+                            Term::Nil => vec![State {
+                                env: self.env,
+                                term: StateTerm::Closure(Closure {
+                                    term: *pm_list.nil, vars: closure.vars
+                                }),
+                                stack: self.stack
+                            }],
+                            Term::Cons(x, xs) => {
+                                closure.store(pm_list.cons.x, StateTerm::Term(*x));
+                                closure.store(pm_list.cons.xs, StateTerm::Term(*xs));
+
+                                vec![State {
+                                    env: self.env,
+                                    term: StateTerm::Closure(Closure {
+                                        term: *pm_list.cons.body, vars: closure.vars
+                                    }),
+                                    stack: self.stack
+                                }]
+                            },
+                            Term::TypedVar(shape) => if shape.borrow().is_some() {
+                                match shape.borrow().clone().unwrap() {
+                                    Term::Nil => vec![State {
+                                        env: self.env,
+                                        term: StateTerm::Closure(Closure {
+                                            term: *pm_list.nil, vars: closure.vars
+                                        }),
+                                        stack: self.stack
+                                    }],
+                                    Term::Cons(x, xs) => {
+                                        closure.store(pm_list.cons.x, StateTerm::Term(*x));
+                                        closure.store(pm_list.cons.xs, StateTerm::Term(*xs));
+
+                                        vec![State {
+                                            env: self.env,
+                                            term: StateTerm::Closure(Closure {
+                                                term: *pm_list.cons.body, vars: closure.vars
+                                            }),
+                                            stack: self.stack
+                                        }]
+                                    },
+                                    _ => unreachable!()
+                                }
+                            } else {
+                                vec![
+                                    {
+                                        shape.replace(Some(Term::Nil));
+
+                                        let mut new_locations = HashMap::new();
+
+                                        let closure = closure.clone_with_locations(&mut new_locations);
+
+                                        State {
+                                            env: self.env.clone_with_locations(&mut new_locations),
+                                            term: StateTerm::Closure(Closure {
+                                                term: *pm_list.nil, vars: closure.vars
+                                            }),
+                                            stack: self.stack.clone_with_locations(&mut new_locations)
+                                        }
+                                    },
+                                    {
+                                        let x = Term::TypedVar(Rc::new(RefCell::new(None)));
+                                        let xs = Term::TypedVar(Rc::new(RefCell::new(None)));
+
+                                        shape.replace(Some(Term::Cons(Box::new(x.clone()), Box::new(xs.clone()))));
+
+                                        closure.store(pm_list.cons.x, StateTerm::Term(x));
+                                        closure.store(pm_list.cons.xs, StateTerm::Term(xs));
+
+                                        State {
+                                            env: self.env,
+                                            term: StateTerm::Closure(Closure {
+                                                term: *pm_list.cons.body, vars: closure.vars
+                                            }),
+                                            stack: self.stack
+                                        }
+                                    }
+                                ]
+                            },
+                            _ => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    },
+                    PM::PMNat(_) => unreachable!()
                 },
                 Term::Choice(choices) => choices.into_iter()
                     .map(|choice| {

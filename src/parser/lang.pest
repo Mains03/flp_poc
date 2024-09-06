@@ -18,17 +18,19 @@ exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stm }
 equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
-expr = { add | app | bexpr | list | primary_expr }
+expr = { add | app | bexpr | lambda | primary_expr }
 add = { primary_expr ~ "+" ~ (add | primary_expr) }
 app = { primary_expr ~ primary_expr+ }
 bexpr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
+lambda = { "\\" ~ ident ~ "." ~ stm }
+primary_expr = { ident | nat | bool | list | fold | "(" ~ stm ~ ")" }
 list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)? ~ "]" }
-primary_expr = { ident | nat | bool | "(" ~ stm ~ ")" }
+fold = { "fold" }
 
 bexpr_op = { "==" | "!=" }
 
 ident = @{ !keywords ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | bool }
+keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | "fold" | bool }
 nat = @{ ASCII_DIGIT+ }
 bool = { "true" | "false" }
 

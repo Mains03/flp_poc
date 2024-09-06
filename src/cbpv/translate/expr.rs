@@ -34,9 +34,24 @@ impl Translate for Expr {
                 elems.reverse();
                 translate_list(elems, 0, vec![])
             },
+            Expr::Lambda(var, body) => {
+                let body = body.translate();
+                
+                let mut free_vars = body.free_vars();
+                free_vars.remove(&var);
+
+                Term::Return(Box::new(Term::Thunk(Box::new(
+                    Term::Lambda {
+                        var,
+                        free_vars,
+                        body: Box::new(body)
+                    }
+                ))))
+            },
             Expr::Ident(s) => Term::Return(Box::new(Term::Var(s.clone()))),
             Expr::Nat(n) => Term::Return(Box::new(translate_nat(n))),
             Expr::Bool(b) => Term::Return(Box::new(Term::Bool(b))),
+            Expr::Fold => Term::Fold,
             Expr::Stm(s) => s.translate()
         }
     }

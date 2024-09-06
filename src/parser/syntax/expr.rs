@@ -6,9 +6,11 @@ pub enum Expr {
     App(Box<Expr>, Box<Expr>),
     BExpr(BExpr),
     List(Vec<Expr>),
+    Lambda(String, Box<Stm>),
     Ident(String),
     Nat(usize),
     Bool(bool),
+    Fold,
     Stm(Box<Stm>)
 }
 
