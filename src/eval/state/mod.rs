@@ -6,7 +6,7 @@ use equate::equate;
 use stack::{Stack, StackTerm};
 use state_term::StateTerm;
 
-use crate::cbpv::{PMSucc, Term};
+use crate::cbpv::{PMNat, PMNatSucc, Term, PM};
 
 mod closure;
 mod env;
@@ -106,15 +106,15 @@ impl State {
                 },
                 Term::Add(lhs, rhs) => vec![State {
                     env: self.env,
-                    term: StateTerm::Term(Term::PM {
+                    term: StateTerm::Term(Term::PM(PM::PMNat(PMNat {
                         var: lhs,
                         zero: Box::new(Term::Return(Box::new(Term::Var(rhs.clone())))),
-                        succ: PMSucc {
+                        succ: PMNatSucc {
                             var: "n".to_string(),
-                            body: Box::new(Term::PM {
+                            body: Box::new(Term::PM(PM::PMNat(PMNat {
                                 var: rhs,
                                 zero: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Var("n".to_string())))))),
-                                succ: PMSucc {
+                                succ: PMNatSucc {
                                     var: "m".to_string(),
                                     body: Box::new(Term::Bind {
                                         var: "0".to_string(),
@@ -124,9 +124,9 @@ impl State {
                                         )))
                                     })
                                 }
-                            })
+                            })))
                         }
-                    }),
+                    }))),
                     stack: self.stack
                 }],
                 Term::Eq(lhs, rhs) => todo!(),
@@ -183,73 +183,76 @@ impl State {
                     },
                     _ => unreachable!()
                 },
-                Term::PM { var, zero, succ } => match self.env.lookup(&var).unwrap() {
-                    StateTerm::Term(term) => match term {
-                        Term::Zero => vec![State {
-                            env: self.env,
-                            term: StateTerm::Term(*zero),
-                            stack: self.stack
-                        }],
-                        Term::Succ(s) => {
-                            self.stack.push(StackTerm::Release(succ.var.clone()));
-                            self.env.store(succ.var, StateTerm::Term(*s));
-
-                            vec![State {
+                Term::PM(pm) => match pm {
+                    PM::PMNat(pm_nat) => match self.env.lookup(&pm_nat.var).unwrap() {
+                        StateTerm::Term(term) => match term {
+                            Term::Zero => vec![State {
                                 env: self.env,
-                                term: StateTerm::Term(*succ.body),
+                                term: StateTerm::Term(*pm_nat.zero),
                                 stack: self.stack
-                            }]
-                        },
-                        Term::TypedVar(shape) => if shape.borrow().is_some() {
-                            match shape.borrow().clone().unwrap() {
-                                Term::Zero => vec![State {
+                            }],
+                            Term::Succ(s) => {
+                                self.stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                                self.env.store(pm_nat.succ.var, StateTerm::Term(*s));
+
+                                vec![State {
                                     env: self.env,
-                                    term: StateTerm::Term(*zero),
+                                    term: StateTerm::Term(*pm_nat.succ.body),
                                     stack: self.stack
-                                }],
-                                Term::Succ(s) => {
-                                    self.stack.push(StackTerm::Release(succ.var.clone()));
-                                    self.env.store(succ.var, StateTerm::Term(*s));
-
-                                    vec![State {
+                                }]
+                            },
+                            Term::TypedVar(shape) => if shape.borrow().is_some() {
+                                match shape.borrow().clone().unwrap() {
+                                    Term::Zero => vec![State {
                                         env: self.env,
-                                        term: StateTerm::Term(*succ.body),
+                                        term: StateTerm::Term(*pm_nat.zero),
                                         stack: self.stack
-                                    }]
-                                },
-                                _ => unreachable!()
-                            }
-                        } else {
-                            vec![
-                                {
-                                    shape.replace(Some(Term::Zero));
-
-                                    let mut new_locations = HashMap::new();
-
-                                    State {
-                                        env: self.env.clone_with_locations(&mut new_locations),
-                                        term: StateTerm::Term(*zero),
-                                        stack: self.stack.clone_with_locations(&mut new_locations)
-                                    }
-                                },
-                                {
-                                    let s = Term::TypedVar(Rc::new(RefCell::new(None)));
-                                    shape.replace(Some(Term::Succ(Box::new(s.clone()))));
-
-                                    self.stack.push(StackTerm::Release(succ.var.clone()));
-                                    self.env.store(succ.var, StateTerm::Term(s));
-
-                                    State {
-                                        env: self.env,
-                                        term: StateTerm::Term(*succ.body),
-                                        stack: self.stack
-                                    }
+                                    }],
+                                    Term::Succ(s) => {
+                                        self.stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                                        self.env.store(pm_nat.succ.var, StateTerm::Term(*s));
+    
+                                        vec![State {
+                                            env: self.env,
+                                            term: StateTerm::Term(*pm_nat.succ.body),
+                                            stack: self.stack
+                                        }]
+                                    },
+                                    _ => unreachable!()
                                 }
-                            ]
+                            } else {
+                                vec![
+                                    {
+                                        shape.replace(Some(Term::Zero));
+    
+                                        let mut new_locations = HashMap::new();
+    
+                                        State {
+                                            env: self.env.clone_with_locations(&mut new_locations),
+                                            term: StateTerm::Term(*pm_nat.zero),
+                                            stack: self.stack.clone_with_locations(&mut new_locations)
+                                        }
+                                    },
+                                    {
+                                        let s = Term::TypedVar(Rc::new(RefCell::new(None)));
+                                        shape.replace(Some(Term::Succ(Box::new(s.clone()))));
+    
+                                        self.stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                                        self.env.store(pm_nat.succ.var, StateTerm::Term(s));
+    
+                                        State {
+                                            env: self.env,
+                                            term: StateTerm::Term(*pm_nat.succ.body),
+                                            stack: self.stack
+                                        }
+                                    }
+                                ]
+                            },
+                            _ => unreachable!()
                         },
-                        _ => unreachable!()
+                        StateTerm::Closure(_) => unreachable!()
                     },
-                    StateTerm::Closure(_) => unreachable!()
+                    PM::PMList(_) => todo!()
                 },
                 Term::Choice(choices) => choices.into_iter()
                     .map(|choice| {
@@ -261,7 +264,7 @@ impl State {
                             stack: self.stack.clone_with_locations(&mut new_locations)
                         }
                     }).collect(),
-                Term::Exists { var, r#type: _, body } => {
+                Term::Exists { var, body } => {
                     self.env.store(var, StateTerm::Term(Term::TypedVar(Rc::new(RefCell::new(None)))));
 
                     vec![State {
@@ -428,7 +431,7 @@ impl State {
                     },
                     _ => unreachable!()
                 },
-                Term::Exists { var, r#type: _, body } => {
+                Term::Exists { var, body } => {
                     closure.store(
                         var,
                         StateTerm::Term(Term::TypedVar(Rc::new(RefCell::new(None))))

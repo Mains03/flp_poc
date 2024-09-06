@@ -1,7 +1,5 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
-use crate::parser::syntax::r#type::Type;
-
 pub mod translate;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,7 +27,6 @@ pub enum Term {
     },
     Exists {
         var: String,
-        r#type: Type,
         body: Box<Term>
     },
     Equate {
@@ -42,17 +39,45 @@ pub enum Term {
         free_vars: HashSet<String>,
         body: Box<Term>
     },
-    PM {
-        var: String,
-        zero: Box<Term>,
-        succ: PMSucc
-    },
+    PM(PM),
     Choice(Vec<Term>),
     Thunk(Box<Term>),
     Return(Box<Term>),
     Force(String),
     App(Box<Term>, String),
     Fail
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PM {
+    PMNat(PMNat),
+    PMList(PMList)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PMNat {
+    pub var: String,
+    pub zero: Box<Term>,
+    pub succ: PMNatSucc
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PMNatSucc {
+    pub var: String,
+    pub body: Box<Term>
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PMList {
+    pub var: String,
+    pub nil: Box<Term>,
+    pub cons: PMListCons
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PMListCons {
+    pub var: String,
+    pub body: Box<Term>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,7 +106,7 @@ impl Term {
                 free_vars.remove(var);
                 free_vars
             },
-            Term::Exists { var, r#type: _, body } => {
+            Term::Exists { var, body } => {
                 let mut free_vars = body.free_vars();
                 free_vars.remove(var);
                 free_vars

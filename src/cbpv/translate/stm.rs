@@ -19,9 +19,8 @@ impl Translate for Stm {
                 val: Box::new(val.translate()),
                 body: Box::new(body.translate())
             },
-            Stm::Exists { var, r#type, body } => Term::Exists {
+            Stm::Exists { var, r#type: _, body } => Term::Exists {
                 var,
-                r#type: r#type.clone(),
                 body: Box::new(body.translate())
             },
             Stm::Equate { lhs, rhs, body } => Term::Bind {
