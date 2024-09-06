@@ -431,6 +431,18 @@ impl State {
                     },
                     _ => unreachable!()
                 },
+                Term::Choice(choices) => choices.into_iter()
+                    .map(|choice| {
+                        let mut new_locations = HashMap::new();
+
+                        State {
+                            env: self.env.clone_with_locations(&mut new_locations),
+                            term: StateTerm::Closure(Closure {
+                                term: choice, vars: closure.clone_with_locations(&mut new_locations).vars
+                            }),
+                            stack: self.stack.clone_with_locations(&mut new_locations)
+                        }
+                    }).collect(),
                 Term::Exists { var, body } => {
                     closure.store(
                         var,

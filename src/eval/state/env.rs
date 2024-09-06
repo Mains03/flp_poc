@@ -86,6 +86,13 @@ impl Env {
                 StateTerm::Term(term) => StateTerm::Term(Term::Succ(Box::new(term))),
                 StateTerm::Closure(_) => unreachable!()
             },
+            Term::Cons(x, xs) => match self.expand_value(*x) {
+                StateTerm::Term(x) => match self.expand_value(*xs) {
+                    StateTerm::Term(xs) => StateTerm::Term(Term::Cons(Box::new(x), Box::new(xs))),
+                    StateTerm::Closure(_) => unreachable!()
+                },
+                StateTerm::Closure(_) => unreachable!()
+            },
             Term::TypedVar(shape) => if shape.borrow().is_some() {
                 StateTerm::Term(match shape.borrow().clone().unwrap() {
                     Term::Zero => Term::Zero,
@@ -93,6 +100,14 @@ impl Env {
                         StateTerm::Term(term) => Term::Succ(Box::new(term)),
                         StateTerm::Closure(_) => unreachable!()
                     },
+                    Term::Nil => Term::Nil,
+                    Term::Cons(x, xs) => match self.expand_value(*x) {
+                        StateTerm::Term(x) => match self.expand_value(*xs) {
+                            StateTerm::Term(xs) => Term::Cons(Box::new(x), Box::new(xs)),
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    }
                     _ => unreachable!()
                 })
             } else {

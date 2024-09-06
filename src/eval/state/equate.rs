@@ -7,7 +7,7 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
     
     loop {
         match lhs {
-            Term::Zero =>{
+            Term::Zero => {
                 flag = match rhs {
                     Term::Zero => true,
                     Term::TypedVar(shape) => if shape.borrow().is_some() {
@@ -52,6 +52,62 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                     break;
                 }
             },
+            Term::Nil => {
+                flag = match rhs {
+                    Term::Nil => true,
+                    Term::TypedVar(shape) => if shape.borrow().is_some() {
+                        match shape.borrow().clone().unwrap() {
+                            Term::Nil => true,
+                            _ => false
+                        }
+                    } else {
+                        shape.replace(Some(Term::Nil));
+
+                        true
+                    },
+                    _ => false
+                };
+
+                break;
+            },
+            Term::Cons(x, xs) => match rhs {
+                Term::Cons(y, ys) => if equate(*x, *y) {
+                    lhs = *xs;
+                    rhs = *ys;
+                } else {
+                    flag = false;
+                    break;
+                },
+                Term::TypedVar(shape) => if shape.borrow().is_some() {
+                    match shape.borrow().clone().unwrap() {
+                        Term::Cons(y, ys) => if equate(*x, *y) {
+                            lhs = *xs;
+                            rhs = *ys;
+                        } else {
+                            flag = false;
+                            break;
+                        },
+                        _ => {
+                            flag = false;
+                            break;
+                        }
+                    }
+                } else {
+                    let y = Term::TypedVar(Rc::new(RefCell::new(None)));
+                    let ys = Term::TypedVar(Rc::new(RefCell::new(None)));
+
+                    shape.replace(Some(Term::Cons(Box::new(y.clone()), Box::new(ys.clone()))));
+
+                    equate(*x, y);
+
+                    lhs = *xs;
+                    rhs = ys;
+                },
+                _ => {
+                    flag = false;
+                    break;
+                }
+            },
             Term::TypedVar(lhs_shape) => match rhs {
                 Term::Zero => if lhs_shape.borrow().is_some() {
                     flag = match lhs_shape.borrow().clone().unwrap() {
@@ -82,6 +138,44 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                     lhs_shape.replace(Some(Term::Succ(Box::new(lhs.clone()))));
 
                     rhs = *rhs_term;
+                },
+                Term::Nil => if lhs_shape.borrow().is_some() {
+                    flag = match lhs_shape.borrow().clone().unwrap() {
+                        Term::Nil => true,
+                        _ => false
+                    };
+
+                    break;
+                } else {
+                    lhs_shape.replace(Some(Term::Nil));
+
+                    flag = true;
+                    break;
+                },
+                Term::Cons(y, ys) => if lhs_shape.borrow().is_some() {
+                    match lhs_shape.borrow().clone().unwrap() {
+                        Term::Cons(x, xs) => if equate(*x, *y) {
+                            lhs = *xs;
+                            rhs = *ys;
+                        } else {
+                            flag = false;
+                            break;
+                        },
+                        _ => {
+                            flag = false;
+                            break;
+                        }
+                    }
+                } else {
+                    let x = Term::TypedVar(Rc::new(RefCell::new(None)));
+                    let xs = Term::TypedVar(Rc::new(RefCell::new(None)));
+
+                    lhs_shape.replace(Some(Term::Cons(Box::new(x.clone()), Box::new(xs.clone()))));
+
+                    equate(x, *y);
+
+                    lhs = xs;
+                    rhs = *ys;
                 },
                 Term::TypedVar(rhs_shape) => if is_cyle(&lhs_shape, &rhs_shape) {
                     flag = false;
