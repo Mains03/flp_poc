@@ -64,7 +64,7 @@ impl LocationsClone for Closure {
             });
 
         Closure {
-            term: self.term.clone(),
+            term: self.term.clone_with_locations(new_locations),
             vars
         }
     }

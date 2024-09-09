@@ -302,15 +302,26 @@ impl State {
                                 }
                             } else {
                                 vec![
-                                    {
+                                    {    
+                                        let mut new_locations = HashMap::new();
+
+                                        let env = self.env.clone_with_locations(&mut new_locations);
+                                        let stack = self.stack.clone_with_locations(&mut new_locations);
+
+                                        let shape = match env.lookup(&pm_nat.var).unwrap() {
+                                            Value::Term(term) => match term {
+                                                Term::TypedVar(shape) => shape,
+                                                _ => unreachable!()
+                                            },
+                                            Value::Closure(_) => unreachable!()
+                                        };
+
                                         shape.replace(Some(Term::Zero));
     
-                                        let mut new_locations = HashMap::new();
-    
                                         State {
-                                            env: self.env.clone_with_locations(&mut new_locations),
+                                            env,
                                             term: StateTerm::from_term(*pm_nat.zero),
-                                            stack: self.stack.clone_with_locations(&mut new_locations)
+                                            stack
                                         }
                                     },
                                     {
@@ -564,18 +575,28 @@ impl State {
                             } else {
                                 vec![
                                     {
-                                        shape.replace(Some(Term::Nil));
-
                                         let mut new_locations = HashMap::new();
 
+                                        let env = self.env.clone_with_locations(&mut new_locations);
                                         let closure = closure.clone_with_locations(&mut new_locations);
+                                        let stack = self.stack.clone_with_locations(&mut new_locations);
+
+                                        let shape = match closure.lookup(&pm_list.var).unwrap() {
+                                            Value::Term(term) => match term {
+                                                Term::TypedVar(shape) => shape,
+                                                _ => unreachable!()
+                                            },
+                                            Value::Closure(_) => unreachable!()
+                                        };
+
+                                        shape.replace(Some(Term::Nil));
 
                                         State {
-                                            env: self.env.clone_with_locations(&mut new_locations),
+                                            env,
                                             term: StateTerm::Closure(Closure {
                                                 term: *pm_list.nil, vars: closure.vars
                                             }),
-                                            stack: self.stack.clone_with_locations(&mut new_locations)
+                                            stack
                                         }
                                     },
                                     {
