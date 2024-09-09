@@ -4,6 +4,8 @@ use state::State;
 
 use crate::cbpv::Term;
 
+pub use state::LocationsClone;
+
 mod state;
 
 pub fn eval(cbpv: HashMap<String, Term>) -> Term {

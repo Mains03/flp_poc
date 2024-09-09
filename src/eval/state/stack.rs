@@ -1,6 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{cbpv::Term, eval::state::state_term::StateTerm};
+use crate::cbpv::Term;
+
+use super::state_term::{locations_clone::LocationsClone, state_term::StateTerm};
 
 #[derive(Debug)]
 pub struct Stack {
@@ -46,8 +48,8 @@ impl Stack {
     }
 }
 
-impl StackTerm {
-    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self     {
+impl LocationsClone for StackTerm {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self     {
         match self {
             StackTerm::Cont(var, term) => StackTerm::Cont(var.clone(), term.clone_with_locations(new_locations)),
             StackTerm::Term(term) => StackTerm::Term(term.clone_with_locations(new_locations)),

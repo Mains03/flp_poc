@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::cbpv::Term;
 
-use super::state_term::StateTerm;
+use super::state_term::{locations_clone::LocationsClone, state_term::StateTerm, value::{Value, ValueStore}};
 
 #[derive(Debug)]
 pub struct Env {
@@ -12,41 +12,6 @@ pub struct Env {
 impl Env {
     pub fn new() -> Self {
         Env { envs: vec![HashMap::new()] }
-    }
-
-    pub fn store(&mut self, var: String, val: StateTerm) {
-        if self.envs.get(self.envs.len()-1).unwrap().contains_key(&var) {
-            self.envs.push(HashMap::new());
-        };
-
-        let i = self.envs.len()-1;
-        let env = self.envs.get_mut(i).unwrap();
-        env.insert(var, val);
-    }
-
-    pub fn lookup(&self, var: &String) -> Option<StateTerm> {
-        let ret;
-
-        let mut i = self.envs.len()-1;
-        loop {
-            let env = self.envs.get(i).unwrap();
-            match env.get(var) {
-                Some(val) => {
-                    ret = Some(val.clone());
-                    break;
-                },
-                None => ()
-            }
-
-            if i == 0 {
-                ret = None;
-                break;
-            } else {
-                i -=1 ;
-            }
-        }
-
-        ret
     }
 
     pub fn release(&mut self, var: &String) {
@@ -78,46 +43,85 @@ impl Env {
             }
         }
     }
+}
 
-    pub fn expand_value(&self, term: Term) -> StateTerm {
+impl ValueStore for Env {
+    fn store(&mut self, var: String, val: Value) {
+        if self.envs.get(self.envs.len()-1).unwrap().contains_key(&var) {
+            self.envs.push(HashMap::new());
+        };
+
+        let i = self.envs.len()-1;
+        let env = self.envs.get_mut(i).unwrap();
+        env.insert(var, val.to_state_term());
+    }
+
+    fn lookup(&self, var: &String) -> Option<Value> {
+        let ret;
+
+        let mut i = self.envs.len()-1;
+        loop {
+            let env = self.envs.get(i).unwrap();
+            match env.get(var) {
+                Some(state_term) => {
+                    ret = Some(state_term.as_value());
+                    break;
+                },
+                None => ()
+            }
+
+            if i == 0 {
+                ret = None;
+                break;
+            } else {
+                i -=1 ;
+            }
+        }
+
+        ret
+    }
+
+    fn expand_value(&self, term: Term) -> Value {
         match term {
             Term::Var(var) => self.lookup(&var).unwrap(),
             Term::Succ(succ) => match self.expand_value(*succ) {
-                StateTerm::Term(term) => StateTerm::Term(Term::Succ(Box::new(term))),
-                StateTerm::Closure(_) => unreachable!()
+                Value::Term(term) => Value::Term(Term::Succ(Box::new(term))),
+                Value::Closure(_) => unreachable!()
             },
             Term::Cons(x, xs) => match self.expand_value(*x) {
-                StateTerm::Term(x) => match self.expand_value(*xs) {
-                    StateTerm::Term(xs) => StateTerm::Term(Term::Cons(Box::new(x), Box::new(xs))),
-                    StateTerm::Closure(_) => unreachable!()
+                Value::Term(x) => match self.expand_value(*xs) {
+                    Value::Term(xs) => Value::Term(Term::Cons(Box::new(x), Box::new(xs))),
+                    Value::Closure(_) => unreachable!()
                 },
-                StateTerm::Closure(_) => unreachable!()
+                Value::Closure(_) => unreachable!()
             },
             Term::TypedVar(shape) => if shape.borrow().is_some() {
-                StateTerm::Term(match shape.borrow().clone().unwrap() {
+                Value::Term(match shape.borrow().clone().unwrap() {
                     Term::Zero => Term::Zero,
                     Term::Succ(term) => match self.expand_value(*term) {
-                        StateTerm::Term(term) => Term::Succ(Box::new(term)),
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Term(term) => Term::Succ(Box::new(term)),
+                        Value::Closure(_) => unreachable!()
                     },
                     Term::Nil => Term::Nil,
                     Term::Cons(x, xs) => match self.expand_value(*x) {
-                        StateTerm::Term(x) => match self.expand_value(*xs) {
-                            StateTerm::Term(xs) => Term::Cons(Box::new(x), Box::new(xs)),
-                            StateTerm::Closure(_) => unreachable!()
+                        Value::Term(x) => match self.expand_value(*xs) {
+                            Value::Term(xs) => Term::Cons(Box::new(x), Box::new(xs)),
+                            Value::Closure(_) => unreachable!()
                         },
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Closure(_) => unreachable!()
                     }
                     _ => unreachable!()
                 })
             } else {
-                StateTerm::Term(Term::TypedVar(shape))
+                Value::Term(Term::TypedVar(shape))
             }
-            _ => StateTerm::Term(term)
+            _ => Value::Term(term)
         }
     }
+}
 
-    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
+impl LocationsClone for Env {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
         let mut envs = vec![];
 
         let mut i = self.envs.len()-1;

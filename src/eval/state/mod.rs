@@ -1,14 +1,14 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
-use closure::Closure;
 use env::Env;
 use equate::equate;
 use stack::{Stack, StackTerm};
-use state_term::StateTerm;
+use state_term::{closure::Closure,state_term::StateTerm, term_ptr::TermPtr, value::{Value, ValueStore}};
 
 use crate::cbpv::{PMList, PMListCons, PMNat, PMNatSucc, Term, PM};
 
-mod closure;
+pub use state_term::locations_clone::LocationsClone;
+
 mod env;
 mod equate;
 mod stack;
@@ -27,20 +27,20 @@ impl State {
 
         let env = cbpv.into_iter()
             .fold(Env::new(), |mut env, (var, val)| {
-                env.store(var, StateTerm::Term(val));
+                env.store(var, Value::Term(val));
                 env
             });
 
         State {
             env,
-            term: StateTerm::Term(term),
+            term: StateTerm::Term(TermPtr::new(term)),
             stack: Stack::new()
         }
     }
 
     pub fn step(mut self) -> Vec<State> {
         match self.term {
-            StateTerm::Term(term) => match term {
+            StateTerm::Term(term) => match term.term() {
                 Term::Return(term) => {
                     let val = self.env.expand_value(*term);
 
@@ -73,8 +73,8 @@ impl State {
                                 vec![State {
                                     env: self.env,
                                     term: match val {
-                                        StateTerm::Term(term) => StateTerm::Term(Term::Return(Box::new(term))),
-                                        StateTerm::Closure(closure) => StateTerm::Closure(Closure {
+                                        Value::Term(term) => StateTerm::from_term(Term::Return(Box::new(term))),
+                                        Value::Closure(closure) => StateTerm::Closure(Closure {
                                             term: Term::Return(Box::new(closure.term)), vars: closure.vars
                                         })
                                     },
@@ -86,8 +86,8 @@ impl State {
                         None => vec![State {
                             env: self.env,
                             term: match val {
-                                StateTerm::Term(term) => StateTerm::Term(Term::Return(Box::new(term))),
-                                StateTerm::Closure(closure) => StateTerm::Closure(Closure {
+                                Value::Term(term) => StateTerm::from_term(Term::Return(Box::new(term))),
+                                Value::Closure(closure) => StateTerm::Closure(Closure {
                                     term: Term::Return(Box::new(closure.term)), vars: closure.vars
                                 })
                             },
@@ -96,17 +96,17 @@ impl State {
                     }
                 }
                 Term::Bind { var, val, body } => {
-                    self.stack.push(StackTerm::Cont(var, StateTerm::Term(*body)));
+                    self.stack.push(StackTerm::Cont(var, StateTerm::from_term(*body)));
 
                     vec![State {
                         env: self.env,
-                        term: StateTerm::Term(*val),
+                        term: StateTerm::from_term(*val),
                         stack: self.stack
                     }]
                 },
                 Term::Add(lhs, rhs) => vec![State {
                     env: self.env,
-                    term: StateTerm::Term(Term::PM(PM::PMNat(PMNat {
+                    term: StateTerm::from_term(Term::PM(PM::PMNat(PMNat {
                         var: lhs,
                         zero: Box::new(Term::Return(Box::new(Term::Var(rhs.clone())))),
                         succ: PMNatSucc {
@@ -131,7 +131,7 @@ impl State {
                 }],
                 Term::Fold => vec![State {
                     env: self.env,
-                    term: StateTerm::Term(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                    term: StateTerm::from_term(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
                         var: "f".to_string(),
                         free_vars: HashSet::new(),
                         body: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
@@ -215,25 +215,25 @@ impl State {
                 Term::If { cond, then, r#else } => todo!(),
                 Term::App(lhs, rhs) => {
                     self.stack.push(StackTerm::Term(
-                        self.env.lookup(&rhs).unwrap()
+                        self.env.lookup(&rhs).unwrap().to_state_term()
                     ));
 
                     vec![State {
                         env: self.env,
-                        term: StateTerm::Term(*lhs),
+                        term: StateTerm::from_term(*lhs),
                         stack: self.stack
                     }]
                 },
                 Term::Force(term) => match self.env.lookup(&term).unwrap() {
-                    StateTerm::Term(term) => match term {
+                    Value::Term(term) => match term {
                         Term::Thunk(term) => vec![State {
                             env: self.env,
-                            term: StateTerm::Term(*term),
+                            term: StateTerm::from_term(*term),
                             stack: self.stack
                         }],
                         _ => unreachable!()
                     },
-                    StateTerm::Closure(closure) => match closure.term {
+                    Value::Closure(closure) => match closure.term {
                         Term::Thunk(term) => vec![State {
                             env: self.env,
                             term: StateTerm::Closure(Closure {
@@ -247,7 +247,7 @@ impl State {
                 Term::Lambda { var, free_vars, body } => match self.stack.pop().unwrap() {
                     StackTerm::Term(term) => {
                         let mut closure = Closure::new(*body);
-                        closure.store(var, term);
+                        closure.store(var, term.as_value());
 
                         free_vars.into_iter()
                             .for_each(|var| {
@@ -265,19 +265,19 @@ impl State {
                 },
                 Term::PM(pm) => match pm {
                     PM::PMNat(pm_nat) => match self.env.lookup(&pm_nat.var).unwrap() {
-                        StateTerm::Term(term) => match term {
+                        Value::Term(term) => match term {
                             Term::Zero => vec![State {
                                 env: self.env,
-                                term: StateTerm::Term(*pm_nat.zero),
+                                term: StateTerm::from_term(*pm_nat.zero),
                                 stack: self.stack
                             }],
                             Term::Succ(s) => {
                                 self.stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
-                                self.env.store(pm_nat.succ.var, StateTerm::Term(*s));
+                                self.env.store(pm_nat.succ.var, Value::Term(*s));
 
                                 vec![State {
                                     env: self.env,
-                                    term: StateTerm::Term(*pm_nat.succ.body),
+                                    term: StateTerm::from_term(*pm_nat.succ.body),
                                     stack: self.stack
                                 }]
                             },
@@ -285,16 +285,16 @@ impl State {
                                 match shape.borrow().clone().unwrap() {
                                     Term::Zero => vec![State {
                                         env: self.env,
-                                        term: StateTerm::Term(*pm_nat.zero),
+                                        term: StateTerm::from_term(*pm_nat.zero),
                                         stack: self.stack
                                     }],
                                     Term::Succ(s) => {
                                         self.stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
-                                        self.env.store(pm_nat.succ.var, StateTerm::Term(*s));
+                                        self.env.store(pm_nat.succ.var, Value::Term(*s));
     
                                         vec![State {
                                             env: self.env,
-                                            term: StateTerm::Term(*pm_nat.succ.body),
+                                            term: StateTerm::from_term(*pm_nat.succ.body),
                                             stack: self.stack
                                         }]
                                     },
@@ -309,7 +309,7 @@ impl State {
     
                                         State {
                                             env: self.env.clone_with_locations(&mut new_locations),
-                                            term: StateTerm::Term(*pm_nat.zero),
+                                            term: StateTerm::from_term(*pm_nat.zero),
                                             stack: self.stack.clone_with_locations(&mut new_locations)
                                         }
                                     },
@@ -318,11 +318,11 @@ impl State {
                                         shape.replace(Some(Term::Succ(Box::new(s.clone()))));
     
                                         self.stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
-                                        self.env.store(pm_nat.succ.var, StateTerm::Term(s));
+                                        self.env.store(pm_nat.succ.var, Value::Term(s));
     
                                         State {
                                             env: self.env,
-                                            term: StateTerm::Term(*pm_nat.succ.body),
+                                            term: StateTerm::from_term(*pm_nat.succ.body),
                                             stack: self.stack
                                         }
                                     }
@@ -330,7 +330,7 @@ impl State {
                             },
                             _ => unreachable!()
                         },
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Closure(_) => unreachable!()
                     },
                     PM::PMList(_) => unreachable!()
                 },
@@ -340,35 +340,35 @@ impl State {
 
                         State {
                             env: self.env.clone_with_locations(&mut new_locations),
-                            term: StateTerm::Term(choice),
+                            term: StateTerm::from_term(choice),
                             stack: self.stack.clone_with_locations(&mut new_locations)
                         }
                     }).collect(),
                 Term::Exists { var, body } => {
-                    self.env.store(var, StateTerm::Term(Term::TypedVar(Rc::new(RefCell::new(None)))));
+                    self.env.store(var, Value::Term(Term::TypedVar(Rc::new(RefCell::new(None)))));
 
                     vec![State {
                         env: self.env,
-                        term: StateTerm::Term(*body),
+                        term: StateTerm::from_term(*body),
                         stack: self.stack
                     }]
                 },
                 Term::Equate { lhs, rhs, body } => {
                     let lhs = match self.env.lookup(&lhs).unwrap() {
-                        StateTerm::Term(term) => term,
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Term(term) => term,
+                        Value::Closure(_) => unreachable!()
                     };
 
                     let rhs = match self.env.lookup(&rhs).unwrap() {
-                        StateTerm::Term(term) => term,
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Term(term) => term,
+                        Value::Closure(_) => unreachable!()
                     };
 
                     let flag = equate(lhs, rhs);
 
                     vec![State {
                         env: self.env,
-                        term: StateTerm::Term(if flag {
+                        term: StateTerm::from_term(if flag {
                             *body
                         } else {
                             Term::Fail
@@ -378,7 +378,7 @@ impl State {
                 },
                 Term::Fail => vec![State {
                     env: self.env,
-                    term: StateTerm::Term(Term::Fail),
+                    term: StateTerm::from_term(Term::Fail),
                     stack: self.stack
                 }],
                 _ => unreachable!(),
@@ -416,8 +416,8 @@ impl State {
                                 vec![State {
                                     env: self.env,
                                     term: match val {
-                                        StateTerm::Term(term) => StateTerm::Term(Term::Return(Box::new(term))),
-                                        StateTerm::Closure(closure) => StateTerm::Closure(Closure {
+                                        Value::Term(term) => StateTerm::from_term(Term::Return(Box::new(term))),
+                                        Value::Closure(closure) => StateTerm::Closure(Closure {
                                             term: Term::Return(Box::new(closure.term)), vars: closure.vars
                                         })
                                     },
@@ -451,13 +451,13 @@ impl State {
 
                     vec![State {
                         env: self.env,
-                        term: StateTerm::Term(Term::Add("x".to_string(), "y".to_string())),
+                        term: StateTerm::from_term(Term::Add("x".to_string(), "y".to_string())),
                         stack: self.stack
                     }]
                 },
                 Term::Fold => vec![State {
                     env: self.env,
-                    term: StateTerm::Term(Term::Fold),
+                    term: StateTerm::from_term(Term::Fold),
                     stack: self.stack
                 }],
                 Term::Eq(lhs, rhs) => todo!(),
@@ -466,7 +466,7 @@ impl State {
                 Term::If { cond, then, r#else } => todo!(),
                 Term::App(lhs, rhs) => {
                     self.stack.push(StackTerm::Term(
-                        closure.lookup(&rhs).unwrap()
+                        closure.lookup(&rhs).unwrap().to_state_term()
                     ));
 
                     vec![State {
@@ -478,15 +478,15 @@ impl State {
                     }]
                 },
                 Term::Force(term) => match closure.lookup(&term).unwrap() {
-                    StateTerm::Term(term) => match term {
+                    Value::Term(term) => match term {
                         Term::Thunk(term) => vec![State {
                             env: self.env,
-                            term: StateTerm::Term(*term),
+                            term: StateTerm::from_term(*term),
                             stack: self.stack
                         }],
                         _ => unreachable!()
                     },
-                    StateTerm::Closure(closure) => match closure.term {
+                    Value::Closure(closure) => match closure.term {
                         Term::Thunk(term) => vec![State {
                             env: self.env,
                             term: StateTerm::Closure(Closure {
@@ -500,7 +500,7 @@ impl State {
                 Term::Lambda { var, free_vars,  body } => match self.stack.pop().unwrap() {
                     StackTerm::Term(term) => {
                         let mut state = Closure::new(*body);
-                        state.store(var, term);
+                        state.store(var, term.as_value());
 
                         free_vars.into_iter()
                             .for_each(|var| {
@@ -518,7 +518,7 @@ impl State {
                 },
                 Term::PM(pm) => match pm {
                     PM::PMList(pm_list) => match closure.lookup(&pm_list.var).unwrap() {
-                        StateTerm::Term(term) => match term {
+                        Value::Term(term) => match term {
                             Term::Nil => vec![State {
                                 env: self.env,
                                 term: StateTerm::Closure(Closure {
@@ -527,8 +527,8 @@ impl State {
                                 stack: self.stack
                             }],
                             Term::Cons(x, xs) => {
-                                closure.store(pm_list.cons.x, StateTerm::Term(*x));
-                                closure.store(pm_list.cons.xs, StateTerm::Term(*xs));
+                                closure.store(pm_list.cons.x, Value::Term(*x));
+                                closure.store(pm_list.cons.xs, Value::Term(*xs));
 
                                 vec![State {
                                     env: self.env,
@@ -548,8 +548,8 @@ impl State {
                                         stack: self.stack
                                     }],
                                     Term::Cons(x, xs) => {
-                                        closure.store(pm_list.cons.x, StateTerm::Term(*x));
-                                        closure.store(pm_list.cons.xs, StateTerm::Term(*xs));
+                                        closure.store(pm_list.cons.x, Value::Term(*x));
+                                        closure.store(pm_list.cons.xs, Value::Term(*xs));
 
                                         vec![State {
                                             env: self.env,
@@ -584,8 +584,8 @@ impl State {
 
                                         shape.replace(Some(Term::Cons(Box::new(x.clone()), Box::new(xs.clone()))));
 
-                                        closure.store(pm_list.cons.x, StateTerm::Term(x));
-                                        closure.store(pm_list.cons.xs, StateTerm::Term(xs));
+                                        closure.store(pm_list.cons.x, Value::Term(x));
+                                        closure.store(pm_list.cons.xs, Value::Term(xs));
 
                                         State {
                                             env: self.env,
@@ -599,7 +599,7 @@ impl State {
                             },
                             _ => unreachable!()
                         },
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Closure(_) => unreachable!()
                     },
                     PM::PMNat(_) => unreachable!()
                 },
@@ -618,7 +618,7 @@ impl State {
                 Term::Exists { var, body } => {
                     closure.store(
                         var,
-                        StateTerm::Term(Term::TypedVar(Rc::new(RefCell::new(None))))
+                        Value::Term(Term::TypedVar(Rc::new(RefCell::new(None))))
                     );
                     
                     vec![State {
@@ -631,13 +631,13 @@ impl State {
                 },
                 Term::Equate { lhs, rhs, body } => {
                     let lhs = match closure.lookup(&lhs).unwrap() {
-                        StateTerm::Term(term) => term,
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Term(term) => term,
+                        Value::Closure(_) => unreachable!()
                     };
 
                     let rhs = match closure.lookup(&rhs).unwrap() {
-                        StateTerm::Term(term) => term,
-                        StateTerm::Closure(_) => unreachable!()
+                        Value::Term(term) => term,
+                        Value::Closure(_) => unreachable!()
                     };
 
                     let flag = equate(lhs, rhs);
@@ -649,7 +649,7 @@ impl State {
                                 term: *body, vars: closure.vars
                             })
                         } else {
-                            StateTerm::Term(Term::Fail)
+                            StateTerm::from_term(Term::Fail)
                         },
                         stack: self.stack
                     }]
@@ -661,7 +661,7 @@ impl State {
 
     pub fn is_fail(&self) -> bool {
         match &self.term {
-            StateTerm::Term(term) => match term {
+            StateTerm::Term(term_ptr) => match term_ptr.term() {
                 Term::Fail => true,
                 _ => false
             },
@@ -672,8 +672,8 @@ impl State {
     pub fn is_value(&self) -> bool {
         if self.stack.is_empty() {
             match &self.term {
-                StateTerm::Term(term) => match term {
-                    Term::Return(term) => match **term {
+                StateTerm::Term(term_ptr) => match term_ptr.term() {
+                    Term::Return(term) => match *term {
                         Term::Var(_) => false,
                         _ => true
                     },
@@ -688,7 +688,7 @@ impl State {
 
     pub fn as_term(self) -> Term {
         match self.term {
-            StateTerm::Term(term) => term,
+            StateTerm::Term(term_ptr) => term_ptr.term(),
             StateTerm::Closure(_) => unreachable!()
         }
     }

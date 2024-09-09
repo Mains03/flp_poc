@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
+use crate::eval::LocationsClone;
+
 pub mod translate;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -132,7 +134,21 @@ impl Term {
         }
     }
 
-    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
+    pub fn contains_typed_var(&self) -> bool {
+        match self {
+            Term::TypedVar(val) => match val.borrow().as_ref() {
+                Some(term) => term.contains_typed_var(),
+                None => true
+            },
+            Term::Succ(term) => term.contains_typed_var(),
+            Term::Cons(x, xs) => x.contains_typed_var() || xs.contains_typed_var(),
+            _ => false
+        }
+    }
+}
+
+impl LocationsClone for Term {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
         match self {
             Term::TypedVar(location) => match new_locations.get(&location.as_ptr()) {
                 Some(new_location) => Term::TypedVar(Rc::clone(new_location)),
