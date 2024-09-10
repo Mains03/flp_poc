@@ -1,4 +1,4 @@
-use crate::{cbpv::Term, parser::syntax::{decl::Decl, stm::Stm}};
+use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{decl::Decl, stm::Stm}};
 
 use super::Translate;
 
@@ -21,10 +21,10 @@ fn translate_func(mut args: Vec<String>, body: Stm) -> Term {
         let mut free_vars = body.free_vars();
         free_vars.remove(&var);
 
-        Term::Thunk(Box::new(Term::Lambda {
+        Term::Thunk(TermPtr::from_term(Term::Lambda {
             var,
             free_vars,
-            body: Box::new(body)
+            body: TermPtr::from_term(body)
         }))
     } else {
         translate_func_helper(args, body)
@@ -41,10 +41,10 @@ fn translate_func_helper(mut args: Vec<String>, body: Stm) -> Term {
         let mut free_vars = body.free_vars();
         free_vars.remove(&var);
 
-        Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+        Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
             var,
             free_vars,
-            body: Box::new(body)
+            body: TermPtr::from_term(body)
         }))))
     }
 }

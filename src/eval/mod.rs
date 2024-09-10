@@ -34,12 +34,12 @@ pub fn eval(cbpv: HashMap<String, Term>) -> Term {
     if states.len() == 0 {
         Term::Fail
     } else if states.len() == 1 {
-        states.remove(0).as_term()
+        states.remove(0).term().term().clone()
     } else {
         Term::Choice(
             states.into_iter()
                 .fold(vec![], |mut acc, x| {
-                    acc.push(x.as_term());
+                    acc.push(x.term());
                     acc
                 })
         )

@@ -1,19 +1,19 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::cbpv::Term;
+use crate::cbpv::{term_ptr::TermPtr, Term};
 
 use super::{locations_clone::LocationsClone, state_term::{StateTerm, StateTermStore}};
 
 #[derive(Clone, Debug)]
 pub struct Closure {
-    pub term: Term,
+    pub term_ptr: TermPtr,
     pub vars: HashMap<String, StateTerm>
 }
 
 impl Closure {
-    pub fn from_term(term: Term) -> Self {
+    pub fn from_term_ptr(term_ptr: TermPtr) -> Self {
         Closure {
-            term, vars: HashMap::new()
+            term_ptr, vars: HashMap::new()
         }
     }
 }
@@ -30,32 +30,32 @@ impl StateTermStore for Closure {
         }
     }
 
-    fn expand_value(&self, term: &Term) -> StateTerm {
-        match term {
+    fn expand_value(&self, term_ptr: TermPtr) -> StateTerm {
+        match term_ptr.term() {
             Term::Var(var) => self.lookup(&var).unwrap(),
-            Term::Succ(term) => match self.expand_value(&term) {
-                StateTerm::Term(term) => StateTerm::from_term(Term::Succ(Box::new(term.term()))),
+            Term::Succ(term_ptr) => match self.expand_value(term_ptr.clone()) {
+                StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
                 StateTerm::Closure(_) => unreachable!()
             },
             Term::TypedVar(shape) => match shape.borrow().as_ref() {
-                Some(term) => match term {
+                Some(term_ptr) => match term_ptr.term() {
                     Term::Zero => StateTerm::from_term(Term::Zero),
-                    Term::Succ(term) => match self.expand_value(&term) {
-                        StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(Box::new(term_ptr.term()))),
+                    Term::Succ(term_ptr) => match self.expand_value(term_ptr.clone()) {
+                        StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
                         StateTerm::Closure(_) => unreachable!()
                     },
                     _ => unreachable!()
                 },
                 None => StateTerm::from_term(Term::TypedVar(Rc::clone(shape)))
             },
-            Term::Thunk(_) => StateTerm::Closure(Closure { term: term.clone(), vars: self.vars.clone() }),
-            _ => StateTerm::from_term(term.clone())
+            Term::Thunk(_) => StateTerm::Closure(Closure { term_ptr: term_ptr.clone(), vars: self.vars.clone() }),
+            _ => StateTerm::from_term_ptr(term_ptr.clone())
         }
     }
 }
 
 impl LocationsClone for Closure {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
         let vars = self.vars.iter()
             .fold(HashMap::new(), |mut acc, (var, val)| {
                 acc.insert(var.clone(), val.clone_with_locations(new_locations));
@@ -63,7 +63,7 @@ impl LocationsClone for Closure {
             });
 
         Closure {
-            term: self.term.clone_with_locations(new_locations),
+            term_ptr: self.term_ptr.clone_with_locations(new_locations),
             vars
         }
     }

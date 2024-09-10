@@ -1,20 +1,22 @@
 use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 
 use pm::PM;
+use term_ptr::TermPtr;
 
 use crate::eval::LocationsClone;
 
 pub mod pm;
+pub mod term_ptr;
 pub mod translate;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
     Var(String),
-    TypedVar(Rc<RefCell<Option<Term>>>),
+    TypedVar(Rc<RefCell<Option<TermPtr>>>),
     Zero,
-    Succ(Box<Term>),
+    Succ(TermPtr),
     Nil,
-    Cons(Box<Term>, Box<Term>),
+    Cons(TermPtr, TermPtr),
     Bool(bool),
     Add(String, String),
     Fold,
@@ -23,34 +25,34 @@ pub enum Term {
     Not(String),
     If {
         cond: String,
-        then: Box<Term>,
-        r#else: Box<Term>
+        then: TermPtr,
+        r#else: TermPtr
     },
     Bind {
         var: String,
-        val: Box<Term>,
-        body: Box<Term>,
+        val: TermPtr,
+        body: TermPtr,
     },
     Exists {
         var: String,
-        body: Box<Term>
+        body: TermPtr
     },
     Equate {
         lhs: String,
         rhs: String,
-        body: Box<Term>
+        body: TermPtr
     },
     Lambda {
         var: String,
         free_vars: HashSet<String>,
-        body: Box<Term>
+        body: TermPtr
     },
     PM(PM),
-    Choice(Vec<Term>),
-    Thunk(Box<Term>),
-    Return(Box<Term>),
+    Choice(Vec<TermPtr>),
+    Thunk(TermPtr),
+    Return(TermPtr),
     Force(String),
-    App(Box<Term>, String),
+    App(TermPtr, String),
     Fail
 }
 
@@ -112,7 +114,7 @@ impl Term {
 }
 
 impl LocationsClone for Term {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
         match self {
             Term::TypedVar(location) => match new_locations.get(&location.as_ptr()) {
                 Some(new_location) => Term::TypedVar(Rc::clone(new_location)),
@@ -135,10 +137,10 @@ impl LocationsClone for Term {
                     }
                 }
             },
-            Term::Succ(term) => Term::Succ(Box::new(term.clone_with_locations(new_locations))),
+            Term::Succ(term) => Term::Succ(term.clone_with_locations(new_locations)),
             Term::Cons(x, xs) => Term::Cons(
-                Box::new(x.clone_with_locations(new_locations)),
-                Box::new(xs.clone_with_locations(new_locations))
+                x.clone_with_locations(new_locations),
+                xs.clone_with_locations(new_locations)
             ),
             _ => self.clone()
         }

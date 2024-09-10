@@ -37,7 +37,7 @@ trait Translate {
 mod test {
     use std::collections::HashSet;
 
-    use crate::parser;
+    use crate::{cbpv::term_ptr::TermPtr, parser};
 
     use super::*;
 
@@ -52,25 +52,25 @@ mod test {
             term,
             Term::Bind {
                 var: "0".to_string(),
-                val: Box::new(Term::Return(Box::new(
-                    Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))
+                val: TermPtr::from_term(Term::Return(TermPtr::from_term(
+                    Term::Succ(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero))))
                 ))),
-                body: Box::new(Term::Bind {
+                body: TermPtr::from_term(Term::Bind {
                     var: "1".to_string(),
-                    val: Box::new(Term::Bind {
+                    val: TermPtr::from_term(Term::Bind {
                         var: "0".to_string(),
-                        val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
-                        body: Box::new(Term::Bind {
+                        val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero))))),
+                        body: TermPtr::from_term(Term::Bind {
                             var: "1".to_string(),
-                            val: Box::new(Term::Return(Box::new(Term::Var("const".to_string())))),
-                            body: Box::new(Term::App(
-                                Box::new(Term::Force("1".to_string())),
+                            val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("const".to_string())))),
+                            body: TermPtr::from_term(Term::App(
+                                TermPtr::from_term(Term::Force("1".to_string())),
                                 "0".to_string()
                             ))
                         })
                     }),
-                    body: Box::new(Term::App(
-                        Box::new(Term::Force("1".to_string())),
+                    body: TermPtr::from_term(Term::App(
+                        TermPtr::from_term(Term::Force("1".to_string())),
                         "0".to_string()
                     ))
                 })
@@ -89,17 +89,17 @@ mod test {
             term,
             Term::Bind {
                 var: "x".to_string(),
-                val: Box::new(Term::Return(
-                    Box::new(Term::Succ(Box::new(Term::Zero)))
+                val: TermPtr::from_term(Term::Return(
+                    TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero)))
                 )),
-                body: Box::new(Term::Bind {
+                body: TermPtr::from_term(Term::Bind {
                     var: "0".to_string(),
-                    val: Box::new(Term::Return(Box::new(Term::Var("x".to_string())))),
-                    body: Box::new(Term::Bind {
+                    val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("x".to_string())))),
+                    body: TermPtr::from_term(Term::Bind {
                         var: "1".to_string(),
-                        val: Box::new(Term::Return(Box::new(Term::Var("id".to_string())))),
-                        body: Box::new(Term::App(
-                            Box::new(Term::Force("1".to_string())),
+                        val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("id".to_string())))),
+                        body: TermPtr::from_term(Term::App(
+                            TermPtr::from_term(Term::Force("1".to_string())),
                             "0".to_string()
                         ))
                     })
@@ -118,20 +118,20 @@ mod test {
         assert_eq!(
             term,
             Term::Choice(vec![
-                Term::Return(Box::new(Term::Zero)),
-                Term::Bind {
+                TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Zero))),
+                TermPtr::from_term(Term::Bind {
                     var: "0".to_string(),
-                    val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
-                    body: Box::new(Term::Bind {
+                    val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero))))),
+                    body: TermPtr::from_term(Term::Bind {
                         var: "1".to_string(),
-                        val: Box::new(Term::Return(Box::new(Term::Var("id".to_string())))),
-                        body: Box::new(Term::App(
-                            Box::new(Term::Force("1".to_string())),
+                        val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("id".to_string())))),
+                        body: TermPtr::from_term(Term::App(
+                            TermPtr::from_term(Term::Force("1".to_string())),
                             "0".to_string()
                         ))
                     })
-                },
-                Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))
+                }),
+                TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero)))))))
             ])
         )
     }
@@ -146,13 +146,13 @@ const x y = x.";
 
         assert_eq!(
             term,
-            Term::Thunk(Box::new(Term::Lambda {
+            Term::Thunk(TermPtr::from_term(Term::Lambda {
                 var: "x".to_string(),
                 free_vars: HashSet::new(),
-                body: Box::new(Term::Return(Box::new(Term::Thunk(Box::new(Term::Lambda {
+                body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
                     var: "y".to_string(),
                     free_vars: HashSet::from_iter(vec!["x".to_string()]),
-                    body: Box::new(Term::Return(Box::new(Term::Var("x".to_string()))))
+                    body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("x".to_string()))))
                 })))))
             }))
         )
@@ -171,31 +171,31 @@ id x = let f = const x in f 1.";
 
         assert_eq!(
             term,
-            Term::Thunk(Box::new(Term::Lambda {
+            Term::Thunk(TermPtr::from_term(Term::Lambda {
                 var: "x".to_string(),
                 free_vars: HashSet::from_iter(vec!["const".to_string()]),
-                body: Box::new(Term::Bind {
+                body: TermPtr::from_term(Term::Bind {
                     var: "f".to_string(),
-                    val: Box::new(Term::Bind {
+                    val: TermPtr::from_term(Term::Bind {
                         var: "0".to_string(),
-                        val: Box::new(Term::Return(Box::new(Term::Var("x".to_string())))),
-                        body: Box::new(Term::Bind {
+                        val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("x".to_string())))),
+                        body: TermPtr::from_term(Term::Bind {
                             var: "1".to_string(),
-                            val: Box::new(Term::Return(Box::new(Term::Var("const".to_string())))),
-                            body: Box::new(Term::App(
-                                Box::new(Term::Force("1".to_string())),
+                            val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("const".to_string())))),
+                            body: TermPtr::from_term(Term::App(
+                                TermPtr::from_term(Term::Force("1".to_string())),
                                 "0".to_string()
                             ))
                         })
                     }),
-                    body: Box::new(Term::Bind {
+                    body: TermPtr::from_term(Term::Bind {
                         var: "0".to_string(),
-                        val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
-                        body: Box::new(Term::Bind {
+                        val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero))))),
+                        body: TermPtr::from_term(Term::Bind {
                             var: "1".to_string(),
-                            val: Box::new(Term::Return(Box::new(Term::Var("f".to_string())))),
-                            body: Box::new(Term::App(
-                                Box::new(Term::Force("1".to_string())),
+                            val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("f".to_string())))),
+                            body: TermPtr::from_term(Term::App(
+                                TermPtr::from_term(Term::Force("1".to_string())),
                                 "0".to_string()
                             ))
                         })
@@ -216,22 +216,22 @@ id x = let f = const x in f 1.";
             term,
             Term::Bind {
                 var: "0".to_string(),
-                val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Zero))))),
-                body: Box::new(Term::Bind {
+                val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero))))),
+                body: TermPtr::from_term(Term::Bind {
                     var: "1".to_string(),
-                    val: Box::new(Term::Return(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))),
-                    body: Box::new(Term::Bind {
+                    val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero))))))),
+                    body: TermPtr::from_term(Term::Bind {
                         var: "2".to_string(),
-                        val: Box::new(Term::Return(Box::new(
-                            Term::Succ(Box::new(Term::Succ(Box::new(Term::Succ(Box::new(Term::Zero))))))
+                        val: TermPtr::from_term(Term::Return(TermPtr::from_term(
+                            Term::Succ(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Zero))))))
                         ))),
-                        body: Box::new(Term::Return(Box::new(Term::Cons(
-                            Box::new(Term::Var("0".to_string())),
-                            Box::new(Term::Cons(
-                                Box::new(Term::Var("1".to_string())),
-                                Box::new(Term::Cons(
-                                    Box::new(Term::Var("2".to_string())),
-                                    Box::new(Term::Nil)
+                        body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Cons(
+                            TermPtr::from_term(Term::Var("0".to_string())),
+                            TermPtr::from_term(Term::Cons(
+                                TermPtr::from_term(Term::Var("1".to_string())),
+                                TermPtr::from_term(Term::Cons(
+                                    TermPtr::from_term(Term::Var("2".to_string())),
+                                    TermPtr::from_term(Term::Nil)
                                 ))
                             ))
                         ))))

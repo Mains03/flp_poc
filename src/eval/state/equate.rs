@@ -1,22 +1,22 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::cbpv::Term;
+use crate::cbpv::{term_ptr::TermPtr, Term};
 
-pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
+pub fn equate(mut lhs: TermPtr, mut rhs: TermPtr) -> bool {
     let flag;
     
     loop {
-        match lhs {
+        match lhs.clone().term() {
             Term::Zero => {
-                flag = match rhs {
+                flag = match rhs.term() {
                     Term::Zero => true,
                     Term::TypedVar(shape) => if shape.borrow().is_some() {
-                        match shape.borrow().clone().unwrap() {
+                        match shape.borrow().as_ref().unwrap().term() {
                             Term::Zero => true,
                             _ => false
                         }
                     } else {
-                        shape.replace(Some(Term::Zero));
+                        shape.replace(Some(TermPtr::from_term(Term::Zero)));
 
                         true
                     },
@@ -25,16 +25,16 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
 
                 break;
             },
-            Term::Succ(lhs_term) => match rhs {
+            Term::Succ(lhs_term) => match rhs.clone().term() {
                 Term::Succ(rhs_term) => {
-                    lhs = *lhs_term;
-                    rhs = *rhs_term;
+                    lhs = lhs_term.clone();
+                    rhs = rhs_term.clone();
                 },
                 Term::TypedVar(shape) => if shape.borrow().is_some() {
-                    match shape.borrow().clone().unwrap() {
+                    match shape.borrow().as_ref().unwrap().term() {
                         Term::Succ(rhs_term) => {
-                            lhs = *lhs_term;
-                            rhs = *rhs_term;
+                            lhs = lhs_term.clone();
+                            rhs = rhs_term.clone();
                         },
                         _ => {
                             flag = false;
@@ -42,10 +42,10 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                         }
                     }
                 } else {
-                    rhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                    shape.replace(Some(Term::Succ(Box::new(rhs.clone()))));
+                    rhs = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                    shape.replace(Some(TermPtr::from_term(Term::Succ(rhs.clone()))));
 
-                    lhs = *lhs_term;
+                    lhs = lhs_term.clone();
                 },
                 _ => {
                     flag = false;
@@ -53,15 +53,15 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                 }
             },
             Term::Nil => {
-                flag = match rhs {
+                flag = match rhs.term() {
                     Term::Nil => true,
                     Term::TypedVar(shape) => if shape.borrow().is_some() {
-                        match shape.borrow().clone().unwrap() {
+                        match shape.borrow().as_ref().unwrap().term() {
                             Term::Nil => true,
                             _ => false
                         }
                     } else {
-                        shape.replace(Some(Term::Nil));
+                        shape.replace(Some(TermPtr::from_term(Term::Nil)));
 
                         true
                     },
@@ -70,19 +70,19 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
 
                 break;
             },
-            Term::Cons(x, xs) => match rhs {
-                Term::Cons(y, ys) => if equate(*x, *y) {
-                    lhs = *xs;
-                    rhs = *ys;
+            Term::Cons(x, xs) => match rhs.clone().term() {
+                Term::Cons(y, ys) => if equate(x.clone(), y.clone()) {
+                    lhs = xs.clone();
+                    rhs = ys.clone();
                 } else {
                     flag = false;
                     break;
                 },
                 Term::TypedVar(shape) => if shape.borrow().is_some() {
-                    match shape.borrow().clone().unwrap() {
-                        Term::Cons(y, ys) => if equate(*x, *y) {
-                            lhs = *xs;
-                            rhs = *ys;
+                    match shape.borrow().as_ref().unwrap().term() {
+                        Term::Cons(y, ys) => if equate(x.clone(), y.clone()) {
+                            lhs = xs.clone();
+                            rhs = ys.clone();
                         } else {
                             flag = false;
                             break;
@@ -93,14 +93,14 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                         }
                     }
                 } else {
-                    let y = Term::TypedVar(Rc::new(RefCell::new(None)));
-                    let ys = Term::TypedVar(Rc::new(RefCell::new(None)));
+                    let y = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                    let ys = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
 
-                    shape.replace(Some(Term::Cons(Box::new(y.clone()), Box::new(ys.clone()))));
+                    shape.replace(Some(TermPtr::from_term(Term::Cons(y.clone(), ys.clone()))));
 
-                    equate(*x, y);
+                    equate(x.clone(), y);
 
-                    lhs = *xs;
+                    lhs = xs.clone();
                     rhs = ys;
                 },
                 _ => {
@@ -108,25 +108,25 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                     break;
                 }
             },
-            Term::TypedVar(lhs_shape) => match rhs {
+            Term::TypedVar(lhs_shape) => match rhs.clone().term() {
                 Term::Zero => if lhs_shape.borrow().is_some() {
-                    flag = match lhs_shape.borrow().clone().unwrap() {
+                    flag = match lhs_shape.borrow().as_ref().unwrap().term() {
                         Term::Zero => true,
                         _ => false
                     };
 
                     break;
                 } else {
-                    lhs_shape.replace(Some(Term::Zero));
+                    lhs_shape.replace(Some(TermPtr::from_term(Term::Zero)));
 
                     flag = true;
                     break;
                 },
                 Term::Succ(rhs_term) => if lhs_shape.borrow().is_some() {
-                    match lhs_shape.borrow().clone().unwrap() {
+                    match lhs_shape.borrow().as_ref().unwrap().term() {
                         Term::Succ(lhs_term) => {
-                            lhs = *lhs_term;
-                            rhs = *rhs_term;
+                            lhs = lhs_term.clone();
+                            rhs = rhs_term.clone();
                         },
                         _ => {
                             flag = false;
@@ -134,29 +134,29 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                         }
                     }
                 } else {
-                    lhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                    lhs_shape.replace(Some(Term::Succ(Box::new(lhs.clone()))));
+                    lhs = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                    lhs_shape.replace(Some(TermPtr::from_term(Term::Succ(lhs.clone()))));
 
-                    rhs = *rhs_term;
+                    rhs = rhs_term.clone();
                 },
                 Term::Nil => if lhs_shape.borrow().is_some() {
-                    flag = match lhs_shape.borrow().clone().unwrap() {
+                    flag = match lhs_shape.borrow().as_ref().unwrap().term() {
                         Term::Nil => true,
                         _ => false
                     };
 
                     break;
                 } else {
-                    lhs_shape.replace(Some(Term::Nil));
+                    lhs_shape.replace(Some(TermPtr::from_term(Term::Nil)));
 
                     flag = true;
                     break;
                 },
                 Term::Cons(y, ys) => if lhs_shape.borrow().is_some() {
-                    match lhs_shape.borrow().clone().unwrap() {
-                        Term::Cons(x, xs) => if equate(*x, *y) {
-                            lhs = *xs;
-                            rhs = *ys;
+                    match lhs_shape.borrow().as_ref().unwrap().term() {
+                        Term::Cons(x, xs) => if equate(x.clone(), y.clone()) {
+                            lhs = xs.clone();
+                            rhs = ys.clone();
                         } else {
                             flag = false;
                             break;
@@ -167,39 +167,39 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                         }
                     }
                 } else {
-                    let x = Term::TypedVar(Rc::new(RefCell::new(None)));
-                    let xs = Term::TypedVar(Rc::new(RefCell::new(None)));
+                    let x = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                    let xs = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
 
-                    lhs_shape.replace(Some(Term::Cons(Box::new(x.clone()), Box::new(xs.clone()))));
+                    lhs_shape.replace(Some(TermPtr::from_term(Term::Cons(x.clone(), xs.clone()))));
 
-                    equate(x, *y);
+                    equate(x, y.clone());
 
                     lhs = xs;
-                    rhs = *ys;
+                    rhs = ys.clone();
                 },
-                Term::TypedVar(rhs_shape) => if is_cyle(&lhs_shape, &rhs_shape) {
+                Term::TypedVar(rhs_shape) => if is_cyle(lhs_shape, rhs_shape) {
                     flag = false;
                     break;
                 } else if lhs_shape.borrow().is_some() {
-                    match lhs_shape.borrow().clone().unwrap() {
+                    match lhs_shape.borrow().as_ref().unwrap().term() {
                         Term::Zero => if rhs_shape.borrow().is_some() {
-                            flag = match rhs_shape.borrow().clone().unwrap() {
+                            flag = match rhs_shape.borrow().as_ref().unwrap().term() {
                                 Term::Zero => true,
                                 _ => false
                             };
 
                             break;
                         } else {
-                            rhs_shape.replace(Some(Term::Zero));
+                            rhs_shape.replace(Some(TermPtr::from_term(Term::Zero)));
 
                             flag = true;
                             break;
                         },
                         Term::Succ(lhs_term) => if rhs_shape.borrow().is_some() {
-                            match rhs_shape.borrow().clone().unwrap() {
+                            match rhs_shape.borrow().as_ref().unwrap().term() {
                                 Term::Succ(rhs_term) => {
-                                    lhs = *lhs_term;
-                                    rhs = *rhs_term;
+                                    lhs = lhs_term.clone();
+                                    rhs = rhs_term.clone();
                                 },
                                 _ => {
                                     flag = false;
@@ -207,27 +207,27 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
                                 }
                             }
                         } else {
-                            rhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                            rhs_shape.replace(Some(Term::Succ(Box::new(rhs.clone()))));
+                            rhs = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                            rhs_shape.replace(Some(TermPtr::from_term(Term::Succ(rhs.clone()))));
 
-                            lhs = *lhs_term;
+                            lhs = lhs_term.clone();
                         },
                         _ => unreachable!()
                     }
                 } else {
                     if rhs_shape.borrow().is_some() {
-                        match rhs_shape.borrow().clone().unwrap() {
+                        match rhs_shape.borrow().as_ref().unwrap().term(){
                             Term::Zero => {
-                                lhs_shape.replace(Some(Term::Zero));
+                                lhs_shape.replace(Some(TermPtr::from_term(Term::Zero)));
 
                                 flag = true;
                                 break;
                             },
                             Term::Succ(rhs_term) => {
-                                lhs = Term::TypedVar(Rc::new(RefCell::new(None)));
-                                lhs_shape.replace(Some(Term::Succ(Box::new(lhs.clone()))));
+                                lhs = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                                lhs_shape.replace(Some(TermPtr::from_term(Term::Succ(lhs.clone()))));
 
-                                rhs = *rhs_term;
+                                rhs = rhs_term.clone();
                             },
                             _ => unreachable!()
                         }
@@ -245,7 +245,7 @@ pub fn equate(mut lhs: Term, mut rhs: Term) -> bool {
     flag
 }
 
-fn is_cyle(lhs: &Rc<RefCell<Option<Term>>>, rhs: &Rc<RefCell<Option<Term>>>) -> bool {
+fn is_cyle(lhs: &Rc<RefCell<Option<TermPtr>>>, rhs: &Rc<RefCell<Option<TermPtr>>>) -> bool {
     vec![(lhs, rhs), (rhs, lhs)].into_iter()
         .fold(false, |acc, (lhs, rhs)| {
             if acc {
@@ -257,10 +257,10 @@ fn is_cyle(lhs: &Rc<RefCell<Option<Term>>>, rhs: &Rc<RefCell<Option<Term>>>) -> 
                     if Rc::ptr_eq(&tmp, rhs) {
                         return true;
                     } else {
-                        match tmp.clone().borrow().clone() {
-                            Some(term) => match term {
-                                Term::Succ(term) => match *term {
-                                    Term::TypedVar(shape) => tmp = shape,
+                        match tmp.clone().borrow().as_ref() {
+                            Some(term_ptr) => match term_ptr.term() {
+                                Term::Succ(term_ptr) => match term_ptr.term() {
+                                    Term::TypedVar(shape) => tmp = Rc::clone(shape),
                                     _ => return false
                                 },
                                 _ => return false

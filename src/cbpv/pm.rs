@@ -1,4 +1,4 @@
-use super::Term;
+use super::term_ptr::TermPtr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PM {
@@ -9,20 +9,20 @@ pub enum PM {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PMNat {
     pub var: String,
-    pub zero: Box<Term>,
+    pub zero: TermPtr,
     pub succ: PMNatSucc
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PMNatSucc {
     pub var: String,
-    pub body: Box<Term>
+    pub body: TermPtr
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PMList {
     pub var: String,
-    pub nil: Box<Term>,
+    pub nil: TermPtr,
     pub cons: PMListCons
 }
 
@@ -30,11 +30,11 @@ pub struct PMList {
 pub struct PMListCons {
     pub x: String,
     pub xs: String,
-    pub body: Box<Term>
+    pub body: TermPtr
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PMSucc {
     pub var: String,
-    pub body: Box<Term>
+    pub body: TermPtr
 }

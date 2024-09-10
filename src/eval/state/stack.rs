@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::cbpv::Term;
+use crate::cbpv::term_ptr::TermPtr;
 
 use super::state_term::{locations_clone::LocationsClone, state_term::StateTerm};
 
@@ -36,8 +36,10 @@ impl Stack {
     pub fn is_empty(&self) -> bool {
         self.stack.len() == 0
     }
+}
 
-    pub fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self {
+impl LocationsClone for Stack {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
         let stack = self.stack.iter()
             .fold(vec![], |mut acc , term| {
                 acc.push(term.clone_with_locations(new_locations));
@@ -49,7 +51,7 @@ impl Stack {
 }
 
 impl LocationsClone for StackTerm {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<Term>, Rc<RefCell<Option<Term>>>>) -> Self     {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self     {
         match self {
             StackTerm::Cont(var, term) => StackTerm::Cont(var.clone(), term.clone_with_locations(new_locations)),
             StackTerm::Term(term) => StackTerm::Term(term.clone_with_locations(new_locations)),
