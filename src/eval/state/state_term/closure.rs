@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::cbpv::Term;
 
-use super::{locations_clone::LocationsClone, state_term::StateTerm, value::{Value, ValueStore}};
+use super::{locations_clone::LocationsClone, state_term::{StateTerm, StateTermStore}};
 
 #[derive(Clone, Debug)]
 pub struct Closure {
@@ -11,46 +11,45 @@ pub struct Closure {
 }
 
 impl Closure {
-    pub fn new(term: Term) -> Self {
+    pub fn from_term(term: Term) -> Self {
         Closure {
             term, vars: HashMap::new()
         }
     }
 }
 
-impl ValueStore for Closure {
-    fn store(&mut self, var: String, val: Value) {
-        self.vars.insert(var, val.to_state_term());
+impl StateTermStore for Closure {
+    fn store(&mut self, var: String, val: StateTerm) {
+        self.vars.insert(var, val);
     }
 
-    fn lookup(&self, var: &String) -> Option<Value> {
+    fn lookup(&self, var: &String) -> Option<StateTerm> {
         match self.vars.get(var) {
-            Some(state_term) => Some(state_term.as_value()),
+            Some(state_term) => Some(state_term.clone()),
             None => None
         }
     }
 
-    fn expand_value(&self, term: Term) -> Value {
+    fn expand_value(&self, term: &Term) -> StateTerm {
         match term {
             Term::Var(var) => self.lookup(&var).unwrap(),
-            Term::Succ(term) => match self.expand_value(*term) {
-                Value::Term(term) => Value::Term(Term::Succ(Box::new(term))),
-                Value::Closure(_) => unreachable!()
+            Term::Succ(term) => match self.expand_value(&term) {
+                StateTerm::Term(term) => StateTerm::from_term(Term::Succ(Box::new(term.term()))),
+                StateTerm::Closure(_) => unreachable!()
             },
-            Term::TypedVar(shape) => if shape.borrow().is_some() {
-                match shape.borrow().clone().unwrap() {
-                    Term::Zero => Value::Term(Term::Zero),
-                    Term::Succ(term) => match self.expand_value(*term) {
-                        Value::Term(term) => Value::Term(Term::Succ(Box::new(term))),
-                        Value::Closure(_) => unreachable!()
+            Term::TypedVar(shape) => match shape.borrow().as_ref() {
+                Some(term) => match term {
+                    Term::Zero => StateTerm::from_term(Term::Zero),
+                    Term::Succ(term) => match self.expand_value(&term) {
+                        StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(Box::new(term_ptr.term()))),
+                        StateTerm::Closure(_) => unreachable!()
                     },
                     _ => unreachable!()
-                }
-            } else {
-                Value::Term(Term::TypedVar(shape))
+                },
+                None => StateTerm::from_term(Term::TypedVar(Rc::clone(shape)))
             },
-            Term::Thunk(_) => Value::Closure(Closure { term, vars: self.vars.clone() }),
-            _ => Value::Term(term)
+            Term::Thunk(_) => StateTerm::Closure(Closure { term: term.clone(), vars: self.vars.clone() }),
+            _ => StateTerm::from_term(term.clone())
         }
     }
 }

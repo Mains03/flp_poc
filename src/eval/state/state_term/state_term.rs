@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::cbpv::Term;
 
-use super::{closure::Closure, locations_clone::LocationsClone, term_ptr::TermPtr, value::Value};
+use super::{closure::Closure, locations_clone::LocationsClone, term_ptr::TermPtr};
 
 #[derive(Clone, Debug)]
 pub enum StateTerm {
@@ -10,16 +10,17 @@ pub enum StateTerm {
     Closure(Closure)
 }
 
+pub trait StateTermStore {
+    fn store(&mut self, var: String, val: StateTerm);
+
+    fn lookup(&self, var: &String) -> Option<StateTerm>;
+
+    fn expand_value(&self, term: &Term) -> StateTerm;
+}
+
 impl StateTerm {
     pub fn from_term(term: Term) -> Self {
         StateTerm::Term(TermPtr::new(term))
-    }
-
-    pub fn as_value(&self) -> Value {
-        match self {
-            StateTerm::Term(term_ptr) => Value::Term(term_ptr.term()),
-            StateTerm::Closure(closure) => Value::Closure(closure.clone())
-        }
     }
 }
 
