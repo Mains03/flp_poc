@@ -25,7 +25,7 @@ app = { primary_expr ~ primary_expr+ }
 bexpr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
 lambda = { "\\" ~ arg ~ "." ~ stm }
 primary_expr = { ident | nat | bool | pair | list | fold | "(" ~ stm ~ ")" }
-pair = { "(" ~ expr ~ "," ~ expr ~ ")" }
+pair = { "(" ~ stm ~ "," ~ stm ~ ")" }
 list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)? ~ "]" }
 fold = { "fold" }
 

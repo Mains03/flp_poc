@@ -1,4 +1,4 @@
-use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{arg::Arg, expr::Expr}};
+use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{arg::Arg, expr::Expr, stm::Stm}};
 
 use super::Translate;
 
@@ -57,7 +57,7 @@ impl Translate for Expr {
             Expr::Ident(s) => Term::Return(TermPtr::from_term(Term::Var(s.clone()))),
             Expr::Nat(n) => Term::Return(TermPtr::from_term(translate_nat(n))),
             Expr::Bool(b) => Term::Return(TermPtr::from_term(Term::Bool(b))),
-            Expr::Pair(_, _) => todo!(),
+            Expr::Pair(lhs, rhs) => translate_pair(*lhs, *rhs),
             Expr::Fold => Term::Fold,
             Expr::Stm(s) => s.translate()
         }
@@ -93,5 +93,22 @@ fn translate_nat(n: usize) -> Term {
         Term::Zero
     } else {
         Term::Succ(TermPtr::from_term(translate_nat(n-1)))
+    }
+}
+
+fn translate_pair(lhs: Stm, rhs: Stm) -> Term {
+    Term::Bind {
+        var: "x".to_string(),
+        val: TermPtr::from_term(lhs.translate()),
+        body: TermPtr::from_term(Term::Bind {
+            var: "y".to_string(),
+            val: TermPtr::from_term(rhs.translate()),
+            body: TermPtr::from_term(Term::Return(TermPtr::from_term(
+                Term::Pair(
+                    TermPtr::from_term(Term::Var("x".to_string())),
+                    TermPtr::from_term(Term::Var("y".to_string()))
+                )
+            )))
+        })
     }
 }

@@ -249,7 +249,16 @@ impl State {
                         let mut closure = Closure::from_term_ptr(body.clone());
                         match arg {
                             Arg::Ident(var) => { closure.store(var.clone(), term); },
-                            Arg::Pair(_, _) => todo!()
+                            Arg::Pair(lhs, rhs) => match term {
+                                StateTerm::Term(term) => match term.term() {
+                                    Term::Pair(lhs_val, rhs_val) => {
+                                        closure.store(lhs.clone(), StateTerm::from_term_ptr(lhs_val.clone()));
+                                        closure.store(rhs.clone(), StateTerm::from_term_ptr(rhs_val.clone()));
+                                    },
+                                    _ => unreachable!()
+                                },
+                                StateTerm::Closure(_) => unreachable!()
+                            }
                         }
 
                         free_vars.into_iter()

@@ -84,6 +84,13 @@ impl StateTermStore for Env {
     fn expand_value(&self, term_ptr: TermPtr) -> StateTerm {
         match term_ptr.term() {
             Term::Var(var) => self.lookup(&var).unwrap(),
+            Term::Pair(lhs, rhs) => match self.expand_value(lhs.clone()) {
+                StateTerm::Term(lhs) => match self.expand_value(rhs.clone()) {
+                    StateTerm::Term(rhs) => StateTerm::from_term(Term::Pair(lhs, rhs)),
+                    StateTerm::Closure(_) => unreachable!()
+                },
+                StateTerm::Closure(_) => unreachable!()
+            },
             Term::Succ(succ) => match self.expand_value(succ.clone()) {
                 StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
                 StateTerm::Closure(_) => unreachable!()

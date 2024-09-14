@@ -18,6 +18,7 @@ pub enum Term {
     Nil,
     Cons(TermPtr, TermPtr),
     Bool(bool),
+    Pair(TermPtr, TermPtr),
     Add(String, String),
     Fold,
     Eq(String, String),

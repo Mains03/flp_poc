@@ -132,7 +132,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
             Stm::Choice(choice)
         },
         Rule::expr => Stm::Expr(parse_expr(pair.into_inner())),
-        _ => unreachable!()
+        t => unreachable!("{:#?}", t)
     }
 }
 
