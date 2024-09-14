@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::cbpv::{term_ptr::TermPtr, Term};
+use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::arg::Arg};
 
 use super::{locations_clone::LocationsClone, state_term::{StateTerm, StateTermStore}};
 
@@ -14,6 +14,22 @@ impl Closure {
     pub fn from_term_ptr(term_ptr: TermPtr) -> Self {
         Closure {
             term_ptr, vars: HashMap::new()
+        }
+    }
+
+    pub fn store_arg(&mut self, arg: Arg, val: StateTerm) {
+        match arg {
+            Arg::Ident(var) => self.store(var, val),
+            Arg::Pair(lhs, rhs) => match val {
+                StateTerm::Term(term) => match term.term() {
+                    Term::Pair(lhs_val, rhs_val) => {
+                        self.store_arg(*lhs, StateTerm::from_term_ptr(lhs_val.clone()));
+                        self.store_arg(*rhs, StateTerm::from_term_ptr(rhs_val.clone()));
+                    },
+                    _ => unreachable!()
+                },
+                StateTerm::Closure(_) => unreachable!()
+            }
         }
     }
 }

@@ -19,13 +19,7 @@ fn translate_func(mut args: Vec<Arg>, body: Stm) -> Term {
         let body = translate_func_helper(args, body);
 
         let mut free_vars = body.free_vars();
-        match &arg {
-            Arg::Ident(var) => { free_vars.remove(var); },
-            Arg::Pair(var1, var2) => {
-                free_vars.remove(var1);
-                free_vars.remove(var2);
-            }
-        }
+        free_vars.remove_arg(&arg);
 
         Term::Thunk(TermPtr::from_term(Term::Lambda {
             arg,
@@ -45,13 +39,7 @@ fn translate_func_helper(mut args: Vec<Arg>, body: Stm) -> Term {
         let body = translate_func_helper(args, body);
 
         let mut free_vars = body.free_vars();
-        match &arg {
-            Arg::Ident(var) => { free_vars.remove(var); },
-            Arg::Pair(var1, var2) => {
-                free_vars.remove(var1);
-                free_vars.remove(var2);
-            }
-        }
+        free_vars.remove_arg(&arg);
 
         Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
             arg,

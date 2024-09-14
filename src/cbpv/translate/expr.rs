@@ -1,4 +1,4 @@
-use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{arg::Arg, expr::Expr, stm::Stm}};
+use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{expr::Expr, stm::Stm}};
 
 use super::Translate;
 
@@ -38,13 +38,7 @@ impl Translate for Expr {
                 let body = body.translate();
                 
                 let mut free_vars = body.free_vars();
-                match &arg {
-                    Arg::Ident(var) => { free_vars.remove(var); },
-                    Arg::Pair(var1, var2) => {
-                        free_vars.remove(var1);
-                        free_vars.remove(var2);
-                    }
-                }
+                free_vars.remove_arg(&arg);
 
                 Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(
                     Term::Lambda {

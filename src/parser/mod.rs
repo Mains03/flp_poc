@@ -73,8 +73,8 @@ fn parse_arg(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
 
 fn parse_arg_pair(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
     Arg::Pair(
-        pairs.next().unwrap().as_str().to_string(),
-        pairs.next().unwrap().as_str().to_string()
+        Box::new(parse_arg(pairs.next().unwrap().into_inner())),
+        Box::new(parse_arg(pairs.next().unwrap().into_inner()))
     )
 }
 
@@ -664,10 +664,41 @@ id x = x.
             ast,
             vec![Decl::Func {
                 name: "add_pair".to_string(),
-                args: vec![Arg::Pair("x".to_string(), "y".to_string())],
+                args: vec![Arg::Pair(
+                    Box::new(Arg::Ident("x".to_string())),
+                    Box::new(Arg::Ident("y".to_string()))
+                )],
                 body: Stm::Expr(Expr::Add(
                     Box::new(Expr::Ident("x".to_string())),
                     Box::new(Expr::Ident("y".to_string()))
+                ))
+            }]
+        )
+    }
+
+    #[test]
+    fn test16() {
+        let src = "add (x,(y,z)) = x+y+z.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::Func {
+                name: "add".to_string(),
+                args: vec![Arg::Pair(
+                    Box::new(Arg::Ident("x".to_string())),
+                    Box::new(Arg::Pair(
+                        Box::new(Arg::Ident("y".to_string())),
+                        Box::new(Arg::Ident("z".to_string()))
+                    ))
+                )],
+                body: Stm::Expr(Expr::Add(
+                    Box::new(Expr::Ident("x".to_string())),
+                    Box::new(Expr::Add(
+                        Box::new(Expr::Ident("y".to_string())),
+                        Box::new(Expr::Ident("z".to_string()))
+                    ))
                 ))
             }]
         )

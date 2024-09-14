@@ -1,6 +1,8 @@
-use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{cbpv::Term, eval::LocationsClone};
+
+use super::free_vars::FreeVars;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TermPtr {
@@ -16,7 +18,7 @@ impl TermPtr {
         self.val.as_ref()
     }
 
-    pub fn free_vars(&self) -> HashSet<String> {
+    pub fn free_vars(&self) -> FreeVars {
         self.val.free_vars()
     }
 

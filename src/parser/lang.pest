@@ -9,7 +9,7 @@ list_type = { "[" ~ primary_type ~ "]"}
 
 func = { ident ~ arg* ~ "=" ~ stm ~ "." }
 arg = { ident | arg_pair }
-arg_pair = { "(" ~ ident ~ "," ~ ident ~ ")" }
+arg_pair = { "(" ~ arg ~ "," ~ arg ~ ")" }
 
 stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
 

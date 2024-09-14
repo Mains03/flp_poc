@@ -7,9 +7,9 @@ mod eval;
 
 fn main() {
     let src = "
-add_pair (x,y) = x+y.
+add ((x,y), z) = x+y+z.
 
-add_pair (1,2).";
+add ((1,2), 3).";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);
