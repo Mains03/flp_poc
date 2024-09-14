@@ -7,9 +7,15 @@ mod eval;
 
 fn main() {
     let src = "
-add ((x,y), z) = x+y+z.
+length :: [Nat] -> Nat
+length xs = fold (\\x. \\y. x+1) 0 xs.
 
-add ((1,2), 3).";
+f (xs, i) n = n =:= i. (xs, i+1).
+
+fst (xs, n) = xs.
+
+exists xs :: [Nat]. length xs =:= 100. fst (fold f (xs, 0) xs).
+";
 
     let ast = parser::parse(src).unwrap();
     let cbpv = translate(ast);
