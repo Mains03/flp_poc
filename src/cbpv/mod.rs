@@ -109,6 +109,7 @@ impl Term {
                 Some(term) => term.contains_typed_var(),
                 None => true
             },
+            Term::Pair(lhs, rhs) => lhs.contains_typed_var() || rhs.contains_typed_var(),
             Term::Succ(term) => term.contains_typed_var(),
             Term::Cons(x, xs) => x.contains_typed_var() || xs.contains_typed_var(),
             _ => false
@@ -140,6 +141,10 @@ impl LocationsClone for Term {
                     }
                 }
             },
+            Term::Pair(lhs, rhs) => Term::Pair(
+                lhs.clone_with_locations(new_locations),
+                rhs.clone_with_locations(new_locations)
+            ),
             Term::Succ(term) => Term::Succ(term.clone_with_locations(new_locations)),
             Term::Cons(x, xs) => Term::Cons(
                 x.clone_with_locations(new_locations),
