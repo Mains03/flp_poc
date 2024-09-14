@@ -1,4 +1,4 @@
-use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::expr::Expr};
+use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{arg::Arg, expr::Expr}};
 
 use super::Translate;
 
@@ -34,15 +34,21 @@ impl Translate for Expr {
                 elems.reverse();
                 translate_list(elems, 0, vec![])
             },
-            Expr::Lambda(var, body) => {
+            Expr::Lambda(arg, body) => {
                 let body = body.translate();
                 
                 let mut free_vars = body.free_vars();
-                free_vars.remove(&var);
+                match &arg {
+                    Arg::Ident(var) => { free_vars.remove(var); },
+                    Arg::Pair(var1, var2) => {
+                        free_vars.remove(var1);
+                        free_vars.remove(var2);
+                    }
+                }
 
                 Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(
                     Term::Lambda {
-                        var,
+                        arg,
                         free_vars,
                         body: TermPtr::from_term(body)
                     }
@@ -51,6 +57,7 @@ impl Translate for Expr {
             Expr::Ident(s) => Term::Return(TermPtr::from_term(Term::Var(s.clone()))),
             Expr::Nat(n) => Term::Return(TermPtr::from_term(translate_nat(n))),
             Expr::Bool(b) => Term::Return(TermPtr::from_term(Term::Bool(b))),
+            Expr::Pair(_, _) => todo!(),
             Expr::Fold => Term::Fold,
             Expr::Stm(s) => s.translate()
         }

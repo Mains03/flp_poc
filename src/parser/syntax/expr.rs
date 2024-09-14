@@ -1,4 +1,4 @@
-use super::{bexpr::BExpr, stm::Stm};
+use super::{arg::Arg, bexpr::BExpr, stm::Stm};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr {
@@ -6,10 +6,11 @@ pub enum Expr {
     App(Box<Expr>, Box<Expr>),
     BExpr(BExpr),
     List(Vec<Expr>),
-    Lambda(String, Box<Stm>),
+    Lambda(Arg, Box<Stm>),
     Ident(String),
     Nat(usize),
     Bool(bool),
+    Pair(Box<Stm>, Box<Stm>),
     Fold,
     Stm(Box<Stm>)
 }

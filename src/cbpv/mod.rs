@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::{HashMap, HashSet}, rc::Rc};
 use pm::PM;
 use term_ptr::TermPtr;
 
-use crate::eval::LocationsClone;
+use crate::{eval::LocationsClone, parser::syntax::arg::Arg};
 
 pub mod pm;
 pub mod term_ptr;
@@ -43,7 +43,7 @@ pub enum Term {
         body: TermPtr
     },
     Lambda {
-        var: String,
+        arg: Arg,
         free_vars: HashSet<String>,
         body: TermPtr
     },
@@ -82,7 +82,7 @@ impl Term {
                 free_vars
             },
             Term::Equate { lhs: _, rhs: _, body } => body.free_vars(),
-            Term::Lambda { var: _, free_vars, body: _ } => free_vars.clone(),
+            Term::Lambda { arg: _, free_vars, body: _ } => free_vars.clone(),
             Term::Choice(v) => v.iter()
                 .fold(HashSet::new(), |mut acc, x| {
                     acc.extend(x.free_vars());

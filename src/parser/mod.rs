@@ -1,7 +1,7 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{expr::Expr, bexpr::BExpr, decl::Decl, stm::Stm, r#type::Type};
+use syntax::{arg::Arg, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
 
 pub mod syntax;
 
@@ -61,13 +61,21 @@ pub fn parse(src: &str) -> Result<Vec<Decl>, Error<Rule>> {
     Ok(prog)
 }
 
-fn parse_arg(mut pairs: pest::iterators::Pairs<Rule>) -> String {
+fn parse_arg(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
-        Rule::ident => pair.as_str().to_string(),
+        Rule::ident => Arg::Ident(pair.as_str().to_string()),
+        Rule::arg_pair => parse_arg_pair(pair.into_inner()),
         _ => unreachable!()
     }
+}
+
+fn parse_arg_pair(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
+    Arg::Pair(
+        pairs.next().unwrap().as_str().to_string(),
+        pairs.next().unwrap().as_str().to_string()
+    )
 }
 
 fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
@@ -164,11 +172,19 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
             }).unwrap()
         },
         Rule::bexpr => Expr::BExpr(parse_bexpr(pair.into_inner())),
+        Rule::pair => {
+            let mut pairs = pair.into_inner();
+
+            Expr::Pair(
+                Box::new(parse_stm(pairs.next().unwrap().into_inner())),
+                Box::new(parse_stm(pairs.next().unwrap().into_inner()))
+            )
+        },
         Rule::list => Expr::List(parse_list(pair.into_inner())),
         Rule::lambda => {
             let mut pairs = pair.into_inner();
             Expr::Lambda(
-                pairs.next().unwrap().as_str().to_string(),
+                parse_arg(pairs.next().unwrap().into_inner()),
                 Box::new(parse_stm(pairs.next().unwrap().into_inner()))
             )
         },
@@ -276,7 +292,7 @@ const x y = x.";
                 },
                 Decl::Func {
                     name: "const".to_string(),
-                    args: vec!["x".to_string(), "y".to_string()],
+                    args: vec![Arg::Ident("x".to_string()), Arg::Ident("y".to_string())],
                     body: Stm::Expr(Expr::Ident("x".to_string()))
                 }
             ]
@@ -308,7 +324,7 @@ id x = x.";
                 },
                 Decl::Func {
                     name: "const".to_string(),
-                    args: vec!["x".to_string(), "y".to_string()],
+                    args: vec![Arg::Ident("x".to_string()), Arg::Ident("y".to_string())],
                     body: Stm::Expr(Expr::Ident("x".to_string()))
                 },
                 Decl::FuncType {
@@ -320,7 +336,7 @@ id x = x.";
                 },
                 Decl::Func {
                     name: "id".to_string(),
-                    args: vec!["x".to_string()],
+                    args: vec![Arg::Ident("x".to_string())],
                     body: Stm::Expr(Expr::Ident("x".to_string()))
                 }
             ]
@@ -349,7 +365,7 @@ fix f = exists n :: Nat. f n =:= n. n.";
                 },
                 Decl::Func {
                     name: "fix".to_string(),
-                    args: vec!["f".to_string()],
+                    args: vec![Arg::Ident("f".to_string())],
                     body: Stm::Exists {
                         var: "n".to_string(),
                         r#type: Type::Ident("Nat".to_string()),
@@ -407,7 +423,7 @@ id 5.";
                 },
                 Decl::Func {
                     name: "id".to_string(),
-                    args: vec!["x".to_string()],
+                    args: vec![Arg::Ident("x".to_string())],
                     body: Stm::Exists {
                         var: "n".to_string(),
                         r#type: Type::Ident("Nat".to_string()),
@@ -441,7 +457,7 @@ id :: a -> a";
             vec![
                 Decl::Func {
                     name: "id".to_string(),
-                    args: vec!["x".to_string()],
+                    args: vec![Arg::Ident("x".to_string())],
                     body: Stm::Expr(Expr::Ident("x".to_string()))
                 },
                 Decl::Stm(Stm::Expr(Expr::App(
@@ -479,7 +495,7 @@ id x = x.
                     },
                 Decl::Func {
                     name: "id".to_string(),
-                    args: vec!["x".to_string()],
+                    args: vec![Arg::Ident("x".to_string())],
                     body: Stm::Expr(Expr::Ident("x".to_string()))
                 },
                 Decl::Stm(Stm::Choice(vec![
@@ -613,15 +629,15 @@ id x = x.
             vec![
                 Decl::Func {
                     name: "sum".to_string(),
-                    args: vec!["xs".to_string()],
+                    args: vec![Arg::Ident("xs".to_string())],
                     body: Stm::Expr(Expr::App(
                         Box::new(Expr::App(
                             Box::new(Expr::App(
                                 Box::new(Expr::Fold),
                                 Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::Lambda(
-                                    "s".to_string(),
+                                    Arg::Ident("s".to_string()),
                                     Box::new(Stm::Expr(Expr::Lambda(
-                                        "x".to_string(),
+                                        Arg::Ident("x".to_string()),
                                         Box::new(Stm::Expr(Expr::Add(
                                             Box::new(Expr::Ident("x".to_string())),
                                             Box::new(Expr::Ident("s".to_string()))
@@ -635,6 +651,25 @@ id x = x.
                     ))
                 }
             ]
+        )
+    }
+
+    #[test]
+    fn test15() {
+        let src = "add_pair (x,y) = x+y.";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::Func {
+                name: "add_pair".to_string(),
+                args: vec![Arg::Pair("x".to_string(), "y".to_string())],
+                body: Stm::Expr(Expr::Add(
+                    Box::new(Expr::Ident("x".to_string())),
+                    Box::new(Expr::Ident("y".to_string()))
+                ))
+            }]
         )
     }
 }

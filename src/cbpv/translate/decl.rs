@@ -1,4 +1,4 @@
-use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{decl::Decl, stm::Stm}};
+use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::{arg::Arg, decl::Decl, stm::Stm}};
 
 use super::Translate;
 
@@ -11,18 +11,24 @@ impl Translate for Decl {
     }
 }
 
-fn translate_func(mut args: Vec<String>, body: Stm) -> Term {
+fn translate_func(mut args: Vec<Arg>, body: Stm) -> Term {
     args.reverse();
 
     if args.len() > 0 {
-        let var = args.remove(args.len()-1);
+        let arg = args.remove(args.len()-1);
         let body = translate_func_helper(args, body);
 
         let mut free_vars = body.free_vars();
-        free_vars.remove(&var);
+        match &arg {
+            Arg::Ident(var) => { free_vars.remove(var); },
+            Arg::Pair(var1, var2) => {
+                free_vars.remove(var1);
+                free_vars.remove(var2);
+            }
+        }
 
         Term::Thunk(TermPtr::from_term(Term::Lambda {
-            var,
+            arg,
             free_vars,
             body: TermPtr::from_term(body)
         }))
@@ -31,18 +37,24 @@ fn translate_func(mut args: Vec<String>, body: Stm) -> Term {
     }
 }
 
-fn translate_func_helper(mut args: Vec<String>, body: Stm) -> Term {
+fn translate_func_helper(mut args: Vec<Arg>, body: Stm) -> Term {
     if args.len() == 0 {
         body.translate()
     } else {
-        let var = args.remove(args.len()-1);
+        let arg = args.remove(args.len()-1);
         let body = translate_func_helper(args, body);
 
         let mut free_vars = body.free_vars();
-        free_vars.remove(&var);
+        match &arg {
+            Arg::Ident(var) => { free_vars.remove(var); },
+            Arg::Pair(var1, var2) => {
+                free_vars.remove(var1);
+                free_vars.remove(var2);
+            }
+        }
 
         Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-            var,
+            arg,
             free_vars,
             body: TermPtr::from_term(body)
         }))))

@@ -1,4 +1,4 @@
-use super::{r#type::Type, stm::*};
+use super::{arg::Arg, stm::*, r#type::Type};
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Decl {
@@ -8,7 +8,7 @@ pub enum Decl {
     },
     Func {
         name: String,
-        args: Vec<String>,
+        args: Vec<Arg>,
         body: Stm
     },
     Stm(Stm)

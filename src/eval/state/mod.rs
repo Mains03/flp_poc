@@ -5,7 +5,7 @@ use equate::equate;
 use stack::{Stack, StackTerm};
 use state_term::{closure::Closure,state_term::{StateTerm, StateTermStore}};
 
-use crate::cbpv::{pm::{PMList, PMListCons, PMNat, PMNatSucc, PM}, term_ptr::TermPtr, Term};
+use crate::{cbpv::{pm::{PMList, PMListCons, PMNat, PMNatSucc, PM}, term_ptr::TermPtr, Term}, parser::syntax::arg::Arg};
 
 pub use state_term::locations_clone::LocationsClone;
 
@@ -132,13 +132,13 @@ impl State {
                 Term::Fold => vec![State {
                     env: self.env,
                     term: StateTerm::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-                        var: "f".to_string(),
+                        arg: Arg::Ident("f".to_string()),
                         free_vars: HashSet::new(),
                         body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-                            var: "z".to_string(),
+                            arg: Arg::Ident("z".to_string()),
                             free_vars: HashSet::from_iter(vec!["f".to_string()]),
                             body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-                                var: "xs".to_string(),
+                                arg: Arg::Ident("xs".to_string()),
                                 free_vars: HashSet::from_iter(vec!["f".to_string(), "z".to_string()]),
                                 body: TermPtr::from_term(Term::PM(PM::PMList(PMList {
                                     var: "xs".to_string(),
@@ -244,10 +244,13 @@ impl State {
                         _ => unreachable!()
                     }
                 },
-                Term::Lambda { var, free_vars, body } => match self.stack.pop().unwrap() {
+                Term::Lambda { arg, free_vars, body } => match self.stack.pop().unwrap() {
                     StackTerm::Term(term) => {
                         let mut closure = Closure::from_term_ptr(body.clone());
-                        closure.store(var.clone(), term);
+                        match arg {
+                            Arg::Ident(var) => { closure.store(var.clone(), term); },
+                            Arg::Pair(_, _) => todo!()
+                        }
 
                         free_vars.into_iter()
                             .for_each(|var| {
@@ -508,10 +511,13 @@ impl State {
                         _ => unreachable!()
                     }
                 },
-                Term::Lambda { var, free_vars,  body } => match self.stack.pop().unwrap() {
+                Term::Lambda { arg, free_vars,  body } => match self.stack.pop().unwrap() {
                     StackTerm::Term(term) => {
                         let mut state = Closure::from_term_ptr(body.clone());
-                        state.store(var.clone(), term);
+                        match arg {
+                            Arg::Ident(var) => { state.store(var.clone(), term); },
+                            Arg::Pair(_, _) => todo!()
+                        }
 
                         free_vars.into_iter()
                             .for_each(|var| {

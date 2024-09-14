@@ -8,7 +8,8 @@ primary_type = { ident | list_type | "(" ~ type ~ ")" }
 list_type = { "[" ~ primary_type ~ "]"}
 
 func = { ident ~ arg* ~ "=" ~ stm ~ "." }
-arg = { ident }
+arg = { ident | arg_pair }
+arg_pair = { "(" ~ ident ~ "," ~ ident ~ ")" }
 
 stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
 
@@ -22,8 +23,9 @@ expr = { add | app | bexpr | lambda | primary_expr }
 add = { primary_expr ~ "+" ~ (add | primary_expr) }
 app = { primary_expr ~ primary_expr+ }
 bexpr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
-lambda = { "\\" ~ ident ~ "." ~ stm }
-primary_expr = { ident | nat | bool | list | fold | "(" ~ stm ~ ")" }
+lambda = { "\\" ~ arg ~ "." ~ stm }
+primary_expr = { ident | nat | bool | pair | list | fold | "(" ~ stm ~ ")" }
+pair = { "(" ~ expr ~ "," ~ expr ~ ")" }
 list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)? ~ "]" }
 fold = { "fold" }
 

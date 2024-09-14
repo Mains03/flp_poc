@@ -37,7 +37,7 @@ trait Translate {
 mod test {
     use std::collections::HashSet;
 
-    use crate::{cbpv::term_ptr::TermPtr, parser};
+    use crate::{cbpv::term_ptr::TermPtr, parser::{self, syntax::arg::Arg}};
 
     use super::*;
 
@@ -147,10 +147,10 @@ const x y = x.";
         assert_eq!(
             term,
             Term::Thunk(TermPtr::from_term(Term::Lambda {
-                var: "x".to_string(),
+                arg: Arg::Ident("x".to_string()),
                 free_vars: HashSet::new(),
                 body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-                    var: "y".to_string(),
+                    arg: Arg::Ident("y".to_string()),
                     free_vars: HashSet::from_iter(vec!["x".to_string()]),
                     body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("x".to_string()))))
                 })))))
@@ -172,7 +172,7 @@ id x = let f = const x in f 1.";
         assert_eq!(
             term,
             Term::Thunk(TermPtr::from_term(Term::Lambda {
-                var: "x".to_string(),
+                arg: Arg::Ident("x".to_string()),
                 free_vars: HashSet::from_iter(vec!["const".to_string()]),
                 body: TermPtr::from_term(Term::Bind {
                     var: "f".to_string(),
