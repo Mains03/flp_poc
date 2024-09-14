@@ -148,6 +148,14 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
                 Box::new(parse_expr(pairs))
             )
         },
+        Rule::concat => {
+            let mut pairs = pair.into_inner();
+
+            Expr::Concat(
+                Box::new(parse_expr(pairs.next().unwrap().into_inner())),
+                Box::new(parse_expr(pairs))
+            )
+        },
         Rule::app => {
             let mut pairs = pair.into_inner();
 
@@ -701,6 +709,24 @@ id x = x.
                     ))
                 ))
             }]
+        )
+    }
+
+    #[test]
+    fn test17() {
+        let src = "[1,2] ++ [3,4] ++[5].";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::Stm(Stm::Expr(Expr::Concat(
+                Box::new(Expr::List(vec![Expr::Nat(1),Expr::Nat(2)])),
+                Box::new(Expr::Concat(
+                    Box::new(Expr::List(vec![Expr::Nat(3),Expr::Nat(4)])),
+                    Box::new(Expr::List(vec![Expr::Nat(5)]))
+                ))
+            )))]
         )
     }
 }

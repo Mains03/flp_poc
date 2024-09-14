@@ -60,6 +60,13 @@ impl StateTermStore for Closure {
                 StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
                 StateTerm::Closure(_) => unreachable!()
             },
+            Term::Cons(x, xs) => match self.expand_value(x.clone()) {
+                StateTerm::Term(x) => match self.expand_value(xs.clone()) {
+                    StateTerm::Term(xs) => StateTerm::from_term(Term::Cons(x, xs)),
+                    StateTerm::Closure(_) => unreachable!()
+                },
+                StateTerm::Closure(_) => unreachable!()
+            }
             Term::TypedVar(shape) => match shape.borrow().as_ref() {
                 Some(term_ptr) => match term_ptr.term() {
                     Term::Zero => StateTerm::from_term(Term::Zero),

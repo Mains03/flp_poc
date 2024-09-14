@@ -129,6 +129,26 @@ impl State {
                     }))),
                     stack: self.stack
                 }],
+                Term::Concat(lhs, rhs) => vec![State {
+                    env: self.env,
+                    term: StateTerm::from_term(Term::PM(PM::PMList(PMList {
+                        var: lhs.clone(),
+                        nil: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var(rhs.clone())))),
+                        cons: PMListCons {
+                            x: "x".to_string(),
+                            xs: "xs".to_string(),
+                            body: TermPtr::from_term(Term::Bind {
+                                var: "ys".to_string(),
+                                val: TermPtr::from_term(Term::Concat("xs".to_string(), rhs.clone())),
+                                body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Cons(
+                                    TermPtr::from_term(Term::Var("x".to_string())),
+                                    TermPtr::from_term(Term::Var("ys".to_string()))
+                                ))))
+                            })
+                        }
+                    }))),
+                    stack: self.stack
+                }],
                 Term::Fold => vec![State {
                     env: self.env,
                     term: StateTerm::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
@@ -343,7 +363,95 @@ impl State {
                         },
                         StateTerm::Closure(_) => unreachable!()
                     },
-                    PM::PMList(_) => unreachable!()
+                    PM::PMList(pm_list) => match self.env.lookup(&pm_list.var).unwrap() {
+                        StateTerm::Term(term) => match term.term() {
+                            Term::Nil => vec![State {
+                                env: self.env,
+                                term: StateTerm::from_term_ptr(pm_list.nil.clone()),
+                                stack: self.stack
+                            }],
+                            Term::Cons(x, xs) => {
+                                self.stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                                self.env.store(pm_list.cons.x.clone(), StateTerm::from_term_ptr(x.clone()));
+
+                                self.stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                                self.env.store(pm_list.cons.xs.clone(), StateTerm::from_term_ptr(xs.clone()));
+
+                                vec![State {
+                                    env: self.env,
+                                    term: StateTerm::from_term_ptr(pm_list.cons.body.clone()),
+                                    stack: self.stack
+                                }]
+                            },
+                            Term::TypedVar(shape) => if shape.borrow().is_some() {
+                                match shape.borrow().as_ref().unwrap().term() {
+                                    Term::Nil => vec![State {
+                                        env: self.env,
+                                        term: StateTerm::from_term_ptr(pm_list.nil.clone()),
+                                        stack: self.stack
+                                    }],
+                                    Term::Cons(x, xs) => {
+                                        self.stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                                        self.env.store(pm_list.cons.x.clone(), StateTerm::from_term_ptr(x.clone()));
+        
+                                        self.stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                                        self.env.store(pm_list.cons.xs.clone(), StateTerm::from_term_ptr(xs.clone()));
+        
+                                        vec![State {
+                                            env: self.env,
+                                            term: StateTerm::from_term_ptr(pm_list.cons.body.clone()),
+                                            stack: self.stack
+                                        }]
+                                    },
+                                    _ => unreachable!()
+                                }
+                            } else {
+                                vec![
+                                    {
+                                        let mut new_locations = HashMap::new();
+
+                                        let env = self.env.clone_with_locations(&mut new_locations);
+                                        let stack = self.stack.clone_with_locations(&mut new_locations);
+
+                                        let shape = match env.lookup(&pm_list.var).unwrap() {
+                                            StateTerm::Term(term_ptr) => match term_ptr.term() {
+                                                Term::TypedVar(shape) => Rc::clone(shape),
+                                                _ => unreachable!()
+                                            },
+                                            StateTerm::Closure(_) => unreachable!()
+                                        };
+
+                                        shape.replace(Some(TermPtr::from_term(Term::Nil)));
+    
+                                        State {
+                                            env,
+                                            term: StateTerm::from_term_ptr(pm_list.nil.clone()),
+                                            stack
+                                        }
+                                    },
+                                    {
+                                        let x = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                                        let xs = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                                        shape.replace(Some(TermPtr::from_term(Term::Cons(x.clone(), xs.clone()))));
+    
+                                        self.stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                                        self.env.store(pm_list.cons.x.clone(), StateTerm::from_term_ptr(x));
+
+                                        self.stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                                        self.env.store(pm_list.cons.xs.clone(), StateTerm::from_term_ptr(xs));
+    
+                                        State {
+                                            env: self.env,
+                                            term: StateTerm::from_term_ptr(pm_list.cons.body.clone()),
+                                            stack: self.stack
+                                        }
+                                    }
+                                ]
+                            },
+                            _ => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    }
                 },
                 Term::Choice(choices) => choices.into_iter()
                     .map(|choice| {
@@ -463,6 +571,19 @@ impl State {
                     vec![State {
                         env: self.env,
                         term: StateTerm::from_term(Term::Add("x".to_string(), "y".to_string())),
+                        stack: self.stack
+                    }]
+                },
+                Term::Concat(lhs, rhs) => {
+                    self.stack.push(StackTerm::Release("x".to_string()));
+                    self.stack.push(StackTerm::Release("y".to_string()));
+
+                    self.env.store("x".to_string(), closure.lookup(&lhs).unwrap());
+                    self.env.store("y".to_string(), closure.lookup(&rhs).unwrap());
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::from_term(Term::Concat("x".to_string(), "y".to_string())),
                         stack: self.stack
                     }]
                 },
