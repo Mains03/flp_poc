@@ -3,9 +3,11 @@ program = _{ SOI ~ decl* ~ EOI }
 decl = { func_type | func | stm ~ "." }
 
 func_type = { ident ~ "::" ~ type }
-type = { primary_type ~ ("->" ~ type)* }
-primary_type = { ident | list_type | "(" ~ type ~ ")" }
-list_type = { "[" ~ primary_type ~ "]"}
+type = { arrow_type | primary_type }
+arrow_type = { primary_type ~ "->" ~ type }
+primary_type = { ident | list_type | pair_type | "(" ~ type ~ ")" }
+list_type = { "[" ~ type ~ "]"}
+pair_type = { "(" ~ type ~ "," ~ type ~ ")" }
 
 func = { ident ~ arg* ~ "=" ~ stm ~ "." }
 arg = { ident | arg_pair }

@@ -10,10 +10,12 @@ fn main() {
 length :: [Nat] -> Nat
 length xs = fold (\\x. \\y. x+1) 0 xs.
 
+half :: [Nat] -> ([Nat], [Nat])
 half xs = exists ys :: [Nat].
             exists zs :: [Nat].
                 ys ++ zs =:= xs.
-                    let z = length ys <> (length ys) + 1 in length zs =:= z. (ys, zs).
+                    length zs =:= (length ys <> (length ys) + 1).
+                        (ys, zs).
 
 half [1,2,3].
 ";

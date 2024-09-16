@@ -255,22 +255,38 @@ fn parse_bool(s: &str) -> bool {
 }
 
 fn parse_type(mut pairs: pest::iterators::Pairs<Rule>) -> Type {
-    let lhs = {
-        let pair = pairs.next().unwrap().into_inner().next().unwrap();
-        match pair.as_rule() {
-            Rule::ident => Type::Ident(pair.as_str().to_string()),
-            Rule::list_type => Type::List(Box::new(parse_type(pair.into_inner()))),
-            Rule::r#type => parse_type(pair.into_inner()),
-            _ => unreachable!()
-        }
-    };
+    let pair = pairs.next().unwrap();
 
-    match pairs.next() {
-        Some(t) => Type::Arrow(
-            Box::new(lhs),
-            Box::new(parse_type(t.into_inner()))
-        ),
-        None => lhs
+    match pair.as_rule() {
+        Rule::arrow_type => parse_arrow_type(pair.into_inner()),
+        Rule::primary_type => parse_primary_type(pair.into_inner()),
+        t => unreachable!("{:#?}", t)
+    }
+}
+
+fn parse_arrow_type(mut pairs: pest::iterators::Pairs<Rule>) -> Type {
+    let lhs = parse_primary_type(pairs.next().unwrap().into_inner());
+    let rhs = parse_type(pairs.next().unwrap().into_inner());
+
+    Type::Arrow(Box::new(lhs), Box::new(rhs))
+}
+
+fn parse_primary_type(mut pairs: pest::iterators::Pairs<Rule>) -> Type {
+    let pair = pairs.next().unwrap();
+
+    match pair.as_rule() {
+        Rule::ident => Type::Ident(pair.as_str().to_string()),
+        Rule::list_type => Type::List(Box::new(parse_type(pair.into_inner().next().unwrap().into_inner()))),
+        Rule::pair_type => {
+            let mut pair = pair.into_inner();
+
+            Type::Pair(
+                Box::new(parse_type(pair.next().unwrap().into_inner())),
+                Box::new(parse_type(pair.next().unwrap().into_inner()))
+            )
+        },
+        Rule::r#type => parse_type(pair.into_inner()),
+        _ => unreachable!()
     }
 }
 
@@ -727,6 +743,51 @@ id x = x.
                     Box::new(Expr::List(vec![Expr::Nat(5)]))
                 ))
             )))]
+        )
+    }
+
+    #[test]
+    fn test18() {
+        let src = "pair :: a -> (b -> (a, b))";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::FuncType {
+                name: "pair".to_string(),
+                r#type: Type::Arrow(
+                    Box::new(Type::Ident("a".to_string())),
+                    Box::new(Type::Arrow(
+                        Box::new(Type::Ident("b".to_string())),
+                        Box::new(Type::Pair(
+                            Box::new(Type::Ident("a".to_string())),
+                            Box::new(Type::Ident("b".to_string()))
+                        ))
+                    ))
+                )
+            }]
+        )
+    }
+
+    #[test]
+    fn test19() {
+        let src = "half :: [Nat] -> ([Nat], [Nat])";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::FuncType {
+                name: "half".to_string(),
+                r#type: Type::Arrow(
+                    Box::new(Type::List(Box::new(Type::Ident("Nat".to_string())))),
+                    Box::new(Type::Pair(
+                        Box::new(Type::List(Box::new(Type::Ident("Nat".to_string())))),
+                        Box::new(Type::List(Box::new(Type::Ident("Nat".to_string()))))
+                    ))
+                )
+            }]
         )
     }
 }

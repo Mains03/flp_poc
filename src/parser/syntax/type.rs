@@ -2,5 +2,6 @@
 pub enum Type {
     Arrow(Box<Type>, Box<Type>),
     Ident(String),
-    List(Box<Type>)
+    List(Box<Type>),
+    Pair(Box<Type>, Box<Type>)
 }
