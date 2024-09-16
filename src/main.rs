@@ -10,14 +10,16 @@ fn main() {
 length :: [Nat] -> Nat
 length xs = fold (\\x. \\y. x+1) 0 xs.
 
-half :: [Nat] -> ([Nat], [Nat])
-half xs = exists ys :: [Nat].
+itemOf :: Nat -> [Nat] -> Nat
+itemOf n xs =
+    exists ys :: [Nat].
+        exists z :: Nat.
             exists zs :: [Nat].
-                ys ++ zs =:= xs.
-                    length zs =:= (length ys <> (length ys) + 1).
-                        (ys, zs).
+                length ys =:= n.
+                    ys ++ [z] ++ zs =:= xs.
+                        z.
 
-half [1,2,3].
+itemOf 4 [1,1,2,3,5,8,13,21].
 ";
 
     let ast = parser::parse(src).unwrap();
