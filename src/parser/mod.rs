@@ -1,7 +1,7 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{arg::Arg, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
+use syntax::{arg::Arg, bexpr::BExpr, case::{Case, ListCase, ListConsCase, ListEmptyCase, NatCase, NatSuccCase, NatZeroCase}, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
 
 pub mod syntax;
 
@@ -131,9 +131,87 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
 
             Stm::Choice(choice)
         },
+        Rule::case_stm => {
+            let mut pairs = pair.into_inner();
+
+            let var = pairs.next().unwrap().as_str().to_string();
+
+            let mut cases = vec![];
+            loop {
+                match pairs.next() {
+                    Some(pair) => {
+                        let stm = parse_stm(pairs.next().unwrap().into_inner());
+                        let pattern = parse_pattern(pair.into_inner(), stm);
+                        cases.push(pattern);
+                    },
+                    None => break
+                }
+            }
+
+            Stm::Case(var, collect_cases(cases))
+        },
         Rule::expr => Stm::Expr(parse_expr(pair.into_inner())),
-        t => unreachable!("{:#?}", t)
+        _ => unreachable!()
     }
+}
+
+fn parse_pattern(mut pairs: pest::iterators::Pairs<Rule>, stm: Stm) -> Case {
+    let stm = Box::new(stm);
+    let pair = pairs.next().unwrap();
+
+    match pair.as_rule() {
+        Rule::nat_pattern => {
+            let pair = pair.into_inner().next().unwrap();
+            Case::Nat(match pair.as_rule() {
+                Rule::zero => NatCase {
+                    zero: Some(NatZeroCase { stm }),
+                    succ: None
+                },
+                Rule::succ => NatCase {
+                    zero: None,
+                    succ: Some(NatSuccCase {
+                        var: pair.into_inner().next().unwrap().as_str().to_string(),
+                        stm
+                    })
+                },
+                _ => unreachable!()
+            })
+        },
+        Rule::list_pattern => {
+            let pair = pair.into_inner().next().unwrap();
+            Case::List(match pair.as_rule() {
+                Rule::empty_list => ListCase {
+                    empty: Some(ListEmptyCase { stm }),
+                    cons: None
+                },
+                Rule::cons => {
+                    let mut pairs = pair.into_inner();
+                    ListCase {
+                        empty: None,
+                        cons: Some(ListConsCase {
+                            x: pairs.next().unwrap().as_str().to_string(),
+                            xs: pairs.next().unwrap().as_str().to_string(),
+                            stm
+                        })
+                    }
+                },
+                _ => unreachable!()
+            })
+        },
+        _ => unreachable!()
+    }
+}
+
+fn collect_cases(cases: Vec<Case>) -> Case {
+    let init = match cases.get(0).unwrap() {
+        Case::Nat(_) => Case::Nat(NatCase { zero: None, succ: None }),
+        Case::List(_) => Case::List(ListCase { empty: None, cons: None })
+    };
+
+    cases.into_iter()
+        .fold(init, |acc, case| {
+            acc.combine(case)
+        })
 }
 
 fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
@@ -787,6 +865,35 @@ id x = x.
                         Box::new(Type::List(Box::new(Type::Ident("Nat".to_string()))))
                     ))
                 )
+            }]
+        )
+    }
+
+    #[test]
+    fn test20() {
+        let src = "length xs = case xs of [] -> 0. (x:xs) -> 1 + (length xs).";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::Func {
+                name: "length".to_string(),
+                args: vec![Arg::Ident("xs".to_string())],
+                body: Stm::Case("xs".to_string(), Case::List(ListCase {
+                    empty: Some(ListEmptyCase { stm: Box::new(Stm::Expr(Expr::Nat(0))) }),
+                    cons: Some(ListConsCase {
+                        x: "x".to_string(),
+                        xs: "xs".to_string(),
+                        stm: Box::new(Stm::Expr(Expr::Add(
+                            Box::new(Expr::Nat(1)),
+                            Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::App(
+                                Box::new(Expr::Ident("length".to_string())),
+                                Box::new(Expr::Ident("xs".to_string()))
+                            )))))
+                        )))
+                    })
+                }))
             }]
         )
     }

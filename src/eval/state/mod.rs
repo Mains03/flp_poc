@@ -746,7 +746,95 @@ impl State {
                         },
                         StateTerm::Closure(_) => unreachable!()
                     },
-                    PM::PMNat(_) => unreachable!()
+                    PM::PMNat(pm_nat) => match closure.lookup(&pm_nat.var).unwrap() {
+                        StateTerm::Term(term_ptr) => match term_ptr.term() {
+                            Term::Zero => vec![State {
+                                env: self.env,
+                                term: StateTerm::Closure(Closure {
+                                    term_ptr: pm_nat.zero.clone(), vars: closure.vars
+                                }),
+                                stack: self.stack
+                            }],
+                            Term::Succ(s) => {
+                                closure.store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s.clone()));
+
+                                vec![State {
+                                    env: self.env,
+                                    term: StateTerm::Closure(Closure {
+                                        term_ptr: pm_nat.succ.body.clone(), vars: closure.vars
+                                    }),
+                                    stack: self.stack
+                                }]
+                            },
+                            Term::TypedVar(shape) => if shape.borrow().is_some() {
+                                match shape.borrow().as_ref().unwrap().term() {
+                                    Term::Zero => vec![State {
+                                        env: self.env,
+                                        term: StateTerm::Closure(Closure {
+                                            term_ptr: pm_nat.zero.clone(), vars: closure.vars,
+                                        }),
+                                        stack: self.stack
+                                    }],
+                                    Term::Succ(s) => {
+                                        closure.store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s.clone()));
+    
+                                        vec![State {
+                                            env: self.env,
+                                            term: StateTerm::Closure(Closure {
+                                                term_ptr: pm_nat.succ.body.clone(), vars: closure.vars
+                                            }),
+                                            stack: self.stack
+                                        }]
+                                    },
+                                    _ => unreachable!()
+                                }
+                            } else {
+                                vec![
+                                    {    
+                                        let mut new_locations = HashMap::new();
+
+                                        let env = self.env.clone_with_locations(&mut new_locations);
+                                        let closure = closure.clone_with_locations(&mut new_locations);
+                                        let stack = self.stack.clone_with_locations(&mut new_locations);
+
+                                        let shape = match closure.lookup(&pm_nat.var).unwrap() {
+                                            StateTerm::Term(term_ptr) => match term_ptr.term() {
+                                                Term::TypedVar(shape) => Rc::clone(shape),
+                                                _ => unreachable!()
+                                            },
+                                            StateTerm::Closure(_) => unreachable!()
+                                        };
+
+                                        shape.replace(Some(TermPtr::from_term(Term::Zero)));
+    
+                                        State {
+                                            env,
+                                            term: StateTerm::Closure(Closure {
+                                                term_ptr: pm_nat.zero.clone(), vars: closure.vars
+                                            }),
+                                            stack
+                                        }
+                                    },
+                                    {
+                                        let s = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
+                                        shape.replace(Some(TermPtr::from_term(Term::Succ(s.clone()))));
+    
+                                        closure.store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s));
+    
+                                        State {
+                                            env: self.env,
+                                            term: StateTerm::Closure(Closure {
+                                                term_ptr: pm_nat.succ.body.clone(), vars: closure.vars
+                                            }),
+                                            stack: self.stack
+                                        }
+                                    }
+                                ]
+                            },
+                            _ => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    },
                 },
                 Term::Choice(choices) => choices.into_iter()
                     .map(|choice| {

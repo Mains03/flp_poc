@@ -15,4 +15,3 @@ pub enum Expr {
     Fold,
     Stm(Box<Stm>)
 }
-

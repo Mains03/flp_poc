@@ -13,7 +13,7 @@ func = { ident ~ arg* ~ "=" ~ stm ~ "." }
 arg = { ident | arg_pair }
 arg_pair = { "(" ~ arg ~ "," ~ arg ~ ")" }
 
-stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | expr }
+stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | case_stm | expr }
 
 if_stm = { "if" ~ stm ~ "then" ~ stm ~ "else" ~ stm }
 let_stm = { "let" ~ ident ~ "=" ~ stm ~ "in" ~ stm }
@@ -21,12 +21,22 @@ exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stm }
 equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
 choice_stm = { expr ~ ("<>" ~ expr)+ }
 
+case_stm = { "case" ~ ident ~ "of" ~ pattern ~ "->" ~ stm ~ ("." ~ pattern ~ "->" ~ stm)* }
+pattern = { nat_pattern | list_pattern }
+nat_pattern = { zero | succ }
+zero = { "Zero" }
+succ = { "(" ~ "Succ" ~ ident ~ ")" }
+list_pattern = { empty_list | cons }
+empty_list = { "[" ~ "]" }
+cons = { "(" ~ ident ~ ":" ~ ident ~ ")" }
+
 expr = { add | concat | app | bexpr | lambda | primary_expr }
 add = { primary_expr ~ "+" ~ (add | primary_expr) }
 concat = { primary_expr ~ "++" ~ (concat | primary_expr) }
 app = { primary_expr ~ primary_expr+ }
 bexpr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
 lambda = { "\\" ~ arg ~ "." ~ stm }
+
 primary_expr = { ident | nat | bool | pair | list | fold | "(" ~ stm ~ ")" }
 pair = { "(" ~ stm ~ "," ~ stm ~ ")" }
 list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)? ~ "]" }

@@ -7,19 +7,17 @@ mod eval;
 
 fn main() {
     let src = "
-length :: [Nat] -> Nat
-length xs = fold (\\x. \\y. x+1) 0 xs.
+head :: [Nat] -> Nat
+head xs = case xs of
+    [] -> 0.
+    (x:xs) -> x.
 
 itemOf :: Nat -> [Nat] -> Nat
-itemOf n xs =
-    exists ys :: [Nat].
-        exists z :: Nat.
-            exists zs :: [Nat].
-                length ys =:= n.
-                    ys ++ [z] ++ zs =:= xs.
-                        z.
+itemOf n xs = case n of
+    Zero -> head xs.
+    (Succ n) -> itemOf n xs.
 
-itemOf 4 [1,1,2,3,5,8,13,21].
+itemOf 1 [1,2,3].
 ";
 
     let ast = parser::parse(src).unwrap();

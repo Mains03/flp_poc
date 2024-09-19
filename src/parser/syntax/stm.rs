@@ -1,4 +1,4 @@
-use super::{expr::Expr, r#type::Type};
+use super::{case::Case, expr::Expr, r#type::Type};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Stm {
@@ -23,5 +23,6 @@ pub enum Stm {
         body: Box<Stm>
     },
     Choice(Vec<Expr>),
+    Case(String, Case),
     Expr(Expr)
 }

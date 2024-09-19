@@ -100,7 +100,8 @@ impl Term {
                 free_vars.add_var(rhs.clone());
                 free_vars
             },
-            _ => FreeVars::new(),
+            Term::PM(pm) => pm.free_vars(),
+            _ => FreeVars::new()
         }
     }
 

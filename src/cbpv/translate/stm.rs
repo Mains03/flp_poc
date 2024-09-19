@@ -1,4 +1,4 @@
-use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::stm::Stm};
+use crate::{cbpv::{pm::{PMList, PMListCons, PMNat, PMNatSucc, PM}, term_ptr::TermPtr, Term}, parser::syntax::{case::Case, stm::Stm}};
 
 use super::Translate;
 
@@ -40,6 +40,33 @@ impl Translate for Stm {
                 exprs.into_iter()
                     .map(|e| TermPtr::from_term(e.translate())).collect()
             ),
+            Stm::Case(var, case) => Term::PM(match case {
+                Case::Nat(nat_case) => {
+                    let succ = nat_case.succ.unwrap();
+
+                    PM::PMNat(PMNat {
+                        var,
+                        zero: TermPtr::from_term(nat_case.zero.unwrap().stm.translate()),
+                        succ: PMNatSucc {
+                            var: succ.var,
+                            body: TermPtr::from_term(succ.stm.translate())
+                        }
+                    })
+                },
+                Case::List(list_case) => {
+                    let cons = list_case.cons.unwrap();
+
+                    PM::PMList(PMList {
+                        var,
+                        nil: TermPtr::from_term(list_case.empty.unwrap().stm.translate()),
+                        cons: PMListCons {
+                            x: cons.x,
+                            xs: cons.xs,
+                            body: TermPtr::from_term(cons.stm.translate())
+                        }
+                    })
+                }
+            }),
             Stm::Expr(e) => e.translate()
         }
     }
