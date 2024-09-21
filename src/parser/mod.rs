@@ -226,14 +226,6 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
                 Box::new(parse_expr(pairs))
             )
         },
-        Rule::concat => {
-            let mut pairs = pair.into_inner();
-
-            Expr::Concat(
-                Box::new(parse_expr(pairs.next().unwrap().into_inner())),
-                Box::new(parse_expr(pairs))
-            )
-        },
         Rule::app => {
             let mut pairs = pair.into_inner();
 
@@ -278,7 +270,6 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
         Rule::ident => Expr::Ident(pair.as_str().to_string()),
         Rule::nat => Expr::Nat(pair.as_str().parse().unwrap()),
         Rule::bool => Expr::Bool(parse_bool(pair.as_str())),
-        Rule::fold => Expr::Fold,
         Rule::stm => Expr::Stm(Box::new(parse_stm(pair.into_inner()))),
         _ => unreachable!()
     }
@@ -722,42 +713,6 @@ id x = x.
 
     #[test]
     fn test14() {
-        let src = "sum xs = fold (\\s. \\x. x+s) 0 xs.";
-
-        let ast = parse(src).unwrap();
-
-        assert_eq!(
-            ast,
-            vec![
-                Decl::Func {
-                    name: "sum".to_string(),
-                    args: vec![Arg::Ident("xs".to_string())],
-                    body: Stm::Expr(Expr::App(
-                        Box::new(Expr::App(
-                            Box::new(Expr::App(
-                                Box::new(Expr::Fold),
-                                Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::Lambda(
-                                    Arg::Ident("s".to_string()),
-                                    Box::new(Stm::Expr(Expr::Lambda(
-                                        Arg::Ident("x".to_string()),
-                                        Box::new(Stm::Expr(Expr::Add(
-                                            Box::new(Expr::Ident("x".to_string())),
-                                            Box::new(Expr::Ident("s".to_string()))
-                                        )))
-                                    )))
-                                )))))
-                            )),
-                            Box::new(Expr::Nat(0))
-                        )),
-                        Box::new(Expr::Ident("xs".to_string()))
-                    ))
-                }
-            ]
-        )
-    }
-
-    #[test]
-    fn test15() {
         let src = "add_pair (x,y) = x+y.";
 
         let ast = parse(src).unwrap();
@@ -779,7 +734,7 @@ id x = x.
     }
 
     #[test]
-    fn test16() {
+    fn test15() {
         let src = "add (x,(y,z)) = x+y+z.";
 
         let ast = parse(src).unwrap();
@@ -807,25 +762,7 @@ id x = x.
     }
 
     #[test]
-    fn test17() {
-        let src = "[1,2] ++ [3,4] ++[5].";
-
-        let ast = parse(src).unwrap();
-
-        assert_eq!(
-            ast,
-            vec![Decl::Stm(Stm::Expr(Expr::Concat(
-                Box::new(Expr::List(vec![Expr::Nat(1),Expr::Nat(2)])),
-                Box::new(Expr::Concat(
-                    Box::new(Expr::List(vec![Expr::Nat(3),Expr::Nat(4)])),
-                    Box::new(Expr::List(vec![Expr::Nat(5)]))
-                ))
-            )))]
-        )
-    }
-
-    #[test]
-    fn test18() {
+    fn test16() {
         let src = "pair :: a -> (b -> (a, b))";
 
         let ast = parse(src).unwrap();
@@ -849,7 +786,7 @@ id x = x.
     }
 
     #[test]
-    fn test19() {
+    fn test17() {
         let src = "half :: [Nat] -> ([Nat], [Nat])";
 
         let ast = parse(src).unwrap();
@@ -870,7 +807,7 @@ id x = x.
     }
 
     #[test]
-    fn test20() {
+    fn test18() {
         let src = "length xs = case xs of [] -> 0. (x:xs) -> 1 + (length xs).";
 
         let ast = parse(src).unwrap();

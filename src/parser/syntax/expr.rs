@@ -3,7 +3,6 @@ use super::{arg::Arg, bexpr::BExpr, stm::Stm};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr {
     Add(Box<Expr>, Box<Expr>),
-    Concat(Box<Expr>, Box<Expr>),
     App(Box<Expr>, Box<Expr>),
     BExpr(BExpr),
     List(Vec<Expr>),
@@ -12,6 +11,5 @@ pub enum Expr {
     Nat(usize),
     Bool(bool),
     Pair(Box<Stm>, Box<Stm>),
-    Fold,
     Stm(Box<Stm>)
 }

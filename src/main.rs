@@ -7,22 +7,12 @@ mod eval;
 
 fn main() {
     let src = "
-head :: [Nat] -> Nat
-head xs = case xs of
-    [] -> 0.
-    (x:xs) -> x.
+concat :: [Nat] -> [Nat]
+concat xs ys = case xs of
+    [] -> ys
+    (x:xs) -> x : concat xs ys
 
-tail :: [Nat] -> Nat
-tail xs = case xs of
-    [] -> [].
-    (x:xs) -> xs.
-
-itemOf :: Nat -> [Nat] -> Nat
-itemOf n xs = case n of
-    Zero -> head xs.
-    (Succ n) -> itemOf n (tail xs).
-
-itemOf 1 [4,2,3].
+concat [1,2,3] [4,5].
 ";
 
     let ast = parser::parse(src).unwrap();

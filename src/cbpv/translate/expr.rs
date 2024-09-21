@@ -17,18 +17,6 @@ impl Translate for Expr {
                     ))
                 })
             },
-            Expr::Concat(lhs, rhs) => Term::Bind {
-                var: "0".to_string(),
-                val: TermPtr::from_term(lhs.translate()),
-                body: TermPtr::from_term(Term::Bind {
-                    var: "1".to_string(),
-                    val: TermPtr::from_term(rhs.translate()),
-                    body: TermPtr::from_term(Term::Concat(
-                        "0".to_string(),
-                        "1".to_string()
-                    ))
-                })
-            },
             Expr::App(lhs, rhs) => Term::Bind {
                 var: "0".to_string(),
                 val: TermPtr::from_term(rhs.translate()),
@@ -64,7 +52,6 @@ impl Translate for Expr {
             Expr::Nat(n) => Term::Return(TermPtr::from_term(translate_nat(n))),
             Expr::Bool(b) => Term::Return(TermPtr::from_term(Term::Bool(b))),
             Expr::Pair(lhs, rhs) => translate_pair(*lhs, *rhs),
-            Expr::Fold => Term::Fold,
             Expr::Stm(s) => s.translate()
         }
     }

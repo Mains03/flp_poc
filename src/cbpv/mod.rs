@@ -22,8 +22,6 @@ pub enum Term {
     Bool(bool),
     Pair(TermPtr, TermPtr),
     Add(String, String),
-    Concat(String, String),
-    Fold,
     Eq(String, String),
     NEq(String, String),
     Not(String),

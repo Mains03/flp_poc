@@ -129,106 +129,6 @@ impl State {
                     }))),
                     stack: self.stack
                 }],
-                Term::Concat(lhs, rhs) => vec![State {
-                    env: self.env,
-                    term: StateTerm::from_term(Term::PM(PM::PMList(PMList {
-                        var: lhs.clone(),
-                        nil: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var(rhs.clone())))),
-                        cons: PMListCons {
-                            x: "x".to_string(),
-                            xs: "xs".to_string(),
-                            body: TermPtr::from_term(Term::Bind {
-                                var: "ys".to_string(),
-                                val: TermPtr::from_term(Term::Concat("xs".to_string(), rhs.clone())),
-                                body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Cons(
-                                    TermPtr::from_term(Term::Var("x".to_string())),
-                                    TermPtr::from_term(Term::Var("ys".to_string()))
-                                ))))
-                            })
-                        }
-                    }))),
-                    stack: self.stack
-                }],
-                Term::Fold => vec![State {
-                    env: self.env,
-                    term: StateTerm::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-                        arg: Arg::Ident("f".to_string()),
-                        free_vars: FreeVars::new(),
-                        body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-                            arg: Arg::Ident("z".to_string()),
-                            free_vars: FreeVars::from_vars(vec!["f".to_string()]),
-                            body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-                                arg: Arg::Ident("xs".to_string()),
-                                free_vars: FreeVars::from_vars(vec!["f".to_string(), "z".to_string()]),
-                                body: TermPtr::from_term(Term::PM(PM::PMList(PMList {
-                                    var: "xs".to_string(),
-                                    nil: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("z".to_string())))),
-                                    cons: PMListCons {
-                                        x: "y".to_string(),
-                                        xs: "ys".to_string(),
-                                        body: TermPtr::from_term(Term::Bind {
-                                            var: "0".to_string(),
-                                            val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("ys".to_string())))),
-                                            body: TermPtr::from_term(Term::Bind {
-                                                var: "1".to_string(),
-                                                val: TermPtr::from_term(Term::Bind {
-                                                    var: "0".to_string(),
-                                                    val: TermPtr::from_term(Term::Bind {
-                                                        var: "0".to_string(),
-                                                        val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("y".to_string())))),
-                                                        body: TermPtr::from_term(Term::Bind {
-                                                            var: "1".to_string(),
-                                                            val: TermPtr::from_term(Term::Bind {
-                                                                var: "0".to_string(),
-                                                                val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("z".to_string())))),
-                                                                body: TermPtr::from_term(Term::Bind {
-                                                                    var: "1".to_string(),
-                                                                    val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("f".to_string())))),
-                                                                    body: TermPtr::from_term(Term::App(
-                                                                        TermPtr::from_term(Term::Force("1".to_string())),
-                                                                        "0".to_string()
-                                                                    ))
-                                                                })
-                                                            }),
-                                                            body: TermPtr::from_term(Term::App(
-                                                                TermPtr::from_term(Term::Force("1".to_string())),
-                                                                "0".to_string()
-                                                            ))
-                                                        })
-                                                    }),
-                                                    body: TermPtr::from_term(Term::Bind {
-                                                        var: "1".to_string(),
-                                                        val: TermPtr::from_term(Term::Bind {
-                                                            var: "0".to_string(),
-                                                            val: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("f".to_string())))),
-                                                            body: TermPtr::from_term(Term::Bind {
-                                                                var: "1".to_string(),
-                                                                val: TermPtr::from_term(Term::Fold),
-                                                                body: TermPtr::from_term(Term::App(
-                                                                    TermPtr::from_term(Term::Force("1".to_string())),
-                                                                    "0".to_string()
-                                                                ))
-                                                            })
-                                                        }),
-                                                        body: TermPtr::from_term(Term::App(
-                                                            TermPtr::from_term(Term::Force("1".to_string())),
-                                                            "0".to_string()
-                                                        ))
-                                                    })
-                                                }),
-                                                body: TermPtr::from_term(Term::App(
-                                                    TermPtr::from_term(Term::Force("1".to_string())),
-                                                    "0".to_string()
-                                                ))
-                                            })
-                                        })
-                                    }
-                                })))
-                            })))))
-                        })))))
-                    }))))),
-                    stack: self.stack
-                }],
                 Term::Eq(lhs, rhs) => todo!(),
                 Term::NEq(lhs, rhs) => todo!(),
                 Term::Not(term) => todo!(),
@@ -574,24 +474,6 @@ impl State {
                         stack: self.stack
                     }]
                 },
-                Term::Concat(lhs, rhs) => {
-                    self.stack.push(StackTerm::Release("x".to_string()));
-                    self.stack.push(StackTerm::Release("y".to_string()));
-
-                    self.env.store("x".to_string(), closure.lookup(&lhs).unwrap());
-                    self.env.store("y".to_string(), closure.lookup(&rhs).unwrap());
-
-                    vec![State {
-                        env: self.env,
-                        term: StateTerm::from_term(Term::Concat("x".to_string(), "y".to_string())),
-                        stack: self.stack
-                    }]
-                },
-                Term::Fold => vec![State {
-                    env: self.env,
-                    term: StateTerm::from_term(Term::Fold),
-                    stack: self.stack
-                }],
                 Term::Eq(lhs, rhs) => todo!(),
                 Term::NEq(lhs, rhs) => todo!(),
                 Term::Not(term) => todo!(),

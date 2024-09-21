@@ -30,22 +30,20 @@ list_pattern = { empty_list | cons }
 empty_list = { "[" ~ "]" }
 cons = { "(" ~ ident ~ ":" ~ ident ~ ")" }
 
-expr = { add | concat | app | bexpr | lambda | primary_expr }
+expr = { add | app | bexpr | lambda | primary_expr }
 add = { primary_expr ~ "+" ~ (add | primary_expr) }
-concat = { primary_expr ~ "++" ~ (concat | primary_expr) }
 app = { primary_expr ~ primary_expr+ }
 bexpr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
 lambda = { "\\" ~ arg ~ "." ~ stm }
 
-primary_expr = { ident | nat | bool | pair | list | fold | "(" ~ stm ~ ")" }
+primary_expr = { ident | nat | bool | pair | list | "(" ~ stm ~ ")" }
 pair = { "(" ~ stm ~ "," ~ stm ~ ")" }
 list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)? ~ "]" }
-fold = { "fold" }
 
 bexpr_op = { "==" | "!=" }
 
 ident = @{ !keywords ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | "fold" | bool }
+keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | bool }
 nat = @{ ASCII_DIGIT+ }
 bool = { "true" | "false" }
 
