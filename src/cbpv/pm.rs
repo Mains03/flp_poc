@@ -43,18 +43,18 @@ impl PM {
     pub fn free_vars(&self) -> FreeVars {
         match self {
             PM::PMNat(pm_nat) => {
-                let mut free_vars = FreeVars::from_vars(vec![pm_nat.var.clone()]);
-                free_vars.extend(pm_nat.zero.free_vars());
+                let mut free_vars = pm_nat.zero.free_vars();
                 free_vars.extend(pm_nat.succ.body.free_vars());
                 free_vars.remove_var(&pm_nat.succ.var);
+                free_vars.add_var(pm_nat.var.clone());
                 free_vars
             },
             PM::PMList(pm_list) => {
-                let mut free_vars = FreeVars::from_vars(vec![pm_list.var.clone()]);
-                free_vars.extend(pm_list.nil.free_vars());
+                let mut free_vars = pm_list.nil.free_vars();
                 free_vars.extend(pm_list.cons.body.free_vars());
                 free_vars.remove_var(&pm_list.cons.x);
                 free_vars.remove_var(&pm_list.cons.xs);
+                free_vars.add_var(pm_list.var.clone());
                 free_vars
             }
         }

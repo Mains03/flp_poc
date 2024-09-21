@@ -12,12 +12,17 @@ head xs = case xs of
     [] -> 0.
     (x:xs) -> x.
 
+tail :: [Nat] -> Nat
+tail xs = case xs of
+    [] -> [].
+    (x:xs) -> xs.
+
 itemOf :: Nat -> [Nat] -> Nat
 itemOf n xs = case n of
     Zero -> head xs.
-    (Succ n) -> itemOf n xs.
+    (Succ n) -> itemOf n (tail xs).
 
-itemOf 1 [1,2,3].
+itemOf 1 [4,2,3].
 ";
 
     let ast = parser::parse(src).unwrap();
