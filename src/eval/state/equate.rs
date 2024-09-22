@@ -7,6 +7,13 @@ pub fn equate(mut lhs: TermPtr, mut rhs: TermPtr) -> bool {
     
     loop {
         match lhs.clone().term() {
+            Term::Bool(lhs_bool) => match rhs.term() {
+                Term::Bool(rhs_bool) => {
+                    flag = lhs_bool == rhs_bool;
+                    break;
+                },
+                _ => unreachable!()
+            },
             Term::Zero => {
                 flag = match rhs.term() {
                     Term::Zero => true,

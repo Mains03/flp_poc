@@ -46,10 +46,10 @@ impl Translate for Stm {
 
                     PM::PMNat(PMNat {
                         var,
-                        zero: TermPtr::from_term(nat_case.zero.unwrap().stm.translate()),
+                        zero: TermPtr::from_term(nat_case.zero.unwrap().expr.translate()),
                         succ: PMNatSucc {
                             var: succ.var,
-                            body: TermPtr::from_term(succ.stm.translate())
+                            body: TermPtr::from_term(succ.expr.translate())
                         }
                     })
                 },
@@ -58,11 +58,11 @@ impl Translate for Stm {
 
                     PM::PMList(PMList {
                         var,
-                        nil: TermPtr::from_term(list_case.empty.unwrap().stm.translate()),
+                        nil: TermPtr::from_term(list_case.empty.unwrap().expr.translate()),
                         cons: PMListCons {
                             x: cons.x,
                             xs: cons.xs,
-                            body: TermPtr::from_term(cons.stm.translate())
+                            body: TermPtr::from_term(cons.expr.translate())
                         }
                     })
                 }

@@ -140,8 +140,8 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
             loop {
                 match pairs.next() {
                     Some(pair) => {
-                        let stm = parse_stm(pairs.next().unwrap().into_inner());
-                        let pattern = parse_pattern(pair.into_inner(), stm);
+                        let expr = parse_expr(pairs.next().unwrap().into_inner());
+                        let pattern = parse_pattern(pair.into_inner(), expr);
                         cases.push(pattern);
                     },
                     None => break
@@ -155,8 +155,7 @@ fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
     }
 }
 
-fn parse_pattern(mut pairs: pest::iterators::Pairs<Rule>, stm: Stm) -> Case {
-    let stm = Box::new(stm);
+fn parse_pattern(mut pairs: pest::iterators::Pairs<Rule>, expr: Expr) -> Case {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
@@ -164,14 +163,14 @@ fn parse_pattern(mut pairs: pest::iterators::Pairs<Rule>, stm: Stm) -> Case {
             let pair = pair.into_inner().next().unwrap();
             Case::Nat(match pair.as_rule() {
                 Rule::zero => NatCase {
-                    zero: Some(NatZeroCase { stm }),
+                    zero: Some(NatZeroCase { expr }),
                     succ: None
                 },
                 Rule::succ => NatCase {
                     zero: None,
                     succ: Some(NatSuccCase {
                         var: pair.into_inner().next().unwrap().as_str().to_string(),
-                        stm
+                        expr
                     })
                 },
                 _ => unreachable!()
@@ -181,17 +180,17 @@ fn parse_pattern(mut pairs: pest::iterators::Pairs<Rule>, stm: Stm) -> Case {
             let pair = pair.into_inner().next().unwrap();
             Case::List(match pair.as_rule() {
                 Rule::empty_list => ListCase {
-                    empty: Some(ListEmptyCase { stm }),
+                    empty: Some(ListEmptyCase { expr }),
                     cons: None
                 },
-                Rule::cons => {
+                Rule::cons_pattern => {
                     let mut pairs = pair.into_inner();
                     ListCase {
                         empty: None,
                         cons: Some(ListConsCase {
                             x: pairs.next().unwrap().as_str().to_string(),
                             xs: pairs.next().unwrap().as_str().to_string(),
-                            stm
+                            expr
                         })
                     }
                 },
@@ -218,6 +217,14 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
+        Rule::cons => {
+            let mut pairs = pair.into_inner();
+
+            Expr::Cons(
+                Box::new(parse_expr(pairs.next().unwrap().into_inner())),
+                Box::new(parse_expr(pairs.next().unwrap().into_inner()))
+            )
+        },
         Rule::add => {
             let mut pairs = pair.into_inner();
 
@@ -818,20 +825,73 @@ id x = x.
                 name: "length".to_string(),
                 args: vec![Arg::Ident("xs".to_string())],
                 body: Stm::Case("xs".to_string(), Case::List(ListCase {
-                    empty: Some(ListEmptyCase { stm: Box::new(Stm::Expr(Expr::Nat(0))) }),
+                    empty: Some(ListEmptyCase { expr: Expr::Nat(0) }),
                     cons: Some(ListConsCase {
                         x: "x".to_string(),
                         xs: "xs".to_string(),
-                        stm: Box::new(Stm::Expr(Expr::Add(
+                        expr: Expr::Add(
                             Box::new(Expr::Nat(1)),
                             Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::App(
                                 Box::new(Expr::Ident("length".to_string())),
                                 Box::new(Expr::Ident("xs".to_string()))
-                            )))))
-                        )))
+                            ))))
+                        ))
                     })
                 }))
             }]
+        )
+    }
+
+    #[test]
+    fn test19() {
+        let src = "1 : 2 : [3,4].";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::Stm(Stm::Expr(Expr::Cons(
+                Box::new(Expr::Nat(1)),
+                Box::new(Expr::Cons(
+                    Box::new(Expr::Nat(2)),
+                    Box::new(Expr::List(vec![
+                        Expr::Nat(3), Expr::Nat(4)
+                    ]))
+                ))
+            )))]
+        )
+    }
+
+    #[test]
+    fn test20() {
+        let src = "case xs of [] -> []. (x:xs) -> (case xs of [] -> []. (y:ys) -> y:ys).";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::Stm(Stm::Case("xs".to_string(), Case::List(ListCase {
+                empty: Some(ListEmptyCase {
+                    expr: Expr::List(vec![])
+                }),
+                cons: Some(ListConsCase {
+                    x: "x".to_string(),
+                    xs: "xs".to_string(),
+                    expr: Expr::Stm(Box::new(Stm::Case("xs".to_string(), Case::List(ListCase {
+                        empty: Some(ListEmptyCase {
+                            expr: Expr::List(vec![])
+                        }),
+                        cons: Some(ListConsCase {
+                            x: "y".to_string(),
+                            xs: "ys".to_string(),
+                            expr: Expr::Cons(
+                                Box::new(Expr::Ident("y".to_string())),
+                                Box::new(Expr::Ident("ys".to_string()))
+                            )
+                        })
+                    }))))
+                })
+            })))]
         )
     }
 }

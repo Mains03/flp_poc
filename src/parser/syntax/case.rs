@@ -1,4 +1,4 @@
-use super::stm::Stm;
+use super::expr::Expr;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Case {
@@ -14,13 +14,13 @@ pub struct NatCase {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NatZeroCase {
-    pub stm: Box<Stm>
+    pub expr: Expr
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NatSuccCase {
     pub var: String,
-    pub stm: Box<Stm>
+    pub expr: Expr
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -31,14 +31,14 @@ pub struct ListCase {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ListEmptyCase {
-    pub stm: Box<Stm>
+    pub expr: Expr
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ListConsCase {
     pub x: String,
     pub xs: String,
-    pub stm: Box<Stm>
+    pub expr: Expr
 }
 
 impl Case {

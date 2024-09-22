@@ -5,6 +5,18 @@ use super::Translate;
 impl Translate for Expr {
     fn translate(self) -> Term {
         match self {
+            Expr::Cons(x, xs) => Term::Bind {
+                var: "0".to_string(),
+                val: TermPtr::from_term(x.translate()),
+                body: TermPtr::from_term(Term::Bind {
+                    var: "1".to_string(),
+                    val: TermPtr::from_term(xs.translate()),
+                    body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Cons(
+                        TermPtr::from_term(Term::Var("0".to_string())),
+                        TermPtr::from_term(Term::Var("1".to_string()))
+                    ))))
+                })
+            },
             Expr::Add(lhs, rhs) => Term::Bind {
                 var: "0".to_string(),
                 val: TermPtr::from_term(lhs.translate()),

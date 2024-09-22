@@ -129,10 +129,88 @@ impl State {
                     }))),
                     stack: self.stack
                 }],
-                Term::Eq(lhs, rhs) => todo!(),
-                Term::NEq(lhs, rhs) => todo!(),
-                Term::Not(term) => todo!(),
-                Term::If { cond, then, r#else } => todo!(),
+                Term::Eq(lhs, rhs) => {
+                    let lhs = match self.env.lookup(lhs).unwrap() {
+                        StateTerm::Term(term) => match self.env.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    let rhs = match self.env.lookup(rhs).unwrap() {
+                        StateTerm::Term(term) => match self.env.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                            Term::Bool(lhs.term() == rhs.term())
+                        )))),
+                        stack: self.stack
+                    }]
+                },
+                Term::NEq(lhs, rhs) => {
+                    let lhs = match self.env.lookup(lhs).unwrap() {
+                        StateTerm::Term(term) => match self.env.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    let rhs = match self.env.lookup(rhs).unwrap() {
+                        StateTerm::Term(term) => match self.env.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                            Term::Bool(lhs.term() != rhs.term())
+                        )))),
+                        stack: self.stack
+                    }]
+                },
+                Term::Not(term) => match self.env.lookup(term).unwrap() {
+                    StateTerm::Term(term) => match term.term() {
+                        Term::Bool(b) => vec![State {
+                            env: self.env,
+                            term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                                Term::Bool(!b)
+                            )))),
+                            stack: self.stack
+                        }],
+                        _ => unreachable!()
+                    },
+                    StateTerm::Closure(_) => unreachable!()
+                },
+                Term::If { cond, then, r#else } => {
+                    let cond = match self.env.lookup(cond).unwrap() {
+                        StateTerm::Term(term) => match term.term() {
+                            Term::Bool(b) => *b,
+                            _ => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Term(if cond {
+                            then.clone()
+                        } else {
+                            r#else.clone()
+                        }),
+                        stack: self.stack
+                    }]
+                },
                 Term::App(lhs, rhs) => {
                     self.stack.push(StackTerm::Term(
                         self.env.lookup(&rhs).unwrap()
@@ -474,10 +552,91 @@ impl State {
                         stack: self.stack
                     }]
                 },
-                Term::Eq(lhs, rhs) => todo!(),
-                Term::NEq(lhs, rhs) => todo!(),
-                Term::Not(term) => todo!(),
-                Term::If { cond, then, r#else } => todo!(),
+                Term::Eq(lhs, rhs) => {
+                    let lhs = match closure.lookup(lhs).unwrap() {
+                        StateTerm::Term(term) => match closure.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    let rhs = match closure.lookup(rhs).unwrap() {
+                        StateTerm::Term(term) => match closure.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                            Term::Bool(lhs.term() == rhs.term())
+                        )))),
+                        stack: self.stack
+                    }]
+                },
+                Term::NEq(lhs, rhs) => {
+                    let lhs = match closure.lookup(lhs).unwrap() {
+                        StateTerm::Term(term) => match closure.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    let rhs = match closure.lookup(rhs).unwrap() {
+                        StateTerm::Term(term) => match closure.expand_value(term) {
+                            StateTerm::Term(term) => term,
+                            StateTerm::Closure(_) => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                            Term::Bool(lhs.term() != rhs.term())
+                        )))),
+                        stack: self.stack
+                    }]
+                },
+                Term::Not(term) => match closure.lookup(term).unwrap() {
+                    StateTerm::Term(term) => match term.term() {
+                        Term::Bool(b) => vec![State {
+                            env: self.env,
+                            term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                                Term::Bool(!b)
+                            )))),
+                            stack: self.stack
+                        }],
+                        _ => unreachable!()
+                    },
+                    StateTerm::Closure(_) => unreachable!()
+                },
+                Term::If { cond, then, r#else } => {
+                    let cond = match closure.lookup(cond).unwrap() {
+                        StateTerm::Term(term) => match term.term() {
+                            Term::Bool(b) => *b,
+                            _ => unreachable!()
+                        },
+                        StateTerm::Closure(_) => unreachable!()
+                    };
+
+                    vec![State {
+                        env: self.env,
+                        term: StateTerm::Closure(Closure {
+                            term_ptr: if cond {
+                                then.clone()
+                            } else {
+                                r#else.clone()
+                            },
+                            vars: closure.vars
+                        }),
+                        stack: self.stack
+                    }]
+                },
                 Term::App(lhs, rhs) => {
                     self.stack.push(StackTerm::Term(
                         closure.lookup(&rhs).unwrap()
