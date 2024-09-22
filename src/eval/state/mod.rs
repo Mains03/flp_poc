@@ -5,7 +5,7 @@ use equate::equate;
 use stack::{Stack, StackTerm};
 use state_term::{closure::Closure,state_term::{StateTerm, StateTermStore}};
 
-use crate::{cbpv::{free_vars::FreeVars, pm::{PMList, PMListCons, PMNat, PMNatSucc, PM}, term_ptr::TermPtr, Term}, parser::syntax::arg::Arg};
+use crate::{cbpv::{pm::{PMNat, PMNatSucc, PM}, term_ptr::TermPtr, Term}, parser::syntax::arg::Arg};
 
 pub use state_term::locations_clone::LocationsClone;
 
@@ -111,20 +111,13 @@ impl State {
                         zero: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var(rhs.clone())))),
                         succ: PMNatSucc {
                             var: "n".to_string(),
-                            body: TermPtr::from_term(Term::PM(PM::PMNat(PMNat {
-                                var: rhs.clone(),
-                                zero: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Var("n".to_string())))))),
-                                succ: PMNatSucc {
-                                    var: "m".to_string(),
-                                    body: TermPtr::from_term(Term::Bind {
-                                        var: "0".to_string(),
-                                        val: TermPtr::from_term(Term::Add("n".to_string(), "m".to_string())),
-                                        body: TermPtr::from_term(Term::Return(TermPtr::from_term(
-                                            Term::Succ(TermPtr::from_term(Term::Succ(TermPtr::from_term(Term::Var("0".to_string())))))
-                                        )))
-                                    })
-                                }
-                            })))
+                            body: TermPtr::from_term(Term::Bind {
+                                var: "0".to_string(),
+                                val: TermPtr::from_term(Term::Add("n".to_string(), rhs.clone())),
+                                body: TermPtr::from_term(Term::Return(TermPtr::from_term(
+                                    Term::Succ(TermPtr::from_term(Term::Var("0".to_string())))
+                                )))
+                            })
                         }
                     }))),
                     stack: self.stack
