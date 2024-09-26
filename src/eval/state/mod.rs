@@ -13,6 +13,7 @@ mod env;
 mod equate;
 mod stack;
 mod state_term;
+mod step;
 
 #[derive(Debug)]
 pub struct State {
@@ -75,7 +76,7 @@ impl State {
                                     term: match val {
                                         StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Return(term_ptr)),
                                         StateTerm::Closure(closure) => StateTerm::Closure(Closure {
-                                            term_ptr: TermPtr::from_term(Term::Return(closure.term_ptr)), vars: closure.vars
+                                            term_ptr: TermPtr::from_term(Term::Return(closure.term_ptr)), env: closure.env
                                         })
                                     },
                                     stack: self.stack
@@ -88,7 +89,7 @@ impl State {
                             term: match val {
                                 StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Return(term_ptr)),
                                 StateTerm::Closure(closure) => StateTerm::Closure(Closure {
-                                    term_ptr: TermPtr::from_term(Term::Return(closure.term_ptr)), vars: closure.vars
+                                    term_ptr: TermPtr::from_term(Term::Return(closure.term_ptr)), env: closure.env
                                 })
                             },
                             stack: self.stack
@@ -228,7 +229,7 @@ impl State {
                         Term::Thunk(term_ptr) => vec![State {
                             env: self.env,
                             term: StateTerm::Closure(Closure {
-                                term_ptr: term_ptr.clone(), vars: closure.vars
+                                term_ptr: term_ptr.clone(), env: closure.env
                             }),
                             stack: self.stack
                         }],
@@ -508,7 +509,7 @@ impl State {
                                     term: match val {
                                         StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Return(term_ptr)),
                                         StateTerm::Closure(closure) => StateTerm::Closure(Closure {
-                                            term_ptr: TermPtr::from_term(Term::Return(closure.term_ptr)), vars: closure.vars
+                                            term_ptr: TermPtr::from_term(Term::Return(closure.term_ptr)), env: closure.env
                                         })
                                     },
                                     stack: self.stack
@@ -521,13 +522,13 @@ impl State {
                 },
                 Term::Bind { var, val, body } => {
                     self.stack.push(StackTerm::Cont(var.clone(), StateTerm::Closure(Closure {
-                        term_ptr: body.clone(), vars: closure.vars.clone()
+                        term_ptr: body.clone(), env: closure.env.clone()
                     })));
 
                     vec![State {
                         env: self.env,
                         term: StateTerm::Closure(Closure {
-                            term_ptr: val.clone(), vars: closure.vars
+                            term_ptr: val.clone(), env: closure.env
                         }),
                         stack: self.stack
                     }]
@@ -625,7 +626,7 @@ impl State {
                             } else {
                                 r#else.clone()
                             },
-                            vars: closure.vars
+                            env: closure.env
                         }),
                         stack: self.stack
                     }]
@@ -638,7 +639,7 @@ impl State {
                     vec![State {
                         env: self.env,
                         term: StateTerm::Closure(Closure {
-                            term_ptr: lhs.clone(), vars: closure.vars
+                            term_ptr: lhs.clone(), env: closure.env
                         }),
                         stack: self.stack
                     }]
@@ -656,7 +657,7 @@ impl State {
                         Term::Thunk(term_ptr) => vec![State {
                             env: self.env,
                             term: StateTerm::Closure(Closure {
-                                term_ptr: term_ptr.clone(), vars: closure.vars
+                                term_ptr: term_ptr.clone(), env: closure.env
                             }),
                             stack: self.stack
                         }],
@@ -691,7 +692,7 @@ impl State {
                             Term::Nil => vec![State {
                                 env: self.env,
                                 term: StateTerm::Closure(Closure {
-                                    term_ptr: pm_list.nil.clone(), vars: closure.vars
+                                    term_ptr: pm_list.nil.clone(), env: closure.env
                                 }),
                                 stack: self.stack
                             }],
@@ -702,7 +703,7 @@ impl State {
                                 vec![State {
                                     env: self.env,
                                     term: StateTerm::Closure(Closure {
-                                        term_ptr: pm_list.cons.body.clone(), vars: closure.vars
+                                        term_ptr: pm_list.cons.body.clone(), env: closure.env
                                     }),
                                     stack: self.stack
                                 }]
@@ -712,7 +713,7 @@ impl State {
                                     Term::Nil => vec![State {
                                         env: self.env,
                                         term: StateTerm::Closure(Closure {
-                                            term_ptr: pm_list.nil.clone(), vars: closure.vars
+                                            term_ptr: pm_list.nil.clone(), env: closure.env
                                         }),
                                         stack: self.stack
                                     }],
@@ -723,7 +724,7 @@ impl State {
                                         vec![State {
                                             env: self.env,
                                             term: StateTerm::Closure(Closure {
-                                                term_ptr: pm_list.cons.body.clone(), vars: closure.vars
+                                                term_ptr: pm_list.cons.body.clone(), env: closure.env
                                             }),
                                             stack: self.stack
                                         }]
@@ -752,7 +753,7 @@ impl State {
                                         State {
                                             env,
                                             term: StateTerm::Closure(Closure {
-                                                term_ptr: pm_list.nil.clone(), vars: closure.vars
+                                                term_ptr: pm_list.nil.clone(), env: closure.env
                                             }),
                                             stack
                                         }
@@ -769,7 +770,7 @@ impl State {
                                         State {
                                             env: self.env,
                                             term: StateTerm::Closure(Closure {
-                                                term_ptr: pm_list.cons.body.clone(), vars: closure.vars
+                                                term_ptr: pm_list.cons.body.clone(), env: closure.env
                                             }),
                                             stack: self.stack
                                         }
@@ -785,7 +786,7 @@ impl State {
                             Term::Zero => vec![State {
                                 env: self.env,
                                 term: StateTerm::Closure(Closure {
-                                    term_ptr: pm_nat.zero.clone(), vars: closure.vars
+                                    term_ptr: pm_nat.zero.clone(), env: closure.env
                                 }),
                                 stack: self.stack
                             }],
@@ -795,7 +796,7 @@ impl State {
                                 vec![State {
                                     env: self.env,
                                     term: StateTerm::Closure(Closure {
-                                        term_ptr: pm_nat.succ.body.clone(), vars: closure.vars
+                                        term_ptr: pm_nat.succ.body.clone(), env: closure.env
                                     }),
                                     stack: self.stack
                                 }]
@@ -805,7 +806,7 @@ impl State {
                                     Term::Zero => vec![State {
                                         env: self.env,
                                         term: StateTerm::Closure(Closure {
-                                            term_ptr: pm_nat.zero.clone(), vars: closure.vars,
+                                            term_ptr: pm_nat.zero.clone(), env: closure.env,
                                         }),
                                         stack: self.stack
                                     }],
@@ -815,7 +816,7 @@ impl State {
                                         vec![State {
                                             env: self.env,
                                             term: StateTerm::Closure(Closure {
-                                                term_ptr: pm_nat.succ.body.clone(), vars: closure.vars
+                                                term_ptr: pm_nat.succ.body.clone(), env: closure.env
                                             }),
                                             stack: self.stack
                                         }]
@@ -844,7 +845,7 @@ impl State {
                                         State {
                                             env,
                                             term: StateTerm::Closure(Closure {
-                                                term_ptr: pm_nat.zero.clone(), vars: closure.vars
+                                                term_ptr: pm_nat.zero.clone(), env: closure.env
                                             }),
                                             stack
                                         }
@@ -858,7 +859,7 @@ impl State {
                                         State {
                                             env: self.env,
                                             term: StateTerm::Closure(Closure {
-                                                term_ptr: pm_nat.succ.body.clone(), vars: closure.vars
+                                                term_ptr: pm_nat.succ.body.clone(), env: closure.env
                                             }),
                                             stack: self.stack
                                         }
@@ -877,7 +878,7 @@ impl State {
                         State {
                             env: self.env.clone_with_locations(&mut new_locations),
                             term: StateTerm::Closure(Closure {
-                                term_ptr: choice.clone(), vars: closure.clone_with_locations(&mut new_locations).vars
+                                term_ptr: choice.clone(), env: closure.clone_with_locations(&mut new_locations).env
                             }),
                             stack: self.stack.clone_with_locations(&mut new_locations)
                         }
@@ -891,7 +892,7 @@ impl State {
                     vec![State {
                         env: self.env,
                         term: StateTerm::Closure(Closure {
-                            term_ptr: body.clone(), vars: closure.vars
+                            term_ptr: body.clone(), env: closure.env
                         }),
                         stack: self.stack
                     }]
@@ -913,7 +914,7 @@ impl State {
                         env: self.env,
                         term: if flag {
                             StateTerm::Closure(Closure {
-                                term_ptr: body.clone(), vars: closure.vars
+                                term_ptr: body.clone(), env: closure.env
                             })
                         } else {
                             StateTerm::from_term(Term::Fail)

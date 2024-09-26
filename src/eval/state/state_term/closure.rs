@@ -7,19 +7,26 @@ use super::{locations_clone::LocationsClone, state_term::{StateTerm, StateTermSt
 #[derive(Clone, Debug)]
 pub struct Closure {
     pub term_ptr: TermPtr,
-    pub vars: HashMap<String, StateTerm>
+    pub env: ClosureEnv
+}
+
+#[derive(Clone, Debug)]
+pub struct ClosureEnv {
+    pub env: HashMap<String, StateTerm>
 }
 
 impl Closure {
     pub fn from_term_ptr(term_ptr: TermPtr) -> Self {
         Closure {
-            term_ptr, vars: HashMap::new()
+            term_ptr, env: ClosureEnv {
+                env: HashMap::new()
+            }
         }
     }
 
     pub fn store_arg(&mut self, arg: Arg, val: StateTerm) {
         match arg {
-            Arg::Ident(var) => self.store(var, val),
+            Arg::Ident(var) => self.env.store(var, val),
             Arg::Pair(lhs, rhs) => match val {
                 StateTerm::Term(term) => match term.term() {
                     Term::Pair(lhs_val, rhs_val) => {
@@ -34,13 +41,13 @@ impl Closure {
     }
 }
 
-impl StateTermStore for Closure {
+impl StateTermStore for ClosureEnv {
     fn store(&mut self, var: String, val: StateTerm) {
-        self.vars.insert(var, val);
+        self.env.insert(var, val);
     }
 
     fn lookup(&self, var: &String) -> Option<StateTerm> {
-        match self.vars.get(var) {
+        match self.env.get(var) {
             Some(state_term) => Some(state_term.clone()),
             None => None
         }
@@ -78,7 +85,9 @@ impl StateTermStore for Closure {
                 },
                 None => StateTerm::from_term(Term::TypedVar(Rc::clone(shape)))
             },
-            Term::Thunk(_) => StateTerm::Closure(Closure { term_ptr: term_ptr.clone(), vars: self.vars.clone() }),
+            Term::Thunk(_) => StateTerm::Closure(Closure { term_ptr: term_ptr.clone(), env: ClosureEnv {
+                env: self.env.clone()
+            }}),
             _ => StateTerm::from_term_ptr(term_ptr.clone())
         }
     }
@@ -86,7 +95,7 @@ impl StateTermStore for Closure {
 
 impl LocationsClone for Closure {
     fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
-        let vars = self.vars.iter()
+        let env = self.env.env.iter()
             .fold(HashMap::new(), |mut acc, (var, val)| {
                 acc.insert(var.clone(), val.clone_with_locations(new_locations));
                 acc
@@ -94,7 +103,9 @@ impl LocationsClone for Closure {
 
         Closure {
             term_ptr: self.term_ptr.clone_with_locations(new_locations),
-            vars
+            env: ClosureEnv {
+                env
+            }
         }
     }
 }

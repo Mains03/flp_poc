@@ -7,25 +7,19 @@ mod eval;
 
 fn main() {
     let src = "
-mult :: Nat -> Nat -> Nat
-mult n m = case n of
-	Zero -> 0.
-	(Succ n) -> m + (mult n m).
+length :: [Nat] -> Nat
+length xs = case xs of
+	[] -> 0.
+	(x:xs) -> 1 + (length xs).
 
-square :: Nat -> Nat
-square n = mult n n.
+concat :: [Nat] -> [Nat] -> [Nat]
+concat xs ys = case xs of
+	[] -> ys.
+	(x:xs) -> x : (concat xs ys).
 
-head :: [Nat] -> Nat
-head xs = case xs of
-	[] -> Zero.
-	(x:xs) -> x.
-
-squareRoot :: [Nat] -> [Nat]
-squareRoot xs = case xs of
-	[] -> [].
-	(x:xs) -> (exists y :: Nat. square y =:= x. y : (squareRoot xs)).
-
-squareRoot [36, 9, 144].
+exists xs :: [Nat].
+	length (concat xs xs) =:= 8.
+		xs.
 ";
 
     let ast = parser::parse(src).unwrap();
