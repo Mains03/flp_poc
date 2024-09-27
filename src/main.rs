@@ -12,14 +12,7 @@ length xs = case xs of
 	[] -> 0.
 	(x:xs) -> 1 + (length xs).
 
-concat :: [Nat] -> [Nat] -> [Nat]
-concat xs ys = case xs of
-	[] -> ys.
-	(x:xs) -> x : (concat xs ys).
-
-exists xs :: [Nat].
-	length (concat xs xs) =:= 8.
-		xs.
+length [1].
 ";
 
     let ast = parser::parse(src).unwrap();

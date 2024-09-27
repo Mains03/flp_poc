@@ -15,9 +15,9 @@ pub fn step(
     match term.term() {
         Term::Return(term) => {
             let val = if in_closure {
-                env.expand_value(term.clone())
-            } else {
                 closure_env.unwrap().expand_value(term.clone())
+            } else {
+                env.expand_value(term.clone())
             };
 
             match stack.pop() {
@@ -62,16 +62,19 @@ pub fn step(
             }
         },
         Term::Bind { var, val, body } => {
-            stack.push(StackTerm::Cont(var.clone(), StateTerm::from_term_ptr(body.clone())));
+            stack.push(StackTerm::Cont(
+                var.clone(),
+                make_state_term(body.clone(), in_closure, closure_env.clone())
+            ));
 
             vec![State {
                 env,
-                term: StateTerm::from_term_ptr(val.clone()),
+                term: make_state_term(val.clone(), in_closure, closure_env),
                 stack
             }]
         },
         Term::Add(lhs, rhs) => {
-            let term = Term::PM(PM::PMNat(PMNat {
+            let term = TermPtr::from_term(Term::PM(PM::PMNat(PMNat {
                 var: lhs.clone(),
                 zero: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var(rhs.clone())))),
                 succ: PMNatSucc {
@@ -84,7 +87,7 @@ pub fn step(
                         )))
                     })
                 }
-            }));
+            })));
 
             vec![State {
                 env,
@@ -154,12 +157,12 @@ pub fn step(
         },
         Term::App(lhs, rhs) => {
             stack.push(StackTerm::Term(
-                env.lookup(&rhs).unwrap()
+                lookup(&rhs, &env, in_closure, &closure_env)
             ));
 
             vec![State {
                 env,
-                term: StateTerm::from_term_ptr(lhs.clone()),
+                term: make_state_term(lhs.clone(), in_closure, closure_env),
                 stack
             }]
         },
@@ -204,7 +207,7 @@ pub fn step(
             PM::PMNat(pm_nat) => match extract_term(lookup(&pm_nat.var, &env, in_closure, &closure_env)).term() {
                 Term::Zero => vec![State {
                     env,
-                    term: StateTerm::from_term_ptr(pm_nat.zero.clone()),
+                    term: make_state_term(pm_nat.zero.clone(), in_closure, closure_env),
                     stack
                 }],
                 Term::Succ(s) => {
@@ -213,7 +216,7 @@ pub fn step(
 
                     vec![State {
                         env,
-                        term: StateTerm::from_term_ptr(pm_nat.succ.body.clone()),
+                        term: make_state_term(pm_nat.succ.body.clone(), in_closure, closure_env),
                         stack
                     }]
                 },
@@ -221,7 +224,7 @@ pub fn step(
                     match shape.borrow().as_ref().unwrap().term() {
                         Term::Zero => vec![State {
                             env,
-                            term: StateTerm::from_term_ptr(pm_nat.zero.clone()),
+                            term: make_state_term(pm_nat.zero.clone(), in_closure, closure_env),
                             stack
                         }],
                         Term::Succ(s) => {
@@ -230,7 +233,7 @@ pub fn step(
 
                             vec![State {
                                 env,
-                                term: StateTerm::from_term_ptr(pm_nat.succ.body.clone()),
+                                term: make_state_term(pm_nat.succ.body.clone(), in_closure, closure_env),
                                 stack
                             }]
                         },
@@ -256,7 +259,7 @@ pub fn step(
 
                             State {
                                 env,
-                                term: StateTerm::from_term_ptr(pm_nat.zero.clone()),
+                                term: make_state_term(pm_nat.zero.clone(), in_closure, closure_env.clone()),
                                 stack
                             }
                         },
@@ -269,7 +272,7 @@ pub fn step(
 
                             State {
                                 env,
-                                term: StateTerm::from_term_ptr(pm_nat.succ.body.clone()),
+                                term: make_state_term(pm_nat.succ.body.clone(), in_closure, closure_env),
                                 stack
                             }
                         }
@@ -280,7 +283,7 @@ pub fn step(
             PM::PMList(pm_list) => match extract_term(lookup(&pm_list.var, &env, in_closure, &closure_env)).term() {
                 Term::Nil => vec![State {
                     env,
-                    term: StateTerm::from_term_ptr(pm_list.nil.clone()),
+                    term: make_state_term(pm_list.nil.clone(), in_closure, closure_env),
                     stack
                 }],
                 Term::Cons(x, xs) => {
@@ -292,7 +295,7 @@ pub fn step(
 
                     vec![State {
                         env,
-                        term: StateTerm::from_term_ptr(pm_list.cons.body.clone()),
+                        term: make_state_term(pm_list.cons.body.clone(), in_closure, closure_env),
                         stack
                     }]
                 },
@@ -300,7 +303,7 @@ pub fn step(
                     match shape.borrow().as_ref().unwrap().term() {
                         Term::Nil => vec![State {
                             env,
-                            term: StateTerm::from_term_ptr(pm_list.nil.clone()),
+                            term: make_state_term(pm_list.nil.clone(), in_closure, closure_env),
                             stack
                         }],
                         Term::Cons(x, xs) => {
@@ -312,7 +315,7 @@ pub fn step(
 
                             vec![State {
                                 env,
-                                term: StateTerm::from_term_ptr(pm_list.cons.body.clone()),
+                                term: make_state_term(pm_list.cons.body.clone(), in_closure, closure_env),
                                 stack
                             }]
                         },
@@ -338,7 +341,7 @@ pub fn step(
 
                             State {
                                 env,
-                                term: StateTerm::from_term_ptr(pm_list.nil.clone()),
+                                term: make_state_term(pm_list.nil.clone(), in_closure, closure_env.clone()),
                                 stack
                             }
                         },
@@ -355,7 +358,7 @@ pub fn step(
 
                             State {
                                 env,
-                                term: StateTerm::from_term_ptr(pm_list.cons.body.clone()),
+                                term: make_state_term(pm_list.cons.body.clone(), in_closure, closure_env),
                                 stack
                             }
                         }
@@ -417,13 +420,13 @@ pub fn step(
     }
 }
 
-fn make_state_term(term: Term, in_closure: bool, closure_env: Option<ClosureEnv>) -> StateTerm {
+fn make_state_term(term: TermPtr, in_closure: bool, closure_env: Option<ClosureEnv>) -> StateTerm {
     if in_closure {
         StateTerm::Closure(Closure {
-            term_ptr: TermPtr::from_term(term), env: closure_env.unwrap()
+            term_ptr: term, env: closure_env.unwrap()
         })
     } else {
-        StateTerm::Term(TermPtr::from_term(term))
+        StateTerm::Term(term)
     }
 }
 
