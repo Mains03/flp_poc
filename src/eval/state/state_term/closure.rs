@@ -95,17 +95,23 @@ impl StateTermStore for ClosureEnv {
 
 impl LocationsClone for Closure {
     fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
-        let env = self.env.env.iter()
+        let env = self.env.clone_with_locations(new_locations);
+
+        Closure {
+            term_ptr: self.term_ptr.clone_with_locations(new_locations),
+            env
+        }
+    }
+}
+
+impl LocationsClone for ClosureEnv {
+    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
+        let env = self.env.iter()
             .fold(HashMap::new(), |mut acc, (var, val)| {
                 acc.insert(var.clone(), val.clone_with_locations(new_locations));
                 acc
             });
 
-        Closure {
-            term_ptr: self.term_ptr.clone_with_locations(new_locations),
-            env: ClosureEnv {
-                env
-            }
-        }
+        ClosureEnv { env }
     }
 }

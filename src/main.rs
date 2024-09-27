@@ -12,7 +12,7 @@ length xs = case xs of
 	[] -> 0.
 	(x:xs) -> 1 + (length xs).
 
-length [1].
+exists xs :: [Nat]. length xs =:= 3. xs.
 ";
 
     let ast = parser::parse(src).unwrap();

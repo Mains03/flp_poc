@@ -211,7 +211,9 @@ pub fn step(
                     stack
                 }],
                 Term::Succ(s) => {
-                    stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                    if !in_closure {
+                        stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                    }
                     store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s.clone()), &mut env, in_closure, &mut closure_env);
 
                     vec![State {
@@ -228,7 +230,9 @@ pub fn step(
                             stack
                         }],
                         Term::Succ(s) => {
-                            stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                            if !in_closure {
+                                stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                            }
                             store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s.clone()), &mut env, in_closure, &mut closure_env);
 
                             vec![State {
@@ -245,9 +249,13 @@ pub fn step(
                             let mut new_locations = HashMap::new();
 
                             let env = env.clone_with_locations(&mut new_locations);
+                            let closure_env = match &closure_env {
+                                Some(closure_env) => Some(closure_env.clone_with_locations(&mut new_locations)),
+                                None => None
+                            };
                             let stack = stack.clone_with_locations(&mut new_locations);
 
-                            let shape = match env.lookup(&pm_nat.var).unwrap() {
+                            let shape = match lookup(&pm_nat.var, &env, in_closure, &closure_env) {
                                 StateTerm::Term(term_ptr) => match term_ptr.term() {
                                     Term::TypedVar(shape) => Rc::clone(shape),
                                     _ => unreachable!()
@@ -259,7 +267,7 @@ pub fn step(
 
                             State {
                                 env,
-                                term: make_state_term(pm_nat.zero.clone(), in_closure, closure_env.clone()),
+                                term: make_state_term(pm_nat.zero.clone(), in_closure, closure_env),
                                 stack
                             }
                         },
@@ -267,7 +275,9 @@ pub fn step(
                             let s = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
                             shape.replace(Some(TermPtr::from_term(Term::Succ(s.clone()))));
 
-                            stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                            if !in_closure {
+                                stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
+                            }
                             env.store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s));
 
                             State {
@@ -287,10 +297,14 @@ pub fn step(
                     stack
                 }],
                 Term::Cons(x, xs) => {
-                    stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                    if !in_closure {
+                        stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                    }
                     store(pm_list.cons.x.clone(), StateTerm::from_term_ptr(x.clone()), &mut env, in_closure, &mut closure_env);
 
-                    stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                    if !in_closure {
+                        stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                    }
                     store(pm_list.cons.xs.clone(), StateTerm::from_term_ptr(xs.clone()), &mut env, in_closure, &mut closure_env);
 
                     vec![State {
@@ -307,10 +321,14 @@ pub fn step(
                             stack
                         }],
                         Term::Cons(x, xs) => {
-                            stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                            if !in_closure {
+                                stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                            }
                             store(pm_list.cons.x.clone(), StateTerm::from_term_ptr(x.clone()), &mut env, in_closure, &mut closure_env);
 
-                            stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                            if !in_closure {
+                                stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                            }
                             store(pm_list.cons.xs.clone(), StateTerm::from_term_ptr(xs.clone()), &mut env, in_closure, &mut closure_env);
 
                             vec![State {
@@ -327,9 +345,13 @@ pub fn step(
                             let mut new_locations = HashMap::new();
 
                             let env = env.clone_with_locations(&mut new_locations);
+                            let closure_env = match &closure_env {
+                                Some(closure_env) => Some(closure_env.clone_with_locations(&mut new_locations)),
+                                None => None
+                            };
                             let stack = stack.clone_with_locations(&mut new_locations);
 
-                            let shape = match env.lookup(&pm_list.var).unwrap() {
+                            let shape = match lookup(&pm_list.var, &env, in_closure, &closure_env) {
                                 StateTerm::Term(term_ptr) => match term_ptr.term() {
                                     Term::TypedVar(shape) => Rc::clone(shape),
                                     _ => unreachable!()
@@ -350,10 +372,14 @@ pub fn step(
                             let xs = TermPtr::from_term(Term::TypedVar(Rc::new(RefCell::new(None))));
                             shape.replace(Some(TermPtr::from_term(Term::Cons(x.clone(), xs.clone()))));
 
-                            stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                            if !in_closure {
+                                stack.push(StackTerm::Release(pm_list.cons.x.clone()));
+                            }
                             store(pm_list.cons.x.clone(), StateTerm::from_term_ptr(x), &mut env, in_closure, &mut closure_env);
 
-                            stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                            if !in_closure {
+                                stack.push(StackTerm::Release(pm_list.cons.xs.clone()));
+                            }
                             store(pm_list.cons.xs.clone(), StateTerm::from_term_ptr(xs), &mut env, in_closure, &mut closure_env);
 
                             State {
@@ -373,7 +399,7 @@ pub fn step(
 
                 State {
                     env: env.clone_with_locations(&mut new_locations),
-                    term: StateTerm::from_term_ptr(choice.clone()),
+                    term: make_state_term(choice.clone(), in_closure, closure_env.clone()),
                     stack: stack.clone_with_locations(&mut new_locations)
                 }
             }).collect(),
@@ -386,7 +412,7 @@ pub fn step(
 
             vec![State {
                 env,
-                term: StateTerm::from_term_ptr(body.clone()),
+                term: make_state_term(body.clone(), in_closure, closure_env),
                 stack
             }]
         },
@@ -403,11 +429,11 @@ pub fn step(
 
             vec![State {
                 env,
-                term: StateTerm::from_term_ptr(if flag {
-                    body.clone()
+                term: if flag {
+                    make_state_term(body.clone(), in_closure, closure_env)
                 } else {
-                    TermPtr::from_term(Term::Fail)
-                }),
+                    StateTerm::from_term(Term::Fail)
+                },
                 stack
             }]
         },
