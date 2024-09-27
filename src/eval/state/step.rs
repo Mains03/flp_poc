@@ -278,7 +278,7 @@ pub fn step(
                             if !in_closure {
                                 stack.push(StackTerm::Release(pm_nat.succ.var.clone()));
                             }
-                            env.store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s));
+                            store(pm_nat.succ.var.clone(), StateTerm::from_term_ptr(s), &mut env, in_closure, &mut closure_env);
 
                             State {
                                 env,
