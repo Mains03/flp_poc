@@ -2,8 +2,6 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{cbpv::Term, eval::LocationsClone};
 
-use super::free_vars::FreeVars;
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TermPtr {
     val: Rc<Term>
@@ -16,10 +14,6 @@ impl TermPtr {
 
     pub fn term(&self) -> &Term {
         self.val.as_ref()
-    }
-
-    pub fn free_vars(&self) -> FreeVars {
-        self.val.free_vars()
     }
 
     pub fn contains_typed_var(&self) -> bool {

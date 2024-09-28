@@ -14,12 +14,13 @@ length xs = case xs of
     [] -> 0.
     (x:xs) -> 1 + (length xs).
 
-sum :: [Nat] -> Nat
-sum xs = case xs of
-    [] -> 0.
-    (x:xs) -> x + (sum xs).
+const :: a -> b -> a
+const x y = x.
 
-exists xs :: [Nat]. sum xs =:= 5. length xs =:= 2. xs.
+f :: [Nat] -> Nat -> Nat
+f xs y = const (const (length xs) 1) y.
+
+f [1,2,3] 2.
 ";
 
     let args: Vec<String> = env::args().collect();

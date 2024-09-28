@@ -14,10 +14,15 @@ pub fn step(
 {
     match term.term() {
         Term::Return(term) => {
-            let val = if in_closure {
-                closure_env.unwrap().expand_value(term.clone())
-            } else {
-                env.expand_value(term.clone())
+            let val = match term.term() {
+                Term::Thunk(_) => if in_closure {
+                    StateTerm::Closure(Closure {
+                        term_ptr: term.clone(), env: closure_env.unwrap()
+                    })
+                } else {
+                    StateTerm::from_term_ptr(term.clone())
+                },
+                _ => expand_value(term, &env, in_closure, &closure_env)
             };
 
             match stack.pop() {
@@ -184,16 +189,18 @@ pub fn step(
                 env, term, stack
             }]
         },
-        Term::Lambda { arg, free_vars, body } => match stack.pop().unwrap() {
+        Term::Lambda { arg, body } => match stack.pop().unwrap() {
             StackTerm::Term(term) => {
-                let mut closure = Closure::from_term_ptr(body.clone());
-                closure.store_arg(arg.clone(), term);
+                let mut closure = if in_closure {
+                    Closure {
+                        term_ptr: body.clone(),
+                        env: closure_env.unwrap()
+                    }
+                } else {
+                    Closure::from_term_ptr(body.clone())
+                };
 
-                free_vars.vars().into_iter()
-                    .for_each(|var| {
-                        let val = lookup(&var, &env, in_closure, &closure_env);
-                        closure.env.store(var.clone(), val);
-                    });
+                closure.store_arg(arg.clone(), term);
 
                 vec![State {
                     env,
@@ -456,6 +463,42 @@ fn make_state_term(term: TermPtr, in_closure: bool, closure_env: Option<ClosureE
     }
 }
 
+fn expand_value(term: &TermPtr, env: &Env, in_closure: bool, closure_env: &Option<ClosureEnv>) -> StateTerm {
+    match term.term() {
+        Term::Var(var) => lookup(var, env, in_closure, closure_env),
+        Term::Pair(lhs, rhs) => match expand_value(lhs, env, in_closure, closure_env) {
+            StateTerm::Term(lhs) => match expand_value(rhs, env, in_closure, closure_env) {
+                StateTerm::Term(rhs) => StateTerm::from_term(Term::Pair(lhs, rhs)),
+                StateTerm::Closure(_) => unreachable!()
+            },
+            StateTerm::Closure(_) => unreachable!()
+        },
+        Term::Succ(term_ptr) => match expand_value(term_ptr, env, in_closure, closure_env) {
+            StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
+            StateTerm::Closure(_) => unreachable!()
+        },
+        Term::Cons(x, xs) => match expand_value(x, env, in_closure, closure_env) {
+            StateTerm::Term(x) => match expand_value(xs, env, in_closure, closure_env) {
+                StateTerm::Term(xs) => StateTerm::from_term(Term::Cons(x, xs)),
+                StateTerm::Closure(_) => unreachable!()
+            },
+            StateTerm::Closure(_) => unreachable!()
+        }
+        Term::TypedVar(shape) => match shape.borrow().as_ref() {
+            Some(term_ptr) => match term_ptr.term() {
+                Term::Zero => StateTerm::from_term(Term::Zero),
+                Term::Succ(term_ptr) => match expand_value(term_ptr, env, in_closure, closure_env) {
+                    StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
+                    StateTerm::Closure(_) => unreachable!()
+                },
+                _ => unreachable!()
+            },
+            None => StateTerm::from_term(Term::TypedVar(Rc::clone(shape)))
+        },
+        _ => StateTerm::from_term_ptr(term.clone())
+    }
+}
+
 fn wrap_return(val: StateTerm) -> StateTerm {
     match val {
         StateTerm::Term(term) => StateTerm::from_term(Term::Return(term)),
@@ -467,7 +510,10 @@ fn wrap_return(val: StateTerm) -> StateTerm {
 
 fn lookup(var: &String, env: &Env, in_closure: bool, closure_env: &Option<ClosureEnv>) -> StateTerm {
     if in_closure {
-        closure_env.as_ref().unwrap().lookup(var).unwrap()
+        match closure_env.as_ref().unwrap().lookup(var) {
+            Some(val) => val,
+            None => env.lookup(var).unwrap()
+        }
     } else {
         env.lookup(var).unwrap()
     }

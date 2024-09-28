@@ -48,15 +48,10 @@ impl Translate for Expr {
             },
             Expr::Lambda(arg, body) => {
                 let body = body.translate();
-                
-                let mut free_vars = body.free_vars();
-                free_vars.remove_arg(&arg);
 
                 Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(
                     Term::Lambda {
-                        arg,
-                        free_vars,
-                        body: TermPtr::from_term(body)
+                        arg, body: TermPtr::from_term(body)
                     }
                 ))))
             },

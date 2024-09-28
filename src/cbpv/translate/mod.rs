@@ -35,7 +35,7 @@ trait Translate {
 
 #[cfg(test)]
 mod test {
-    use crate::{cbpv::{free_vars::FreeVars, term_ptr::TermPtr}, parser::{self, syntax::arg::Arg}};
+    use crate::{cbpv::term_ptr::TermPtr, parser::{self, syntax::arg::Arg}};
 
     use super::*;
 
@@ -146,10 +146,8 @@ const x y = x.";
             term,
             Term::Thunk(TermPtr::from_term(Term::Lambda {
                 arg: Arg::Ident("x".to_string()),
-                free_vars: FreeVars::new(),
                 body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
                     arg: Arg::Ident("y".to_string()),
-                    free_vars: FreeVars::from_vars(vec!["x".to_string()]),
                     body: TermPtr::from_term(Term::Return(TermPtr::from_term(Term::Var("x".to_string()))))
                 })))))
             }))
@@ -171,7 +169,6 @@ id x = let f = const x in f 1.";
             term,
             Term::Thunk(TermPtr::from_term(Term::Lambda {
                 arg: Arg::Ident("x".to_string()),
-                free_vars: FreeVars::from_vars(vec!["const".to_string()]),
                 body: TermPtr::from_term(Term::Bind {
                     var: "f".to_string(),
                     val: TermPtr::from_term(Term::Bind {

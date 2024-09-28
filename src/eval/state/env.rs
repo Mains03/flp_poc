@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::cbpv::{term_ptr::TermPtr, Term};
+use crate::cbpv::term_ptr::TermPtr;
 
 use super::state_term::{locations_clone::LocationsClone, state_term::{StateTerm, StateTermStore}};
 
@@ -79,50 +79,6 @@ impl StateTermStore for Env {
         }
 
         ret
-    }
-
-    fn expand_value(&self, term_ptr: TermPtr) -> StateTerm {
-        match term_ptr.term() {
-            Term::Var(var) => self.lookup(&var).unwrap(),
-            Term::Pair(lhs, rhs) => match self.expand_value(lhs.clone()) {
-                StateTerm::Term(lhs) => match self.expand_value(rhs.clone()) {
-                    StateTerm::Term(rhs) => StateTerm::from_term(Term::Pair(lhs, rhs)),
-                    StateTerm::Closure(_) => unreachable!()
-                },
-                StateTerm::Closure(_) => unreachable!()
-            },
-            Term::Succ(succ) => match self.expand_value(succ.clone()) {
-                StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
-                StateTerm::Closure(_) => unreachable!()
-            },
-            Term::Cons(x_ptr, xs_ptr) => match self.expand_value(x_ptr.clone()) {
-                StateTerm::Term(x_ptr) => match self.expand_value(xs_ptr.clone()) {
-                    StateTerm::Term(xs_ptr) => StateTerm::from_term(Term::Cons(x_ptr, xs_ptr)),
-                    StateTerm::Closure(_) => unreachable!()
-                },
-                StateTerm::Closure(_) => unreachable!()
-            },
-            Term::TypedVar(shape) => match shape.borrow().as_ref() {
-                Some(term_ptr) => StateTerm::from_term(match term_ptr.term() {
-                    Term::Zero => Term::Zero,
-                    Term::Succ(term_ptr) => match self.expand_value(term_ptr.clone()) {
-                        StateTerm::Term(term_ptr) => Term::Succ(term_ptr),
-                        StateTerm::Closure(_) => unreachable!()
-                    },
-                    Term::Nil => Term::Nil,
-                    Term::Cons(x_ptr, xs_ptr) => match self.expand_value(x_ptr.clone()) {
-                        StateTerm::Term(x_ptr) => match self.expand_value(xs_ptr.clone()) {
-                            StateTerm::Term(xs_ptr) => Term::Cons(x_ptr, xs_ptr),
-                            StateTerm::Closure(_) => unreachable!()
-                        },
-                        StateTerm::Closure(_) => unreachable!()
-                    }
-                    _ => unreachable!()
-                }),
-                None => StateTerm::from_term(Term::TypedVar(Rc::clone(shape)))
-            }
-            _ => StateTerm::from_term_ptr(term_ptr)
-        }
     }
 }
 

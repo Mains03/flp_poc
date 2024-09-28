@@ -14,8 +14,6 @@ pub trait StateTermStore {
     fn store(&mut self, var: String, val: StateTerm);
 
     fn lookup(&self, var: &String) -> Option<StateTerm>;
-
-    fn expand_value(&self, term_ptr: TermPtr) -> StateTerm;
 }
 
 impl StateTerm {

@@ -18,13 +18,8 @@ fn translate_func(mut args: Vec<Arg>, body: Stm) -> Term {
         let arg = args.remove(args.len()-1);
         let body = translate_func_helper(args, body);
 
-        let mut free_vars = body.free_vars();
-        free_vars.remove_arg(&arg);
-
         Term::Thunk(TermPtr::from_term(Term::Lambda {
-            arg,
-            free_vars,
-            body: TermPtr::from_term(body)
+            arg, body: TermPtr::from_term(body)
         }))
     } else {
         translate_func_helper(args, body)
@@ -38,13 +33,8 @@ fn translate_func_helper(mut args: Vec<Arg>, body: Stm) -> Term {
         let arg = args.remove(args.len()-1);
         let body = translate_func_helper(args, body);
 
-        let mut free_vars = body.free_vars();
-        free_vars.remove_arg(&arg);
-
         Term::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(Term::Lambda {
-            arg,
-            free_vars,
-            body: TermPtr::from_term(body)
+            arg, body: TermPtr::from_term(body)
         }))))
     }
 }
