@@ -8,40 +8,38 @@ pub use state::LocationsClone;
 
 mod state;
 
-pub fn eval(cbpv: HashMap<String, Term>) -> Term {
+pub fn eval(cbpv: HashMap<String, Term>, solution_count: usize) -> Term {
     let mut states = vec![State::new(cbpv)];
+    let mut values = vec![];
 
     loop {
         states = states.into_iter()
             .flat_map(|s| s.step())
             .filter(|s| !s.is_fail())
+            .flat_map(|s| if s.is_value() {
+                values.push(s.term().clone());
+                vec![]
+            } else {
+                vec![s]
+            })
             .collect();
 
-        let flag = states.iter()
-            .fold(false, |acc, x| acc || x.is_value());
-
-        if flag {
-            states = states.into_iter()
-                .filter(|s| s.is_value())
-                .collect();
-
+        if states.len() == 0 {
             break;
-        } else if states.len() == 0 {
-            break;
+        } else {
+            if solution_count != 0 && values.len() >= solution_count {
+                break;
+            }
         }
     }
 
-    if states.len() == 0 {
+    values.truncate(solution_count);
+
+    if values.len() == 0 {
         Term::Fail
-    } else if states.len() == 1 {
-        states.remove(0).term().term().clone()
+    } else if values.len() == 1 {
+        values.remove(0).term().clone()
     } else {
-        Term::Choice(
-            states.into_iter()
-                .fold(vec![], |mut acc, x| {
-                    acc.push(x.term());
-                    acc
-                })
-        )
+        Term::Choice(values)
     }
 }
