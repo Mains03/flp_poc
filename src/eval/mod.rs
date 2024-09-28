@@ -26,10 +26,8 @@ pub fn eval(cbpv: HashMap<String, Term>, solution_count: usize) -> Term {
 
         if states.len() == 0 {
             break;
-        } else {
-            if solution_count != 0 && values.len() >= solution_count {
-                break;
-            }
+        } else if values.len() >= solution_count {
+            break;
         }
     }
 

@@ -11,22 +11,22 @@ fn main() {
     let src = "
 length :: [Nat] -> Nat
 length xs = case xs of
-	[] -> 0.
-	(x:xs) -> 1 + (length xs).
+    [] -> 0.
+    (x:xs) -> 1 + (length xs).
 
 sum :: [Nat] -> Nat
 sum xs = case xs of
     [] -> 0.
     (x:xs) -> x + (sum xs).
 
-exists xs :: [Nat]. sum xs =:= 5. xs.
+exists xs :: [Nat]. sum xs =:= 5. length xs =:= 2. xs.
 ";
 
     let args: Vec<String> = env::args().collect();
 
     let solution_count = match args.get(1) {
         Some(n) => n.parse().unwrap(),
-        None => 0
+        None => 1
     };
 
     let ast = parser::parse(src).unwrap();
