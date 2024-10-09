@@ -491,6 +491,14 @@ fn expand_value(term: &TermPtr, env: &Env, in_closure: bool, closure_env: &Optio
                     StateTerm::Term(term_ptr) => StateTerm::from_term(Term::Succ(term_ptr)),
                     StateTerm::Closure(_) => unreachable!()
                 },
+                Term::Nil => StateTerm::from_term(Term::Nil),
+                Term::Cons(x, xs) => match expand_value(x, env, in_closure, closure_env) {
+                    StateTerm::Term(x) => match expand_value(xs, env, in_closure, closure_env) {
+                        StateTerm::Term(xs) => StateTerm::from_term(Term::Cons(x, xs)),
+                        StateTerm::Closure(_) => unreachable!()
+                    },
+                    StateTerm::Closure(_) => unreachable!()
+                }
                 _ => unreachable!()
             },
             None => StateTerm::from_term(Term::TypedVar(Rc::clone(shape)))
