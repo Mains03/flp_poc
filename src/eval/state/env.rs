@@ -4,108 +4,102 @@ use crate::cbpv::term_ptr::TermPtr;
 
 use super::state_term::{locations_clone::LocationsClone, state_term::{StateTerm, StateTermStore}};
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Env {
-    envs: Vec<HashMap<String, StateTerm>>
+    env: HashMap<String, StateTerm>,
+    prev: Option<Rc<RefCell<Env>>>
 }
 
 impl Env {
     pub fn new() -> Self {
-        Env { envs: vec![HashMap::new()] }
+        Env { env: HashMap::new(), prev: None }
     }
 
     pub fn release(&mut self, var: &String) {
-        let mut i = self.envs.len()-1;
-        loop {
-            let env = self.envs.get_mut(i).unwrap();
+        self.env.remove(var);
 
-            if env.contains_key(var) {
-                env.remove(var);
-                break;
-            } else {
-                if i == 0 {
-                    break;
-                } else {
-                    i -= 1;
-                }
-            }
-        }
+        if self.env.is_empty() && self.prev.is_some() {
+            let env = match &self.prev {
+                Some(env) => env.borrow().clone(),
+                None => unreachable!()
+            };
 
-        loop {
-            if self.envs.get(self.envs.len()-1).unwrap().is_empty() {
-                if self.envs.len() > 1 {
-                    self.envs.remove(self.envs.len()-1);
-                } else {
-                    break;
-                }
-            } else {
-                break;
-            }
+            self.env = env.env;
+            self.prev = env.prev;
         }
     }
 }
 
 impl StateTermStore for Env {
     fn store(&mut self, var: String, val: StateTerm) {
-        if self.envs.get(self.envs.len()-1).unwrap().contains_key(&var) {
-            self.envs.push(HashMap::new());
-        };
-
-        let i = self.envs.len()-1;
-        let env = self.envs.get_mut(i).unwrap();
-        env.insert(var, val);
+        if self.env.contains_key(&var) {
+            self.prev = Some(Rc::new(RefCell::new(self.clone())));
+            self.env = HashMap::new();
+        }
+        
+        self.env.insert(var, val);
     }
 
-    fn lookup(&self, var: &String) -> Option<StateTerm> {
-        let ret;
+    fn lookup(&self, var: &String) -> StateTerm {
+        if self.env.contains_key(var) {
+            self.env.get(var).unwrap().clone()
+        } else {
+            let mut env = Rc::clone(match &self.prev {
+                Some(prev) => prev,
+                None => unreachable!()
+            });
 
-        let mut i = self.envs.len()-1;
-        loop {
-            let env = self.envs.get(i).unwrap();
-            match env.get(var) {
-                Some(state_term) => {
-                    ret = Some(state_term.clone());
-                    break;
-                },
-                None => ()
+            let ret_val;
+            loop {
+                let new_env;
+                match env.borrow().env.get(var) {
+                    Some(val) => {
+                        ret_val = val.clone();
+                        break;
+                    },
+                    None => {
+                        match &env.borrow().prev {
+                            Some(env) => new_env = Rc::clone(env),
+                            None => unreachable!()
+                        }
+                    }
+                }
+                env = new_env;
             }
 
-            if i == 0 {
-                ret = None;
-                break;
-            } else {
-                i -=1 ;
-            }
+            ret_val
         }
-
-        ret
     }
 }
 
 impl LocationsClone for Env {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
-        let mut envs = vec![];
+    fn clone_with_locations(
+        &self,
+        new_val_locs: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>,
+        new_env_locs: &mut HashMap<*mut Env, Rc<RefCell<Env>>>
+    ) -> Self {
+        let env = self.env.iter()
+            .fold(HashMap::new(), |mut env, (var, val)| {
+                env.insert(var.clone(), val.clone_with_locations(new_val_locs, new_env_locs));
+                env
+            });
 
-        let mut i = self.envs.len()-1;
+        let prev = match &self.prev {
+            Some(prev) => match new_env_locs.get(&prev.as_ptr()) {
+                Some(prev) => Some(Rc::clone(prev)),
+                None => {
+                    let new_prev = Rc::new(RefCell::new(
+                        prev.borrow().clone_with_locations(new_val_locs, new_env_locs)
+                    ));
 
-        loop {
-            let env = self.envs.get(i).unwrap().iter()
-                .fold(HashMap::new(), |mut acc, (key, val)| {
-                    acc.insert(key.clone(), val.clone_with_locations(new_locations));
-                    acc
-                });
+                    new_env_locs.insert(prev.as_ptr(), Rc::clone(&new_prev));
 
-            envs.push(env);
+                    Some(new_prev)
+                }
+            },
+            None => None
+        };
 
-            if i == 0 {
-                break;
-            } else {
-                i -= 1;
-            }
-        }
-
-        envs.reverse();
-
-        Self { envs }
+        Self { env, prev }
     }
 }

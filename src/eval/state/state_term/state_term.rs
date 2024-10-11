@@ -13,7 +13,7 @@ pub enum StateTerm {
 pub trait StateTermStore {
     fn store(&mut self, var: String, val: StateTerm);
 
-    fn lookup(&self, var: &String) -> Option<StateTerm>;
+    fn lookup(&self, var: &String) -> StateTerm;
 }
 
 impl StateTerm {
