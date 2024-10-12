@@ -253,14 +253,15 @@ pub fn step(
                 } else {
                     vec![
                         {    
-                            let mut new_locations = HashMap::new();
+                            let mut new_val_locs = HashMap::new();
+                            let mut new_env_locs = HashMap::new();
 
-                            let env = env.clone_with_locations(&mut new_locations);
+                            let env = env.clone_with_locations(&mut new_val_locs, &mut new_env_locs);
                             let closure_env = match &closure_env {
-                                Some(closure_env) => Some(closure_env.clone_with_locations(&mut new_locations)),
+                                Some(closure_env) => Some(closure_env.clone_with_locations(&mut new_val_locs, &mut new_env_locs)),
                                 None => None
                             };
-                            let stack = stack.clone_with_locations(&mut new_locations);
+                            let stack = stack.clone_with_locations(&mut new_val_locs, &mut new_env_locs);
 
                             let shape = match lookup(&pm_nat.var, &env, in_closure, &closure_env) {
                                 StateTerm::Term(term_ptr) => match term_ptr.term() {
@@ -349,14 +350,15 @@ pub fn step(
                 } else {
                     vec![
                         {
-                            let mut new_locations = HashMap::new();
+                            let mut new_val_locs = HashMap::new();
+                            let mut new_env_locs = HashMap::new();
 
-                            let env = env.clone_with_locations(&mut new_locations);
+                            let env = env.clone_with_locations(&mut new_val_locs, &mut new_env_locs);
                             let closure_env = match &closure_env {
-                                Some(closure_env) => Some(closure_env.clone_with_locations(&mut new_locations)),
+                                Some(closure_env) => Some(closure_env.clone_with_locations(&mut new_val_locs, &mut new_env_locs)),
                                 None => None
                             };
-                            let stack = stack.clone_with_locations(&mut new_locations);
+                            let stack = stack.clone_with_locations(&mut new_val_locs, &mut new_env_locs);
 
                             let shape = match lookup(&pm_list.var, &env, in_closure, &closure_env) {
                                 StateTerm::Term(term_ptr) => match term_ptr.term() {
@@ -402,12 +404,13 @@ pub fn step(
         },
         Term::Choice(choices) => choices.into_iter()
             .map(|choice| {
-                let mut new_locations = HashMap::new();
+                let mut new_val_locs = HashMap::new();
+                let mut new_env_locs = HashMap::new();
 
                 State {
-                    env: env.clone_with_locations(&mut new_locations),
+                    env: env.clone_with_locations(&mut new_val_locs, &mut new_env_locs),
                     term: make_state_term(choice.clone(), in_closure, closure_env.clone()),
-                    stack: stack.clone_with_locations(&mut new_locations)
+                    stack: stack.clone_with_locations(&mut new_val_locs, &mut new_env_locs)
                 }
             }).collect(),
         Term::Exists { var, body } => {

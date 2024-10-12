@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use pm::PM;
 use term_ptr::TermPtr;
 
-use crate::{eval::LocationsClone, parser::syntax::arg::Arg};
+use crate::{eval::{Env, LocationsClone}, parser::syntax::arg::Arg};
 
 pub mod pm;
 pub mod term_ptr;
@@ -71,37 +71,41 @@ impl Term {
 }
 
 impl LocationsClone for Term {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
+    fn clone_with_locations(
+        &self,
+        new_val_locs: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>,
+        new_env_locs: &mut HashMap<*mut Env, Rc<RefCell<Env>>>
+    ) -> Self {
         match self {
-            Term::TypedVar(location) => match new_locations.get(&location.as_ptr()) {
+            Term::TypedVar(location) => match new_val_locs.get(&location.as_ptr()) {
                 Some(new_location) => Term::TypedVar(Rc::clone(new_location)),
                 None => match location.borrow().clone() {
                     Some(shape) => {
                         let new_location = Rc::new(RefCell::new(
-                            Some(shape.clone_with_locations(new_locations))
+                            Some(shape.clone_with_locations(new_val_locs, new_env_locs))
                         ));
 
-                        new_locations.insert(location.as_ptr(), Rc::clone(&new_location));
+                        new_val_locs.insert(location.as_ptr(), Rc::clone(&new_location));
 
                         Term::TypedVar(new_location)
                     },
                     None => {
                         let new_location = Rc::new(RefCell::new(None));
 
-                        new_locations.insert(location.as_ptr(), Rc::clone(&new_location));
+                        new_val_locs.insert(location.as_ptr(), Rc::clone(&new_location));
 
                         Term::TypedVar(new_location)
                     }
                 }
             },
             Term::Pair(lhs, rhs) => Term::Pair(
-                lhs.clone_with_locations(new_locations),
-                rhs.clone_with_locations(new_locations)
+                lhs.clone_with_locations(new_val_locs, new_env_locs),
+                rhs.clone_with_locations(new_val_locs, new_env_locs)
             ),
-            Term::Succ(term) => Term::Succ(term.clone_with_locations(new_locations)),
+            Term::Succ(term) => Term::Succ(term.clone_with_locations(new_val_locs, new_env_locs)),
             Term::Cons(x, xs) => Term::Cons(
-                x.clone_with_locations(new_locations),
-                xs.clone_with_locations(new_locations)
+                x.clone_with_locations(new_val_locs, new_env_locs),
+                xs.clone_with_locations(new_val_locs, new_env_locs)
             ),
             _ => self.clone()
         }

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{cbpv::{term_ptr::TermPtr, Term}, parser::syntax::arg::Arg};
+use crate::{cbpv::{term_ptr::TermPtr, Term}, eval::state::env::Env, parser::syntax::arg::Arg};
 
 use super::{locations_clone::LocationsClone, state_term::{StateTerm, StateTermStore}};
 
@@ -55,21 +55,29 @@ impl StateTermStore for ClosureEnv {
 }
 
 impl LocationsClone for Closure {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
-        let env = self.env.clone_with_locations(new_locations);
+    fn clone_with_locations(
+        &self,
+        new_val_locs: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>,
+        new_env_locs: &mut HashMap<*mut Env, Rc<RefCell<Env>>>
+    ) -> Self {
+        let env = self.env.clone_with_locations(new_val_locs, new_env_locs);
 
         Closure {
-            term_ptr: self.term_ptr.clone_with_locations(new_locations),
+            term_ptr: self.term_ptr.clone_with_locations(new_val_locs, new_env_locs),
             env
         }
     }
 }
 
 impl LocationsClone for ClosureEnv {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
+    fn clone_with_locations(
+        &self,
+        new_val_locs: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>,
+        new_env_locs: &mut HashMap<*mut Env, Rc<RefCell<Env>>>
+    ) -> Self {
         let env = self.env.iter()
             .fold(HashMap::new(), |mut acc, (var, val)| {
-                acc.insert(var.clone(), val.clone_with_locations(new_locations));
+                acc.insert(var.clone(), val.clone_with_locations(new_val_locs, new_env_locs));
                 acc
             });
 

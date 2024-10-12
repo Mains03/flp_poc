@@ -40,9 +40,12 @@ impl StateTermStore for Env {
         self.env.insert(var, val);
     }
 
-    fn lookup(&self, var: &String) -> StateTerm {
+    fn lookup(&self, var: &String) -> Option<StateTerm> {
         if self.env.contains_key(var) {
-            self.env.get(var).unwrap().clone()
+            match self.env.get(var) {
+                Some(val) => Some(val.clone()),
+                None => unreachable!()
+            }
         } else {
             let mut env = Rc::clone(match &self.prev {
                 Some(prev) => prev,
@@ -67,7 +70,7 @@ impl StateTermStore for Env {
                 env = new_env;
             }
 
-            ret_val
+            Some(ret_val)
         }
     }
 }

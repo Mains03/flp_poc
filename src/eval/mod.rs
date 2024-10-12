@@ -5,6 +5,7 @@ use state::State;
 use crate::cbpv::Term;
 
 pub use state::LocationsClone;
+pub use state::Env;
 
 mod state;
 

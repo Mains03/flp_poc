@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 
-use env::Env;
 use stack::Stack;
 use state_term::state_term::{StateTerm, StateTermStore};
 use step::step;
 
+pub use env::Env;
 pub use state_term::locations_clone::LocationsClone;
 
 use crate::cbpv::{term_ptr::TermPtr, Term};
 
-mod env;
 mod equate;
+mod env;
 mod stack;
 mod state_term;
 mod step;

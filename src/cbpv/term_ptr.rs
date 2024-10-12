@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::{cbpv::Term, eval::LocationsClone};
+use crate::{cbpv::Term, eval::{Env, LocationsClone}};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TermPtr {
@@ -22,10 +22,14 @@ impl TermPtr {
 }
 
 impl LocationsClone for TermPtr {
-    fn clone_with_locations(&self, new_locations: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>) -> Self {
+    fn clone_with_locations(
+        &self,
+        new_val_locs: &mut HashMap<*mut Option<TermPtr>, Rc<RefCell<Option<TermPtr>>>>,
+        new_env_locs: &mut HashMap<*mut Env, Rc<RefCell<Env>>>
+    ) -> Self {
         TermPtr {
             val: if self.val.contains_typed_var() {
-                Rc::new(self.val.clone_with_locations(new_locations))
+                Rc::new(self.val.clone_with_locations(new_val_locs, new_env_locs))
             } else {
                 Rc::clone(&self.val)
             }

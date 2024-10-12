@@ -9,18 +9,24 @@ mod eval;
 
 fn main() {
     let src = "
+cat :: [Nat] -> [Nat] -> [Nat]
+cat xs ys = case xs of
+    [] -> ys.
+    (x:xs) -> x : (cat xs ys).
+
 length :: [Nat] -> Nat
 length xs = case xs of
     [] -> 0.
     (x:xs) -> 1 + (length xs).
 
-const :: a -> b -> a
-const x y = x.
+half :: [Nat] -> ([Nat],[Nat])
+half xs = exists ys :: [Nat]. exists zs :: [Nat].
+    xs =:= cat ys zs.
+    let n = length zs <> (length zs) + 1 in
+    length ys =:= n.
+    (ys,zs).
 
-f :: [Nat] -> Nat -> Nat
-f xs y = const (const (length xs) 1) y.
-
-f [1,2,3] 2.
+half [1,2,3,4,5].
 ";
 
     let args: Vec<String> = env::args().collect();
