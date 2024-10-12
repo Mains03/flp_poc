@@ -14,19 +14,11 @@ cat xs ys = case xs of
     [] -> ys.
     (x:xs) -> x : (cat xs ys).
 
-length :: [Nat] -> Nat
-length xs = case xs of
-    [] -> 0.
-    (x:xs) -> 1 + (length xs).
+last :: [Nat] -> Nat
+last xs = exists ys :: [Nat]. exists y :: Nat.
+    cat ys [y] =:= xs. y.
 
-half :: [Nat] -> ([Nat],[Nat])
-half xs = exists ys :: [Nat]. exists zs :: [Nat].
-    xs =:= cat ys zs.
-    let n = length zs <> (length zs) + 1 in
-    length ys =:= n.
-    (ys,zs).
-
-half [1,2,3,4,5].
+last [1,2,3,4,5,3].
 ";
 
     let args: Vec<String> = env::args().collect();

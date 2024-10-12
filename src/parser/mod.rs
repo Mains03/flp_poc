@@ -299,6 +299,10 @@ fn parse_bexpr(mut pairs: pest::iterators::Pairs<Rule>) -> BExpr {
                 BExpr::Eq(Box::new(lhs), Box::new(rhs))
             } else if op == "!=" {
                 BExpr::NEq(Box::new(lhs), Box::new(rhs))
+            } else if op == "&&" {
+                BExpr::And(Box::new(lhs), Box::new(rhs))
+            } else if op == "||" {
+                BExpr::Or(Box::new(lhs), Box::new(rhs))
             } else {
                 unreachable!()
             }
@@ -892,6 +896,24 @@ id x = x.
                     }))))
                 })
             })))]
+        )
+    }
+
+    #[test]
+    fn test21() {
+        let src = "true && (false || true).";
+
+        let ast = parse(src).unwrap();
+
+        assert_eq!(
+            ast,
+            vec![Decl::Stm(Stm::Expr(Expr::BExpr(BExpr::And(
+                Box::new(Expr::Bool(true)),
+                Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::BExpr(BExpr::Or(
+                    Box::new(Expr::Bool(false)),
+                    Box::new(Expr::Bool(true))
+                ))))))
+            ))))]
         )
     }
 }

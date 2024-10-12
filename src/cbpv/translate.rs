@@ -207,6 +207,30 @@ fn translate_bexpr(bexpr: BExpr) -> Term {
                 ))
             })
         },
+        BExpr::And(lhs, rhs) => Term::Bind {
+            var: "0".to_string(),
+            val: TermPtr::from_term(translate_expr(*lhs)),
+            body: TermPtr::from_term(Term::Bind {
+                var: "1".to_string(),
+                val: TermPtr::from_term(translate_expr(*rhs)),
+                body: TermPtr::from_term(Term::And(
+                    TermPtr::from_term(Term::Var("0".to_string())),
+                    TermPtr::from_term(Term::Var("1".to_string()))
+                ))
+            })
+        },
+        BExpr::Or(lhs, rhs) => Term::Bind {
+            var: "0".to_string(),
+            val: TermPtr::from_term(translate_expr(*lhs)),
+            body: TermPtr::from_term(Term::Bind {
+                var: "1".to_string(),
+                val: TermPtr::from_term(translate_expr(*rhs)),
+                body: TermPtr::from_term(Term::Or(
+                    TermPtr::from_term(Term::Var("0".to_string())),
+                    TermPtr::from_term(Term::Var("1".to_string()))
+                ))
+            })
+        },
         BExpr::Not(e) => Term::Bind {
             var: "".to_string(),
             val: TermPtr::from_term(translate_expr(*e)),

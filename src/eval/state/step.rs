@@ -134,6 +134,68 @@ pub fn step(
                 stack
             }]
         },
+        Term::And(lhs, rhs) => {
+            let lhs = match lhs.term() {
+                Term::Var(var) => match extract_term(
+                    lookup(var, &env, in_closure, &closure_env)
+                ).term() {
+                    Term::Bool(b) => *b,
+                    _ => unreachable!()
+                },
+                Term::Bool(b) => *b,
+                _ => unreachable!()
+            };
+
+            let rhs = match rhs.term() {
+                Term::Var(var) => match extract_term(
+                    lookup(var, &env, in_closure, &closure_env)
+                ).term() {
+                    Term::Bool(b) => *b,
+                    _ => unreachable!()
+                },
+                Term::Bool(b) => *b,
+                _ => unreachable!()
+            };
+
+            vec![State {
+                env,
+                term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                    Term::Bool(lhs && rhs)
+                )))),
+                stack
+            }]
+        },
+        Term::Or(lhs, rhs) => {
+            let lhs = match lhs.term() {
+                Term::Var(var) => match extract_term(
+                    lookup(var, &env, in_closure, &closure_env)
+                ).term() {
+                    Term::Bool(b) => *b,
+                    _ => unreachable!()
+                },
+                Term::Bool(b) => *b,
+                _ => unreachable!()
+            };
+
+            let rhs = match rhs.term() {
+                Term::Var(var) => match extract_term(
+                    lookup(var, &env, in_closure, &closure_env)
+                ).term() {
+                    Term::Bool(b) => *b,
+                    _ => unreachable!()
+                },
+                Term::Bool(b) => *b,
+                _ => unreachable!()
+            };
+
+            vec![State {
+                env,
+                term: StateTerm::Term(TermPtr::from_term(Term::Return(TermPtr::from_term(
+                    Term::Bool(lhs || rhs)
+                )))),
+                stack
+            }]
+        },
         Term::Not(var) => match extract_term(lookup(var, &env, in_closure, &closure_env)).term() {
             Term::Bool(b) => vec![State {
                 env,

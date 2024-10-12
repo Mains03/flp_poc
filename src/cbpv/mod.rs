@@ -22,6 +22,8 @@ pub enum Term {
     Add(String, String),
     Eq(String, String),
     NEq(String, String),
+    And(TermPtr, TermPtr),
+    Or(TermPtr, TermPtr),
     Not(String),
     If {
         cond: String,
