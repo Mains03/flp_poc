@@ -4,33 +4,62 @@ Proof of concept for a functional logic programming language. In particular, the
 
 ## Syntax
 
+A program consists of a sequence of declarations which is either a function type, a function definition, or a statement ending with a period. Periods are required so that whitespace is not needed in the syntax, that is so that indentation does not matter unlike other functional languages.
+
+A function type has the following syntax:
+
+```
+[identifier] :: [type]
+```
+
+A function has the following syntax:
+
+```
+[identifier] = [stm].
+```
+
+### Types
+
+The following are all the values:
+ - natural numbers - `Nat`,
+ - pairs - `(a,b)`,
+ - lists - `[...]`,
+ - functions `A -> B`.
+
+Polymorphic types are supported.
+
 ### Statements
 
-Todo.
+A statement is one of the following:
+
+ - if statement - `if [stm] then [stm] else [stm]`,
+ - let statement - `let [identifier] = [stm] in [stm]`,
+ - exists statement - `exists [identifier] :: [type]. [stm]`,
+ - equate statement - `[expr] =:= [expr]. [stm]`,
+ - choice statement - `[expr] <> ... <> [expr]`,
+ - case statement - `case [identifier] of [case 1] -> [expr]. [case 2] -> [expr]. ... . [case n] -> [expr]`
+
+where choice can be repeated any number of times and case runs over all the possible cases (`Zero`, `Succ n` for natural numbers and `[]`, `(x:xs)` for lists). See the example programs below for clarification on the syntax.
 
 ### Expressions
 
-Todo.
+An expression is one of the following:
 
-## Exists Keyword
+ - cons - `[expr] : [expr]`,
+ - add - `[expr] + [expr]`,
+ - app - `[expr] [expr]`,
+ - boolean expressions - `[expr] [bexpr op] [expr]`,
+ - lambda - `\[identifier]. [stm]`
 
-The syntax is the following:
+where `bexpr op` is one of the following:
 
-```
-exists [var] :: [type]. [stm]
-```
+ - `==`, `!=`, `&&`, `||`.
 
-where the type must be a 'first-order type', that is essentially not a function type.
+Note you might need two backslashes when defining a lambda expression.
 
 ## Equational Constraints
 
-The syntax is the following:
-
-```
-[expr] =:= [expr]. [stm]
-```
-
-Consider the following program:
+To understand how it can be used, we'll show some example programs.
 
 ```
 exists n :: Nat. n =:= 1. n.
@@ -47,11 +76,11 @@ add n m = case n of
 exists n :: Nat. add n n =:= 2. n.
 ```
 
-It sill terminates with `n` set to the value `1` however clearly the way this is reached is not so trivial.
+It sill terminates with `n` set to the value `1` however clearly the way this is reached is not so trivial. We can clearly use a similar  to define a division by two function.
 
 ## Example Programs
 
-The following program can be used to determine the last element in a list.
+The following program determines the last element in a list.
 
 ```
 concat :: [a] -> [a] -> [a]
@@ -66,7 +95,7 @@ last xs = exists ys :: [a]
   y.
 ```
 
-The following program can be used to split a list in half where the two returned lists differ in length by at most one. 
+The following program splits a list in half such that the two returned lists differ in length by at most one. Note we use choice in the let statement to deal with the case where the two lists are not the same length.
 
 ```
 concat :: [a] -> [a] -> [a]
