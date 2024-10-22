@@ -15,8 +15,10 @@ A function type has the following syntax:
 A function has the following syntax:
 
 ```
-[identifier] = [stm].
+[identifier] [arg 1] ... [arg n] = [stm].
 ```
+
+where the arguments are either identifiers or pairs of arguments - `([arg], [arg])`.
 
 ### Types
 
