@@ -61,7 +61,7 @@ Note you might need two backslashes when defining a lambda expression.
 
 ## Equational Constraints
 
-To understand how it can be used, we'll show some example programs.
+To understand how equational constraints are used, we'll show some example programs.
 
 ```
 exists n :: Nat. n =:= 1. n.
@@ -78,7 +78,7 @@ add n m = case n of
 exists n :: Nat. add n n =:= 2. n.
 ```
 
-It sill terminates with `n` set to the value `1` however clearly the way this is reached is not so trivial. We can clearly use a similar  to define a division by two function.
+It sill terminates with `n` set to the value `1` however clearly the way this is reached is not so trivial. Such a program can be used to define a division by two function.
 
 ## Example Programs
 
