@@ -7,6 +7,7 @@ use crate::cbpv::Term;
 pub use state::LocationsClone;
 pub use state::Env;
 
+pub mod machine;
 mod state;
 
 pub fn eval(cbpv: HashMap<String, Term>, solution_count: usize) -> Term {

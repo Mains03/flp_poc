@@ -4,9 +4,10 @@ use std::fs::File;
 use std::io::{self, Read};
 
 use cbpv::translate::translate;
+use cbpv::terms;
+use eval::machine;
 
 mod parser;
-mod type_check;
 mod cbpv;
 mod eval;
 
@@ -48,6 +49,6 @@ fn main() {
 fn interpret(src: &mut String, solution_count: usize) {
 
     let ast = parser::parse(src).unwrap();
-    let cbpv = translate(ast);
-    println!("{:#?}", eval::eval(cbpv, solution_count));
+//    let cbpv = translate(ast);
+//    println!("{:#?}", eval::eval(cbpv, solution_count));
 }

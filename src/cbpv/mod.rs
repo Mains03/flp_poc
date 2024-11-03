@@ -5,6 +5,7 @@ use term_ptr::TermPtr;
 
 use crate::{eval::{Env, LocationsClone}, parser::syntax::arg::Arg};
 
+pub mod terms;
 pub mod pm;
 pub mod term_ptr;
 pub mod translate;
