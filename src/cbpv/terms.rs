@@ -1,9 +1,5 @@
 use std::rc::Rc;
 
-use super::pm::PM;
-use crate::parser::syntax::r#type::Type;
-
-
 #[derive(PartialEq, Clone)]
 pub enum ValueType {
     Nat,
@@ -89,7 +85,8 @@ impl Computation {
                 op.clone().occurs(var) || arg.clone().occurs(var),
             Computation::Choice(vec) => 
                 vec.iter().all(|c| c.clone().occurs(var)),
-            Computation::Exists { var: s, ptype, body } => todo!(),
+            Computation::Exists { var: s, ptype, body } =>
+                *s != *var && body.clone().occurs(var),
             Computation::Equate { lhs, rhs, body } => 
               lhs.clone().occurs(var) || rhs.clone().occurs(var) || body.clone().occurs(var),
             Computation::Ifz { num, zk, sk } => 
@@ -97,3 +94,54 @@ impl Computation {
         }
     }
 }
+
+// #[derive(PartialEq, Eq)]
+// enum BindingType { Lambda, Exists }
+
+// fn convert_val_aux(val : Rc<Value<String>>, lcount : usize, ecount : usize, env : &mut Vec<(BindingType, String)>) -> Value<MachineVar> {
+//     match *val {
+//         Value::Var(xs) => 
+//             if let Some(i) = env.iter().rposition(|y| xs == y.1) {
+//                match &env[i] {
+//                 (Lambda, _) => {
+//                     if let Some(j) = env.iter().filter(|&y| BindingType::Exists == y.0).rposition(|y| xs == y.1) {
+//                         return Value::Var(MachineVar::Level(j))
+//                     } else { unreachable!() }
+//                 },
+//                 (Exists, _) => {
+//                     if let Some(j) = env.iter().filter(|&y| BindingType::Lambda == y.0).rposition(|y| xs == y.1) {
+//                         return Value::Var(MachineVar::Index(lcount - j - 1))
+//                     } else { unreachable!() }
+//                 }
+//                }
+//                todo!()
+//             }
+//             else { panic!("unbound variable") }
+//         Value::Zero => Value::Zero,
+//         Value::Succ(v) => Value::Succ(Rc::new(convert_val_aux(v, lcount, ecount, env))),
+//         Value::Bool(b) => Value::Bool(b),
+//         Value::Nil => Value::Nil,
+//         Value::Cons(v, w) => 
+//             Value::Cons(Rc::new(convert_val_aux(v, lcount, ecount, env)), Rc::new(convert_val_aux(v, lcount, ecount, env))),
+//         Value::Thunk(c) => Value::Thunk(convert_comp_aux(c, lcount, ecount, env).into()),
+//     }
+// }
+
+// pub fn convert_comp(comp : Rc<Computation<String>>) -> Computation<MachineVar> {
+//     convert_comp_aux(comp, 0, 0, &mut vec![])
+// }
+
+// fn convert_comp_aux(comp : Rc<Computation<String>>, lcount : usize, ecount: usize, env) -> Computation<MachineVar> {
+//     match *comp {
+//         Computation::Return(val) => Computation::Return(convert_val_aux(val, lcount, ecount, env).into()),
+//         Computation::Bind { var, comp, cont } => 
+//             Computation::Bind { },
+//         Computation::Force(rc) => todo!(),
+//         Computation::Lambda { var, body } => todo!(),
+//         Computation::App { op, arg } => todo!(),
+//         Computation::Choice(vec) => todo!(),
+//         Computation::Exists { var, ptype, body } => todo!(),
+//         Computation::Equate { lhs, rhs, body } => todo!(),
+//         Computation::Ifz { num, zk, sk } => todo!(),
+//     }
+// }

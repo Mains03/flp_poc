@@ -9,6 +9,7 @@ pub use state::Env;
 
 pub mod machine;
 mod state;
+mod mterms;
 
 pub fn eval(cbpv: HashMap<String, Term>, solution_count: usize) -> Term {
     let mut states = vec![State::new(cbpv)];
