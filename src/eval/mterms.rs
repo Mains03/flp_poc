@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::cbpv::terms::ValueType;
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum MVar {
     Level(usize),
     Index(usize)

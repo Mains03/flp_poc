@@ -1,152 +1,152 @@
 use std::{collections::{HashMap, VecDeque}, rc::Rc};
 
-use crate::cbpv::terms::{Computation, Value, ValueType};
+use crate::{cbpv::terms::ValueType, eval::mterms::MVar};
 
-enum Env {
-    Empty,
-    Cons { 
-        var : String, 
-        clos : Rc<Closure>, // THIS SHOULD ONLY BE A VALUE CLOSURE - PLEASE USE EXTEND METHOD TO MAKE ENVS
-        next : Option<Rc<Env>> }
+use super::mterms::{MValue, MComputation};
+
+#[derive(Clone)]
+struct VClosure {
+    val : Rc<MValue>,
+    env : Rc<Env>
+}
+type Env = Vec<VClosure>;
+
+fn extend_env(env : &Env, val : Rc<MValue>, venv : Rc<Env>) -> Rc<Env> {
+    let mut newenv = env.clone();
+    newenv.push(VClosure { val, env : venv });
+    Rc::new(newenv)
 }
 
-impl Env {
-    fn extend(self : Rc<Self>, var : String, val : Rc<Value>, env : Rc<Env>, gens : Generators) -> Rc<Self> {
-        Rc::new(Env::Cons { var, clos : Rc::new(Closure { frame : Rc::new(Frame::Value(val)), gens, env}), next: Some(self)})
-    }
-    fn extendref(self : &Rc<Self>, var : &String, val : &Rc<Value>, env : &Rc<Env>, gens : &Generators) -> Rc<Self> {
-        self.clone().extend(var.to_string(), val.clone(), env.clone(), gens.clone())
-    }
-    fn find(self : Rc<Env>, s : &String) -> Option<(Rc<Value>, Rc<Env>)> {
-        let mut cenv = &*self;
-        loop {
-            match cenv {
-                Env::Empty => { return None },
-                Env::Cons { var, clos, next } => {
-                    if *var == *s {
-                        let Closure { frame, env, gens } = &**clos;
-                        if let Frame::Value(val) = &**frame {
-                            return Some((val.clone(), env.clone()))
-                        } else { panic!("non-value closure found in env") }
-                    }
-                    let Closure { frame, env, gens } = &**clos;
-                    if let Frame::Value(val) = &**frame {
-                        if *var == *s { return Some((val.clone(), env.clone())) } else { 
-                            if let Some(env) = next { cenv = env; continue; } else { return None }
-                        }
-                    }
-                    return None
-                }
-            }
-        }
-    }
+fn lookup_env(env : &Env, i : usize) -> VClosure {
+    env[i].clone()
 }
 
-type Generators = HashMap<String, ValueType>;
-
-pub enum Frame {
-    Value(Rc<Value>),
-    To(String, Rc<Computation>)
+fn resolve_var(env : &Env, i : usize) -> VClosure {
+    let mut vclos = lookup_env(env, i);
+    while let MValue::Var(MVar::Index(i)) =  &*vclos.val {
+        vclos = lookup_env(env, *i)
+    }
+   vclos 
 }
 
 #[derive(Clone)]
-pub struct Closure {
-    frame: Rc<Frame>,
-    env: Rc<Env>,
-    gens: Generators 
+enum LogicVar {
+    Generator(ValueType),
+    Closure(VClosure)
+}
+
+type LogicEnv = Vec<LogicVar>;
+
+fn extend_lenv_gen(lenv : &LogicEnv, ptype : ValueType) -> Rc<LogicEnv> {
+    let mut newenv = lenv.clone();
+    newenv.push(LogicVar::Generator(ptype));
+    Rc::new(newenv)
+}
+
+fn extend_lenv_clos(lenv : &LogicEnv, clos : VClosure) -> Rc<LogicEnv> {
+    let mut newenv = lenv.clone();
+    newenv.push(LogicVar::Closure(clos));
+    Rc::new(newenv)
+}
+
+fn lenv_newvar(lenv : &LogicEnv) -> MVar {
+    MVar::Level(lenv.len() + 1)
+}
+
+enum Frame {
+    Value(Rc<MValue>),
+    To(Rc<MComputation>)
+}
+
+#[derive(Clone)]
+struct Closure {
+    frame : Rc<Frame>,
+    env : Rc<Env>
 }
 
 type Stack = Vec<Closure>;
 
-fn push_clos(stk : &Stack, frame : Frame, env : &Rc<Env>, gens : &Generators) -> Stack {
-  let mut stk = stk.clone();
-  stk.push(Closure { frame: Rc::new(frame), env : env.clone() , gens : gens.clone() });
-  stk
+fn push_closure(stack : &Stack, frame : Frame, env : Rc<Env>) -> Rc<Stack> {
+    let mut stk = stack.clone();
+    stk.push(Closure { frame: frame.into(), env });
+    Rc::new(stk)
 }
 
 #[derive(Clone)]
 pub struct Machine {
-    comp : Rc<Computation>,
+    comp : Rc<MComputation>,
     env  : Rc<Env>,
-    gens : HashMap<String, ValueType>,
-    stack : Stack,
+    lenv : Rc<LogicEnv>,
+    stack : Rc<Stack>,
     done : bool
 }
 
 pub fn step(m : Machine) -> Vec<Machine> {
     match &*(m.comp) {
-        Computation::Return(val) => {
+        MComputation::Return(val) => {
             match &*(m.stack).as_slice() {
                 [] => vec![Machine { done: true, ..m }],
                 [tail @ .., clos] => {
-                    let Closure { frame , env, gens } = &*clos;
-                    if let Frame::To(var, cont) = &**frame {
-                        vec![Machine { comp: cont.clone(), stack : tail.to_vec(), env: env.extendref(var, val, &m.env, &m.gens), gens : gens.clone(), ..m }]
+                    let Closure { frame , env } = &*clos;
+                    if let Frame::To(cont) = &**frame {
+                        vec![Machine { comp: cont.clone(), stack : Rc::new(tail.to_vec()), ..m }]
                     } else { panic!("return but no to frame in the stack") }
                 },
                   _ => unreachable!()
               }
         },
-        Computation::Bind { var, comp, cont } => 
-            vec![Machine { comp: comp.clone(), stack: push_clos(&m.stack, Frame::To(var.to_string(), cont.clone()), &m.env, &m.gens), ..m}],
-        Computation::Force(th) => todo!(),
-        Computation::Lambda { var, body } => {
+        MComputation::Bind { comp, cont } => 
+            vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
+        MComputation::Force(th) => todo!(),
+        MComputation::Lambda { body } => {
             match &*(m.stack).as_slice() {
-                [] => panic!(),
+                [] => panic!("lambda met with empty stack"),
                 [tail @ .., clos] => {
-                    let Closure { frame , env, gens} = &*clos;
+                    let Closure { frame , env} = &*clos;
                     if let Frame::Value(val) = &**frame {
-                        vec![Machine { comp: body.clone(), stack: tail.to_vec(), env : m.env.extendref(var, val, env, gens), ..m}]
+                        vec![Machine { comp: body.clone(), stack: tail.to_vec().into(), env : extend_env(&*m.env, val.clone(), m.env.clone()), ..m}]
                     } else { panic!("lambda but no value frame in the stack") }
                 },
                 _ => unreachable!()
               }
         },
-        Computation::App { op, arg } => 
-            vec![Machine { comp: op.clone(), stack: push_clos(&m.stack, Frame::Value(arg.clone()), &m.env, &m.gens), ..m}]
-        ,
-        Computation::Choice(choices) => 
+        MComputation::App { op, arg } => 
+            vec![Machine { comp: op.clone(), stack: push_closure(&m.stack, Frame::Value(arg.clone()), m.env.clone()), ..m}],
+        MComputation::Choice(choices) => 
           choices.iter().map(|c| Machine { comp: c.clone(), ..m.clone()}).collect(),
-        Computation::Exists { var, ptype, body } => {
-            let mut gens = m.gens.clone();
-            gens.insert(var.clone(), ptype.clone());
-            vec![Machine { gens : gens, ..m}]
+        MComputation::Exists { ptype, body } => {
+            vec![Machine { lenv : extend_lenv_gen(&m.lenv, ptype.clone()), ..m}]
         }
-        Computation::Equate { lhs, rhs, body } => {
+        MComputation::Equate { lhs, rhs, body } => {
           let constraints = unify(lhs, rhs);
           if constraints.is_empty() {
             vec![]
           }
           else {
-            let old_env = m.env.clone();
-            let new_env = constraints.iter().fold(m.env, 
-                |env, Constraint::VarEq{ var, val}| env.extendref(var, val, &env, &m.gens));
-            vec![Machine { comp: body.clone(), env: new_env, ..m}]
+            todo!()
           }
         },
-        Computation::Ifz { num, zk, sk } => {
+//            let old_env = m.env.clone();
+//            let new_env = constraints.iter().fold(m.env, 
+//                |env, Constraint::VarEq{ var, val}| extend_env(&env, val, &env));
+//            vec![Machine { comp: body.clone(), env: new_env, ..m}]
+//          }
+        MComputation::Ifz { num, zk, sk } => {
             match &**num {
-                Value::Var(var ) => {
-                    let mut x = var;
-                    if let Some(ptype) = m.gens.get(var) {
-                        if *ptype == ValueType::Nat {
-                            let newvar = var.to_string() + "1";
-                            let mut newgens = m.gens.clone();
-                            newgens.insert(newvar.clone(), ValueType::Nat);
-                            return vec![
-                                Machine { comp: zk.clone(), env: m.env.extendref(var, &Rc::new(Value::Zero), &m.env, &m.gens), ..m.clone()},
-                                Machine { comp: sk.clone(), env: m.env.extendref(var, &Rc::new(Value::Succ(Rc::new(Value::Var(newvar)))), &m.env, &newgens), 
-                                    gens : newgens, ..m.clone()}
-                            ]
-                        }
-                        else { panic!("performing a zero test on a non-nat generator")}
-                    }
-                    if let Some((val, env)) = m.env.find(var) {
-                    }
+                MValue::Var(MVar::Index(i)) => {
                     todo!()
                 },
-                Value::Zero => vec![Machine { comp: zk.clone(), ..m}],
-                Value::Succ(rc) => vec![Machine { comp: sk.clone(), ..m}],
+                MValue::Var(MVar::Level(j)) => {
+                    return vec![
+                        Machine { comp: zk.clone(), lenv: extend_lenv_clos(&m.lenv, VClosure { val : Rc::new(MValue::Zero), env : m.env.clone() }), ..m.clone()},
+                        Machine { comp: sk.clone(), lenv: 
+                            extend_lenv_clos(&*extend_lenv_gen(&m.lenv, ValueType::Nat), 
+                                VClosure { val : Rc::new(MValue::Succ(Rc::new(MValue::Var(MVar::Level(*j))))), env : m.env.clone() }),
+                            ..m.clone()}
+                    ]
+                },
+                MValue::Zero => vec![Machine { comp: zk.clone(), ..m}],
+                MValue::Succ(rc) => vec![Machine { comp: sk.clone(), ..m}],
                 _ => panic!("Ifz on something non-numerical")
             }
         },
@@ -154,30 +154,30 @@ pub fn step(m : Machine) -> Vec<Machine> {
     }
 }
 
-enum Constraint { VarEq { var : String, val : Rc<Value>} }
+enum Constraint { VarEq { var : MVar, val : Rc<MValue>} }
 
-fn unify(lhs : &Rc<Value>, rhs : &Rc<Value>) -> Vec<Constraint> {
+fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>) -> Vec<Constraint> {
     let mut out: Vec<Constraint> = vec![];
-    let mut q : VecDeque<(&Rc<Value>, &Rc<Value>)> = VecDeque::new();
+    let mut q : VecDeque<(&Rc<MValue>, &Rc<MValue>)> = VecDeque::new();
     q.push_back((lhs, rhs));
     while let Some((lhs, rhs)) = q.pop_front() {
         match (&**lhs, &**rhs) {
-            (Value::Var(x), v) => { 
+            (MValue::Var(x), v) => { 
                 if (*v).occurs(x) { out = vec![]; break; }
-                out.push(Constraint::VarEq {var : x.to_string(), val : rhs.clone()})
+                out.push(Constraint::VarEq {var : x.clone(), val : rhs.clone()})
             },
-            (v , Value::Var(x)) => {
+            (v , MValue::Var(x)) => {
                 if (*v).occurs(x) { out = vec![]; break; }
-                out.push(Constraint::VarEq {var : x.to_string(), val : lhs.clone()})
+                out.push(Constraint::VarEq {var : x.clone(), val : lhs.clone()})
             },
-            (Value::Zero, Value::Zero) => continue,
-            (Value::Zero, _) => { out = vec![]; break },
-            (Value::Succ(v), Value::Succ(w)) => q.push_back((v, w)),
-            (Value::Succ(_), _) => { out = vec![]; break }
-            (Value::Nil, Value::Nil) => continue,
-            (Value::Nil, _) => {out = vec![]; break },
-            (Value::Cons(x, xs), Value::Cons(y, ys)) => { q.push_back((x, y)); q.push_back((xs, ys)) }
-            (Value::Cons(_, _), _) => { out = vec![]; break }
+            (MValue::Zero, MValue::Zero) => continue,
+            (MValue::Zero, _) => { out = vec![]; break },
+            (MValue::Succ(v), MValue::Succ(w)) => q.push_back((v, w)),
+            (MValue::Succ(_), _) => { out = vec![]; break }
+            (MValue::Nil, MValue::Nil) => continue,
+            (MValue::Nil, _) => {out = vec![]; break },
+            (MValue::Cons(x, xs), MValue::Cons(y, ys)) => { q.push_back((x, y)); q.push_back((xs, ys)) }
+            (MValue::Cons(_, _), _) => { out = vec![]; break }
             _ => continue
         }
     }
