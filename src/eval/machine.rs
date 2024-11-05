@@ -21,12 +21,26 @@ fn lookup_env(env : &Env, i : usize) -> VClosure {
     env[i].clone()
 }
 
-fn resolve_var(env : &Env, i : usize) -> VClosure {
-    let mut vclos = lookup_env(env, i);
-    while let MValue::Var(MVar::Index(i)) =  &*vclos.val {
-        vclos = lookup_env(env, *i)
+fn close_fo_value(val : &Rc<MValue>, env : &Env, lenv : &LogicEnv) -> Rc<MValue> {
+    match &**val {
+        MValue::Var(MVar::Index(i)) => {
+           let vclos = lookup_env(env, *i);
+           close_fo_value(&vclos.val, &*vclos.env, lenv)
+        },
+        MValue::Var(MVar::Level(j)) => {
+            match lookup_lenv(lenv, *j) {
+                LogicVar::Closure(vclos) => close_fo_value(&vclos.val, &*vclos.env, lenv),
+                LogicVar::Generator(ptype) => val.clone()
+            }
+        },
+        MValue::Zero => val.clone(),
+        MValue::Succ(v) => Rc::new(MValue::Succ(close_fo_value(&v.clone(), env, lenv))),
+        MValue::Bool(b) => val.clone(),
+        MValue::Nil => val.clone(),
+        MValue::Cons(v, w) => 
+            Rc::new(MValue::Cons(close_fo_value(&v, env, lenv), close_fo_value(&w, env, lenv))),
+        MValue::Thunk(t) => unreachable!("trying to close thunk"),
     }
-   vclos 
 }
 
 #[derive(Clone)]
@@ -36,6 +50,10 @@ enum LogicVar {
 }
 
 type LogicEnv = Vec<LogicVar>;
+
+fn lookup_lenv(lenv : &LogicEnv, j : usize) -> LogicVar {
+    lenv[j].clone()
+}
 
 fn extend_lenv_gen(lenv : &LogicEnv, ptype : ValueType) -> Rc<LogicEnv> {
     let mut newenv = lenv.clone();
@@ -132,10 +150,9 @@ pub fn step(m : Machine) -> Vec<Machine> {
 //            vec![Machine { comp: body.clone(), env: new_env, ..m}]
 //          }
         MComputation::Ifz { num, zk, sk } => {
-            match &**num {
-                MValue::Var(MVar::Index(i)) => {
-                    todo!()
-                },
+            let closed_num = close_fo_value(&num, &m.env, &m.lenv);
+            match &*closed_num {
+                MValue::Var(MVar::Index(i)) => unreachable!(), // should be closed
                 MValue::Var(MVar::Level(j)) => {
                     return vec![
                         Machine { comp: zk.clone(), lenv: extend_lenv_clos(&m.lenv, VClosure { val : Rc::new(MValue::Zero), env : m.env.clone() }), ..m.clone()},
