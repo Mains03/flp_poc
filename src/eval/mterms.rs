@@ -57,6 +57,11 @@ pub enum MComputation {
     },
     Rec {
         body : Rc<MComputation>
+    },
+    Match {
+        list : Rc<MValue>,
+        nilk : Rc<MComputation>,
+        consk : Rc<MComputation>
     }
 }
 
@@ -78,6 +83,7 @@ impl Display for MComputation {
             MComputation::Ifz { num, zk, sk } => 
                 write!(f, "ifz({}, {}, {})", num, zk, sk),
             MComputation::Rec { body } => write!(f, "rec({})", body),
+            MComputation::Match { list, nilk, consk } => todo!(),
         }
     }
 }
