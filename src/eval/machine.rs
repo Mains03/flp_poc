@@ -313,10 +313,11 @@ fn eval(m : Machine, mut fuel : usize) -> Vec<MValue> {
     let mut machines = vec![m];
     let mut values = vec![];
     
-    for i in (1..fuel) {
+    while fuel > 0 && !machines.is_empty() {
         let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
         values.append(&mut done);
-        machines = ms
+        machines = ms;
+        fuel -= 1
     }
     
     values.iter().map(|m| {
