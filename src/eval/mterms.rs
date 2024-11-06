@@ -1,8 +1,8 @@
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
 use crate::cbpv::terms::ValueType;
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum MValue {
     Var(usize),
     Zero,
@@ -13,21 +13,21 @@ pub enum MValue {
     Thunk(Rc<MComputation>)
 }
 
-impl MValue {
-    pub fn occurs(self : &Self, var : &usize) -> bool {
+impl Display for MValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MValue::Var(s) => *s == *var,
-            MValue::Zero => false,
-            MValue::Succ(v) => v.clone().occurs(var),
-            MValue::Bool(_) => false,
-            MValue::Nil => false,
-            MValue::Cons(v, w) => v.clone().occurs(var) || w.clone().occurs(var),
-            MValue::Thunk(v) => v.clone().occurs(var),
+            MValue::Var(i) => write!(f, "idx {}", i),
+            MValue::Zero => write!(f, "Zero"),
+            MValue::Succ(v) => write!(f, "Succ {}", *v),
+            MValue::Bool(b) => write!(f, "{}", b),
+            MValue::Nil => write!(f, "Nil"),
+            MValue::Cons(v, w) => write!(f, "Cons({}, {})", v, w),
+            MValue::Thunk(t) => write!(f, "Thunk({})", t),
         }
     }
 }
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum MComputation {
     Return(Rc<MValue>),
     Bind {
@@ -54,28 +54,30 @@ pub enum MComputation {
         num : Rc<MValue>,
         zk : Rc<MComputation>,
         sk : Rc<MComputation>
+    },
+    Rec {
+        body : Rc<MComputation>
     }
 }
 
-impl MComputation {
-    pub fn occurs(self : &Self, var : &usize) -> bool {
+impl Display for MComputation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MComputation::Return(v) => v.clone().occurs(var),
-            MComputation::Bind { comp, cont } => 
-                comp.clone().occurs(var) || cont.clone().occurs(var),
-            MComputation::Force(v) => v.clone().occurs(var),
-            MComputation::Lambda { body } => 
-                body.clone().occurs(var),
-            MComputation::App { op, arg } => 
-                op.clone().occurs(var) || arg.clone().occurs(var),
-            MComputation::Choice(vec) => 
-                vec.iter().all(|c| c.clone().occurs(var)),
-            MComputation::Exists { ptype, body } =>
-                body.clone().occurs(var),
+            MComputation::Return(v) => write!(f, "return({})", v),
+            MComputation::Bind { comp, cont } => write!(f, "{} to {}", comp, cont),
+            MComputation::Force(v) => write!(f, "force({})", v),
+            MComputation::Lambda { body } => write!(f, "λ({})", body),
+            MComputation::App { op, arg } => write!(f, "{}({})", op, arg),
+            MComputation::Choice(vec) => {
+                vec.iter().map(|c| write!(f, "{} []", c)).last().expect("lol")
+            },
+            MComputation::Exists { ptype, body } => 
+                write!(f, "exists {}. {}", ptype, body),
             MComputation::Equate { lhs, rhs, body } => 
-                lhs.clone().occurs(var) || rhs.clone().occurs(var) || body.clone().occurs(var),
+                write!(f, "{} =:= {}. {}", lhs, rhs, body),
             MComputation::Ifz { num, zk, sk } => 
-                num.clone().occurs(var) || zk.clone().occurs(var) || sk.clone().occurs(var),
+                write!(f, "ifz({}, {}, {})", num, zk, sk),
+            MComputation::Rec { body } => write!(f, "rec({})", body),
         }
     }
 }

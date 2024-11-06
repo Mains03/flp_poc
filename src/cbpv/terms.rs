@@ -1,6 +1,6 @@
-use std::rc::Rc;
+use std::{fmt::Display, rc::Rc};
 
-#[derive(PartialEq, Eq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum ValueType {
     Nat,
     Bool,
@@ -8,7 +8,18 @@ pub enum ValueType {
     Thunk(Box<ComputationType>)
 }
 
-#[derive(PartialEq, Eq, Clone)]
+impl Display for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueType::Nat => write!(f, "Nat"),
+            ValueType::Bool => write!(f, "Bool"),
+            ValueType::List(value_type) => write!(f, "[{}]", value_type),
+            ValueType::Thunk(computation_type) => write!(f, "THONK"),
+        }
+    }
+}
+
+#[derive(PartialEq, Clone, Debug)]
 pub enum ComputationType {
     Return(Box<ValueType>),
     Arrow(Box<ValueType>, Box<ComputationType>)

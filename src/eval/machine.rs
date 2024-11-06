@@ -8,7 +8,7 @@ struct LogicVar {
 }
 
 impl LogicVar {
-    fn new(ptype : &ValueType) -> Rc<Self> {
+    fn new(ptype : ValueType) -> Rc<Self> {
         Rc::new(LogicVar { 
             ptype: ptype.clone(), 
             vclos : RefCell::new(None)
@@ -108,6 +108,32 @@ fn close_head(vclos : &VClosure) -> Rc<VClosure> {
     Rc::new(vclos)
 }
 
+fn close_val(vclos : &VClosure) -> MValue {
+    match vclos {
+        VClosure::Clos { val,  env } => {
+            match &**val {
+                MValue::Var(i) => close_val(&lookup_env(&env, *i)),
+                MValue::Zero => MValue::Zero,
+                MValue::Succ(v) => MValue::Succ(close_val(&VClosure::Clos { val: v.clone(), env : env.clone() }).into()),
+                MValue::Bool(b) => MValue::Bool(*b),
+                MValue::Nil => MValue::Nil,
+                MValue::Cons(v, w) => 
+                    MValue::Cons(
+                        close_val(&VClosure::Clos { val: v.clone(), env : env.clone() }).into(),
+                        close_val(&VClosure::Clos { val: w.clone(), env : env.clone() }).into()
+                    ),
+                MValue::Thunk(_) => panic!("shouldn't be returning a thunk anyway"),
+            }
+        },
+        VClosure::LogicVar { ref lvar } => {
+            match lvar.vclos.borrow().clone() {
+                Some(v) => close_val(&v),
+                None => panic!("unresolved logic var"),
+            }
+        }
+    }
+}
+
 enum Frame {
     Value(Rc<MValue>),
     To(Rc<MComputation>)
@@ -157,10 +183,10 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 VClosure::Clos { val, env } => {
                     match &**val {
                         MValue::Thunk(t) => vec![Machine { comp : t.clone(), ..m}],
-                    _ => unreachable!("shouldn't be forcing a non-thunk value")
+                    _ => panic!("shouldn't be forcing a non-thunk value")
                     } 
                 },
-                VClosure::LogicVar { lvar } => unreachable!("shouldn't be forcing a logic variable"),
+                VClosure::LogicVar { lvar } => panic!("shouldn't be forcing a logic variable"),
             }
         },
         MComputation::Lambda { body } => {
@@ -180,7 +206,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
         MComputation::Choice(choices) => 
           choices.iter().map(|c| Machine { comp: c.clone(), ..m.clone()}).collect(),
         MComputation::Exists { ptype, body } => {
-            vec![Machine { env : extend_env(&*m.env, VClosure::LogicVar { lvar: LogicVar::new(ptype) }), ..m}]
+            vec![Machine { env : extend_env(&*m.env, VClosure::LogicVar { lvar: LogicVar::new(ptype.clone()) }), ..m}]
         }
         MComputation::Equate { lhs, rhs, body } => {
           if unify(lhs, rhs, &m.env) {
@@ -189,11 +215,6 @@ pub fn step(m : Machine) -> Vec<Machine> {
             vec![]
           }
         },
-//            let old_env = m.env.clone();
-//            let new_env = constraints.iter().fold(m.env, 
-//                |env, Constraint::VarEq{ var, val}| extend_env(&env, val, &env));
-//            vec![Machine { comp: body.clone(), env: new_env, ..m}]
-//          }
         MComputation::Ifz { num, zk, sk } => {
             let vclos = VClosure::Clos { val : num.clone(), env: m.env.clone() };
             let closed_num = close_head(&vclos);
@@ -220,7 +241,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     };
                     
                     let m_succ = {
-                        let lvar_succ = LogicVar::new(&ValueType::Nat);
+                        let lvar_succ = LogicVar::new(ValueType::Nat);
                         let mut lvar_env = vec![];
                         lvar_env.push(VClosure::LogicVar { lvar: lvar_succ });
 
@@ -228,7 +249,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         let vclos_succ = VClosure::Clos { val : num.clone(), env: env_succ.clone() };
                         let closed_num_succ = close_head(&vclos_succ);
                         if let VClosure::LogicVar { lvar } = &*closed_num_succ {
-                            lvar.set_val(MValue::Succ(Rc::new(MValue::Var(1))).into(), lvar_env.into())
+                            lvar.set_val(MValue::Succ(Rc::new(MValue::Var(0))).into(), lvar_env.into())
                         }
                         else { unreachable!() } 
 
@@ -238,8 +259,11 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     vec![m_zero, m_succ]
                 }
             }
+        }
+        MComputation::Rec { body } => {
+            let new_env = extend_env_clos(&m.env,MValue::Thunk(m.comp.clone()).into(), m.env.clone());
+            vec![Machine { comp : body.clone(), env : new_env, ..m }] 
         },
-        _ => unreachable!()
     }
 }
 
@@ -284,3 +308,55 @@ fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>) -> bool {
     }
     return true
 } 
+
+fn eval(m : Machine, mut fuel : usize) -> Vec<MValue> {
+    let mut machines = vec![m];
+    let mut values = vec![];
+    
+    for i in (1..fuel) {
+        let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
+        values.append(&mut done);
+        machines = ms
+    }
+    
+    values.iter().map(|m| {
+        match &*m.comp {
+            MComputation::Return(v) => close_val(&VClosure::Clos { val: v.clone(), env: m.env.clone() }),
+            _ => unreachable!()
+        }
+    }).collect()
+}
+#[cfg(test)]
+mod test {
+    use std::rc::Rc;
+
+    use crate::eval::{machine::{empty_env, eval, Machine}, mterms::{MComputation, MValue}};
+
+    use super::step;
+    
+    #[test]
+    fn test1() {
+        // Succ(Zero)
+        let val = Rc::new(MValue::Succ(MValue::Zero.into()));
+        let ret_val : MComputation = MComputation::Return(val.clone());
+        let m = Machine { comp: ret_val.into(), env : empty_env(), stack: vec![].into(), done: false };
+        let vals = eval(m, 10);
+        assert_eq!(vals.len(), 1);
+        assert_eq!(vals[0], *val);
+    }
+
+    #[test]
+    fn test2() {
+        // this tests the stack
+        let val = Rc::new(MValue::Succ(MValue::Zero.into()));
+        let id : MComputation = MComputation::Lambda { body: MComputation::Return(MValue::Var(0).into()).into() };
+        let app = MComputation::App { op: id.into(), arg: val.clone() };
+        println!("this should be (λx.x)1: {}", app);
+
+        let m = Machine { comp: app.into(), env : empty_env(), stack: vec![].into(), done: false };
+        let vals = eval(m, 1000);
+        assert_eq!(vals.len(), 1);
+        assert_eq!(vals[0], *val);
+        println!("{}", vals[0])
+    }
+}
