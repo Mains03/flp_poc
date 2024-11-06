@@ -24,20 +24,6 @@ pub enum Value {
     Thunk(Rc<Computation>)
 }
 
-impl Value {
-    pub fn occurs(self : &Self, var : &String) -> bool {
-        match self {
-            Value::Var(s) => *s == *var,
-            Value::Zero => false,
-            Value::Succ(v) => v.clone().occurs(var),
-            Value::Bool(_) => false,
-            Value::Nil => false,
-            Value::Cons(v, w) => v.clone().occurs(var) || w.clone().occurs(var),
-            Value::Thunk(v) => v.clone().occurs(var),
-        }
-    }
-}
-
 pub enum Computation {
     Return(Rc<Value>),
     Bind {
@@ -69,29 +55,6 @@ pub enum Computation {
         num : Rc<Value>,
         zk : Rc<Computation>,
         sk : Rc<Computation>
-    }
-}
-
-impl Computation {
-    pub fn occurs(self : &Self, var : &String) -> bool {
-        match self {
-            Computation::Return(v) => v.clone().occurs(var),
-            Computation::Bind { var: s, comp, cont } => 
-                *s != *var && (comp.clone().occurs(var) || cont.clone().occurs(var)),
-            Computation::Force(v) => v.clone().occurs(var),
-            Computation::Lambda { var: s, body } => 
-                *s != *var && body.clone().occurs(var),
-            Computation::App { op, arg } => 
-                op.clone().occurs(var) || arg.clone().occurs(var),
-            Computation::Choice(vec) => 
-                vec.iter().all(|c| c.clone().occurs(var)),
-            Computation::Exists { var: s, ptype, body } =>
-                *s != *var && body.clone().occurs(var),
-            Computation::Equate { lhs, rhs, body } => 
-              lhs.clone().occurs(var) || rhs.clone().occurs(var) || body.clone().occurs(var),
-            Computation::Ifz { num, zk, sk } => 
-              num.clone().occurs(var) || zk.clone().occurs(var) || sk.clone().occurs(var),
-        }
     }
 }
 

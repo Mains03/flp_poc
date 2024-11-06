@@ -151,7 +151,18 @@ pub fn step(m : Machine) -> Vec<Machine> {
         },
         MComputation::Bind { comp, cont } => 
             vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
-        MComputation::Force(th) => todo!(),
+        MComputation::Force(v) => {
+            let w = close_head(&VClosure::Clos { val: v.clone(), env: m.env.clone() });
+            match &*w {
+                VClosure::Clos { val, env } => {
+                    match &**val {
+                        MValue::Thunk(t) => vec![Machine { comp : t.clone(), ..m}],
+                    _ => unreachable!("shouldn't be forcing a non-thunk value")
+                    } 
+                },
+                VClosure::LogicVar { lvar } => unreachable!("shouldn't be forcing a logic variable"),
+            }
+        },
         MComputation::Lambda { body } => {
             match &*(m.stack).as_slice() {
                 [] => panic!("lambda met with empty stack"),
@@ -235,11 +246,13 @@ pub fn step(m : Machine) -> Vec<Machine> {
 fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>) -> bool { 
     let mut q : VecDeque<(Rc<VClosure>, Rc<VClosure>)> = VecDeque::new();
     
-    let lhs = close_head(&VClosure::Clos { val: lhs.clone(), env: env.clone() });
-    let rhs = close_head(&VClosure::Clos { val: rhs.clone(), env: env.clone() });
+    let lhs_clos = VClosure::Clos { val: lhs.clone(), env: env.clone() }.into();
+    let rhs_clos = VClosure::Clos { val: rhs.clone(), env: env.clone() }.into();
     
-    q.push_back((lhs, rhs));
+    q.push_back((lhs_clos, rhs_clos));
     while let Some((lhs, rhs)) = q.pop_front() {
+        let lhs = close_head(&lhs);
+        let rhs = close_head(&rhs);
         match (&*lhs, &*rhs) {
             (VClosure::LogicVar { lvar }, _) => { 
                 // the head of the LHS has been closed, so it must be a free logic variable
