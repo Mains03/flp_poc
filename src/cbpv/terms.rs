@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum ValueType {
     Nat,
     Bool,
@@ -8,7 +8,7 @@ pub enum ValueType {
     Thunk(Box<ComputationType>)
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum ComputationType {
     Return(Box<ValueType>),
     Arrow(Box<ValueType>, Box<ComputationType>)

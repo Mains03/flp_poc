@@ -3,13 +3,8 @@ use std::rc::Rc;
 use crate::cbpv::terms::ValueType;
 
 #[derive(PartialEq, Eq, Clone)]
-pub enum MVar {
-    Level(usize),
-    Index(usize)
-}
-
 pub enum MValue {
-    Var(MVar),
+    Var(usize),
     Zero,
     Succ(Rc<MValue>),
     Bool(bool),
@@ -19,7 +14,7 @@ pub enum MValue {
 }
 
 impl MValue {
-    pub fn occurs(self : &Self, var : &MVar) -> bool {
+    pub fn occurs(self : &Self, var : &usize) -> bool {
         match self {
             MValue::Var(s) => *s == *var,
             MValue::Zero => false,
@@ -32,6 +27,7 @@ impl MValue {
     }
 }
 
+#[derive(PartialEq, Eq, Clone)]
 pub enum MComputation {
     Return(Rc<MValue>),
     Bind {
@@ -62,7 +58,7 @@ pub enum MComputation {
 }
 
 impl MComputation {
-    pub fn occurs(self : &Self, var : &MVar) -> bool {
+    pub fn occurs(self : &Self, var : &usize) -> bool {
         match self {
             MComputation::Return(v) => v.clone().occurs(var),
             MComputation::Bind { comp, cont } => 
