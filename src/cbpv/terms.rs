@@ -4,6 +4,7 @@ use std::{fmt::Display, rc::Rc};
 pub enum ValueType {
     Nat,
     Bool,
+    Pair(Box<ValueType>, Box<ValueType>),
     List(Box<ValueType>),
     Thunk(Box<ComputationType>)
 }
@@ -15,6 +16,7 @@ impl Display for ValueType {
             ValueType::Bool => write!(f, "Bool"),
             ValueType::List(value_type) => write!(f, "[{}]", value_type),
             ValueType::Thunk(computation_type) => write!(f, "THONK"),
+            ValueType::Pair(value_type, value_type1) => todo!(),
         }
     }
 }

@@ -1,6 +1,6 @@
 pub mod mterms;
 mod step;
-// mod translate;
+mod translate;
 use mterms::{MComputation, MValue};
 use step::{close_val, step, Machine, VClosure};
 
