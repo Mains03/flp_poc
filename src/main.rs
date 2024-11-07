@@ -5,11 +5,11 @@ use std::io::{self, Read};
 
 use cbpv::translate::translate;
 use cbpv::terms;
-use eval::machine;
 
 mod parser;
 mod cbpv;
 mod eval;
+mod machine;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

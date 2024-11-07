@@ -1,8 +1,8 @@
 use std::{borrow::Borrow, cell::RefCell, collections::{HashMap, VecDeque}, ptr, rc::Rc};
-use crate::{cbpv::terms::ValueType};
+use crate::cbpv::terms::ValueType;
 use super::mterms::{MValue, MComputation};
 
-struct LogicVar {
+pub struct LogicVar {
     ptype : ValueType,
     vclos : RefCell<Option<VClosure>>
 }
@@ -45,7 +45,7 @@ impl PartialEq for LogicVar {
 }
     
 #[derive(Clone)]
-enum VClosure {
+pub enum VClosure {
     Clos { val : Rc<MValue>, env : Rc<Env> },
     LogicVar { lvar : Rc<LogicVar> }
 }
@@ -69,11 +69,11 @@ impl VClosure {
     }
 }
 
-type Env = Vec<VClosure>;
+pub type Env = Vec<VClosure>;
 
-fn empty_env() -> Rc<Env> { Rc::new(vec![]) }
+pub fn empty_env() -> Rc<Env> { Rc::new(vec![]) }
 
-fn extend_env(env : &Env, vclos : VClosure) -> Rc<Env> {
+pub fn extend_env(env : &Env, vclos : VClosure) -> Rc<Env> {
     let mut newenv = env.clone();
     newenv.push(vclos);
     Rc::new(newenv)
@@ -108,7 +108,7 @@ fn close_head(vclos : &VClosure) -> Rc<VClosure> {
     Rc::new(vclos)
 }
 
-fn close_val(vclos : &VClosure) -> MValue {
+pub fn close_val(vclos : &VClosure) -> MValue {
     match vclos {
         VClosure::Clos { val,  env } => {
             match &**val {
@@ -140,7 +140,7 @@ enum Frame {
 }
 
 #[derive(Clone)]
-struct Closure {
+pub struct Closure {
     frame : Rc<Frame>,
     env : Rc<Env>
 }
@@ -155,10 +155,10 @@ fn push_closure(stack : &Stack, frame : Frame, env : Rc<Env>) -> Rc<Stack> {
 
 #[derive(Clone)]
 pub struct Machine {
-    comp : Rc<MComputation>,
-    env  : Rc<Env>,
-    stack : Rc<Stack>,
-    done : bool
+    pub comp : Rc<MComputation>,
+    pub env  : Rc<Env>,
+    pub stack : Rc<Stack>,
+    pub done : bool
 }
 
 pub fn step(m : Machine) -> Vec<Machine> {
@@ -370,56 +370,3 @@ fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>) -> bool {
     }
     return true
 } 
-
-fn eval(m : Machine, mut fuel : usize) -> Vec<MValue> {
-    let mut machines = vec![m];
-    let mut values = vec![];
-    
-    while fuel > 0 && !machines.is_empty() {
-        let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
-        values.append(&mut done);
-        machines = ms;
-        fuel -= 1
-    }
-    
-    values.iter().map(|m| {
-        match &*m.comp {
-            MComputation::Return(v) => close_val(&VClosure::Clos { val: v.clone(), env: m.env.clone() }),
-            _ => unreachable!()
-        }
-    }).collect()
-}
-#[cfg(test)]
-mod test {
-    use std::rc::Rc;
-
-    use crate::eval::{machine::{empty_env, eval, Machine}, mterms::{MComputation, MValue}};
-
-    use super::step;
-    
-    #[test]
-    fn test1() {
-        // Succ(Zero)
-        let val = Rc::new(MValue::Succ(MValue::Zero.into()));
-        let ret_val : MComputation = MComputation::Return(val.clone());
-        let m = Machine { comp: ret_val.into(), env : empty_env(), stack: vec![].into(), done: false };
-        let vals = eval(m, 10);
-        assert_eq!(vals.len(), 1);
-        assert_eq!(vals[0], *val);
-    }
-
-    #[test]
-    fn test2() {
-        // this tests the stack
-        let val = Rc::new(MValue::Succ(MValue::Zero.into()));
-        let id : MComputation = MComputation::Lambda { body: MComputation::Return(MValue::Var(0).into()).into() };
-        let app = MComputation::App { op: id.into(), arg: val.clone() };
-        println!("this should be (λx.x)1: {}", app);
-
-        let m = Machine { comp: app.into(), env : empty_env(), stack: vec![].into(), done: false };
-        let vals = eval(m, 1000);
-        assert_eq!(vals.len(), 1);
-        assert_eq!(vals[0], *val);
-        println!("{}", vals[0])
-    }
-}
