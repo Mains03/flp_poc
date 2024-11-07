@@ -7,7 +7,9 @@ pub enum MValue {
     Var(usize),
     Zero,
     Succ(Rc<MValue>),
-    Bool(bool),
+    Pair(Rc<MValue>, Rc<MValue>),
+    Inl(Rc<MValue>),
+    Inr(Rc<MValue>),
     Nil,
     Cons(Rc<MValue>, Rc<MValue>),
     Thunk(Rc<MComputation>)
@@ -19,16 +21,33 @@ impl Display for MValue {
             MValue::Var(i) => write!(f, "idx {}", i),
             MValue::Zero => write!(f, "Zero"),
             MValue::Succ(v) => write!(f, "Succ {}", *v),
-            MValue::Bool(b) => write!(f, "{}", b),
             MValue::Nil => write!(f, "Nil"),
             MValue::Cons(v, w) => write!(f, "Cons({}, {})", v, w),
             MValue::Thunk(t) => write!(f, "Thunk({})", t),
+            _ => todo!()
         }
     }
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum MComputation {
+    // Value eliminators
+    Ifz {
+        num : Rc<MValue>,
+        zk : Rc<MComputation>,
+        sk : Rc<MComputation>
+    },
+    Match {
+        list : Rc<MValue>,
+        nilk : Rc<MComputation>,
+        consk : Rc<MComputation>
+    },
+    Case { 
+        sum : Rc<MValue>,
+        inlk : Rc<MComputation>,
+        inrk : Rc<MComputation>
+    },
+    // CBPV primitives
     Return(Rc<MValue>),
     Bind {
         comp: Rc<MComputation>,
@@ -40,6 +59,7 @@ pub enum MComputation {
         op: Rc<MComputation>,
         arg: Rc<MValue>
     },
+    // FLP
     Choice(Vec<Rc<MComputation>>),
     Exists {
         ptype : ValueType,
@@ -50,19 +70,10 @@ pub enum MComputation {
         rhs: Rc<MValue>,
         body: Rc<MComputation>
     },
-    Ifz {
-        num : Rc<MValue>,
-        zk : Rc<MComputation>,
-        sk : Rc<MComputation>
-    },
+    // Recursion
     Rec {
         body : Rc<MComputation>
     },
-    Match {
-        list : Rc<MValue>,
-        nilk : Rc<MComputation>,
-        consk : Rc<MComputation>
-    }
 }
 
 impl Display for MComputation {
@@ -84,6 +95,7 @@ impl Display for MComputation {
                 write!(f, "ifz({}, {}, {})", num, zk, sk),
             MComputation::Rec { body } => write!(f, "rec({})", body),
             MComputation::Match { list, nilk, consk } => todo!(),
+            _ => todo!()
         }
     }
 }

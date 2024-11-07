@@ -1,5 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
-use crate::{cbpv::terms::ValueType, parser::syntax::{bexpr::BExpr, expr::Expr, stm::Stm, r#type::Type}};
+use crate::{cbpv::terms::ValueType, parser::syntax::{arg, bexpr::BExpr, case::Case, expr::Expr, stm::Stm, r#type::Type}};
+use crate::machine::translate::Expr::Ident;
 use super::mterms::{MComputation, MValue};
 
 type Idx = usize;
@@ -27,16 +28,16 @@ fn translate_vtype(ptype : Type) -> ValueType {
     }
 }
 
-fn translate_stm(stm: Stm, env : &Env) -> MComputation {
+fn translate_stm(stm: Stm, env : &mut Env) -> MComputation {
     match stm {
         Stm::If { cond, then, r#else } => MComputation::Bind {
-            comp : translate_stm(*cond, &env).into(),
+            comp : translate_stm(*cond, env).into(),
             cont : todo!() // need sums to complete this
         },
         Stm::Let { var, val, body } => {
-            let comp = translate_stm(*val, &env).into();
+            let comp = translate_stm(*val, env).into();
             env.bind(&var);
-            let cont = translate_stm(*body, &env).into();
+            let cont = translate_stm(*body, env).into();
             env.unbind();
             MComputation::Bind { comp, cont }
         },
@@ -48,214 +49,143 @@ fn translate_stm(stm: Stm, env : &Env) -> MComputation {
             MComputation::Exists { ptype, body: body }
         },
         Stm::Equate { lhs, rhs, body } => MComputation::Bind {
-            comp: translate_expr(lhs, &env).into(),
+            comp: translate_expr(lhs, env).into(),
             cont : MComputation::Bind {
-                comp: translate_expr(rhs, &env).into(),
+                comp: translate_expr(rhs, env).into(),
                 cont: MComputation::Equate {
-                    lhs : MValue::Var(1),
-                    rhs : MValue::Var(0),
-                    body : translate_stm(*body, env)
+                    lhs : MValue::Var(1).into(),
+                    rhs : MValue::Var(0).into(),
+                    body : translate_stm(*body, env).into()
                 }.into()
             }.into()
         },
         Stm::Choice(exprs) => MComputation::Choice(
             exprs.into_iter()
-                .map(|e| translate_expr(e, &env).into()).collect()
+                .map(|e| translate_expr(e, env).into()).collect()
         ),
-        Stm::Case(var, case) => MComputation::PM(match case {
-            Case::Nat(nat_case) => {
-                let succ = nat_case.succ.unwrap();
-
-                PM::PMNat(PMNat {
-                    var,
-                    zero: MComputationPtr::from_term(translate_expr(nat_case.zero.unwrap().expr)),
-                    succ: PMNatSucc {
-                        var: succ.var,
-                        body: MComputationPtr::from_term(translate_expr(succ.expr))
+        Stm::Case(var, case) => 
+            match case {
+                Case::Nat(nat_case) => {
+                    MComputation::Ifz { 
+                        num: MValue::Var(env.find(&var)).into(),
+                        zk: translate_expr(nat_case.zero.unwrap().expr, env).into(),
+                        sk: translate_expr(nat_case.succ.unwrap().expr, env).into(),
                     }
-                })
-            },
-            Case::List(list_case) => {
-                let cons = list_case.cons.unwrap();
-
-                PM::PMList(PMList {
-                    var,
-                    nil: MComputationPtr::from_term(translate_expr(list_case.empty.unwrap().expr)),
-                    cons: PMListCons {
-                        x: cons.x,
-                        xs: cons.xs,
-                        body: MComputationPtr::from_term(translate_expr(cons.expr))
+                },
+                Case::List(list_case) => {
+                    MComputation::Match { 
+                        list: MValue::Var(env.find(&var)).into(),
+                        nilk: translate_expr(list_case.empty.unwrap().expr, env).into(),
+                        consk: translate_expr(list_case.cons.unwrap().expr, env).into(),
                     }
-                })
-            }
-        }),
-        Stm::Expr(e) => translate_expr(e, &env)
+                }
+        },
+        Stm::Expr(e) => translate_expr(e, env)
     }
 }
 
-fn translate_expr(expr: Expr, env : &Env) -> MComputation {
+fn translate_expr(expr: Expr, env : &mut Env) -> MComputation {
     match expr {
-        Expr::Cons(x, xs) => MComputation::Bind {
-            var: "0".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*x)),
-            body: MComputationPtr::from_term(Term::Bind {
-                var: "1".to_string(),
-                val: MComputationPtr::from_term(translate_expr(*xs)),
-                body: MComputationPtr::from_term(Term::Return(TermPtr::from_term(Term::Cons(
-                    MComputationPtr::from_term(Term::Var("0".to_string())),
-                    MComputationPtr::from_term(Term::Var("1".to_string()))
-                ))))
-            })
-        },
-        Expr::Add(lhs, rhs) => MComputation::Bind {
-            var: "0".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*lhs)),
-            body: MComputationPtr::from_term(Term::Bind {
-                var: "1".to_string(),
-                val: MComputationPtr::from_term(translate_expr(*rhs)),
-                body: MComputationPtr::from_term(Term::Add(
-                    "0".to_string(),
-                    "1".to_string()
-                ))
-            })
-        },
+        Expr::Cons(x, xs) => 
+            MComputation::Bind { 
+                comp: translate_expr(*x, env).into(),
+                cont: MComputation::Bind { 
+                    comp: translate_expr(*xs, env).into(), 
+                    cont: MComputation::Return(MValue::Cons(MValue::Var(1).into(), MValue::Var(0).into()).into()).into(),
+                }.into()
+            },
+        Expr::Add(arg1, arg2) =>
+            MComputation::Bind { 
+                comp: translate_expr(*arg1, env).into(),
+                cont: MComputation::Bind { 
+                    comp: translate_expr(*arg2, env).into(), 
+                    cont: todo!(),
+                }.into()
+            },
         Expr::Lambda(arg, body) => {
-            let body = translate_stm(*body);
+            match arg {
+                arg::Arg::Ident(var) => {
+                    env.bind(&var);
+                    let body = translate_stm(*body, env);
+                    env.unbind();
 
-            MComputation::Return(TermPtr::from_term(Term::Thunk(TermPtr::from_term(
-                MComputation::Lambda {
-                    arg, body: MComputationPtr::from_term(body)
-                }
-            ))))
+                    MComputation::Return(MValue::Thunk(MComputation::Lambda { body: body.into() }.into()).into())
+                },
+                arg::Arg::Pair(arg, arg1) => todo!(),
+            }
         },
-        Expr::App(lhs, rhs) => MComputation::Bind {
-            var: "0".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*rhs)),
-            body: MComputationPtr::from_term(Term::Bind {
-                var: "1".to_string(),
-                val: MComputationPtr::from_term(translate_expr(*lhs)),
-                body: MComputationPtr::from_term(Term::App(
-                    MComputationPtr::from_term(Term::Force("1".to_string())),
-                    "0".to_string()
-                ))
-            })
+        Expr::App(op, arg) => MComputation::Bind {
+            comp : translate_expr(*op, env).into(),
+            cont : MComputation::Bind {
+                comp : translate_expr(*arg, env).into(),
+                cont : MComputation::App { 
+                    op: MComputation::Force(MValue::Var(1).into()).into(),
+                    arg: MValue::Var(0).into()
+                }.into()
+            }.into()
         },
-        Expr::BExpr(bexpr) => translate_bexpr(bexpr),
+        Expr::BExpr(bexpr) => translate_bexpr(bexpr, env),
         Expr::List(mut elems) => {
             elems.reverse();
             translate_list(elems, 0, vec![])
         },
-        Expr::Ident(s) => MComputation::Return(TermPtr::from_term(Term::Var(s.clone()))),
-        Expr::Nat(n) => MComputation::Return(TermPtr::from_term(translate_nat(n))),
-        Expr::Bool(b) => MComputation::Return(TermPtr::from_term(Term::Bool(b))),
-        Expr::Pair(lhs, rhs) => translate_pair(*lhs, *rhs),
-        Expr::Stm(s) => translate_stm(*s)
+        Expr::Ident(s) => MComputation::Return(MValue::Var(env.find(&s)).into()),
+        Expr::Nat(n) => translate_nat(n),
+        Expr::Bool(b) => todo!("no bools yet"),
+        Expr::Pair(lhs, rhs) => translate_pair(*lhs, *rhs, env),
+        Expr::Stm(s) => translate_stm(*s, env)
     }
 }
 
-fn translate_bexpr(bexpr: BExpr, &env : Env) -> MComputation {
+fn translate_bexpr(bexpr: BExpr, env : &Env) -> MComputation {
     match bexpr {
-        BExpr::Eq(lhs, rhs) => MComputation::Bind {
-            var: "0".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*lhs)),
-            body: MComputationPtr::from_term(Term::Bind {
-                var: "1".to_string(),
-                val: MComputationPtr::from_term(translate_expr(*rhs)),
-                body: MComputationPtr::from_term(Term::Eq(
-                    "0".to_string(),
-                    "1".to_string()
-                ))
-            })
-        },
-        BExpr::NEq(lhs, rhs) => MComputation::Bind {
-            var: "0".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*lhs)),
-            body: MComputationPtr::from_term(Term::Bind {
-                var: "1".to_string(),
-                val: MComputationPtr::from_term(translate_expr(*rhs)),
-                body: MComputationPtr::from_term(Term::NEq(
-                    "0".to_string(),
-                    "1".to_string()
-                ))
-            })
-        },
-        BExpr::And(lhs, rhs) => MComputation::Bind {
-            var: "0".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*lhs)),
-            body: MComputationPtr::from_term(Term::Bind {
-                var: "1".to_string(),
-                val: MComputationPtr::from_term(translate_expr(*rhs)),
-                body: MComputationPtr::from_term(Term::And(
-                    MComputationPtr::from_term(Term::Var("0".to_string())),
-                    MComputationPtr::from_term(Term::Var("1".to_string()))
-                ))
-            })
-        },
-        BExpr::Or(lhs, rhs) => MComputation::Bind {
-            var: "0".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*lhs)),
-            body: MComputationPtr::from_term(Term::Bind {
-                var: "1".to_string(),
-                val: MComputationPtr::from_term(translate_expr(*rhs)),
-                body: MComputationPtr::from_term(Term::Or(
-                    MComputationPtr::from_term(Term::Var("0".to_string())),
-                    MComputationPtr::from_term(Term::Var("1".to_string()))
-                ))
-            })
-        },
-        BExpr::Not(e) => MComputation::Bind {
-            var: "".to_string(),
-            val: MComputationPtr::from_term(translate_expr(*e)),
-            body: MComputationPtr::from_term(Term::Not("".to_string()))
-        }
+        BExpr::Eq(lhs, rhs) => todo!(),
+        BExpr::NEq(lhs, rhs) => todo!(),
+        BExpr::And(lhs, rhs) => todo!(),
+        BExpr::Or(lhs, rhs) => todo!(),
+        BExpr::Not(e) => todo!()
     }
 }
 
-fn translate_list(mut elems: Vec<Expr>, i: usize, mut list: Vec<MComputation>) -> Term {
-    if elems.len() == 0 {
-        list.reverse();
+fn translate_list(mut elems: Vec<Expr>, i: usize, mut list: Vec<MComputation>) -> MComputation {
+    todo!()
+    // if elems.len() == 0 {
+    //     list.reverse();
 
-        MComputation::Return(TermPtr::from_term(
-            list.into_iter()
-                .fold(MComputation::Nil, |acc, t| {
-                    MComputation::Cons(TermPtr::from_term(t), TermPtr::from_term(acc))
-                })
-        ))
-    } else {
-        let item = translate_expr(elems.remove(elems.len()-1));
-        list.push(MComputation::Var(i.to_string()));
+    //     MComputation::Return(
+    //         list.into_iter()
+    //             .fold(MComputation::Nil, |acc, t| {
+    //                 MValue::Cons(TermPtr::from_term(t), TermPtr::from_term(acc))
+    //             })
+    //     )
+    // } else {
+    //     let item = translate_expr(elems.remove(elems.len()-1));
+    //     list.push(MComputation::Var(i.to_string()));
 
-        MComputation::Bind {
-            var: i.to_string(),
-            val: MComputationPtr::from_term(item),
-            body: MComputationPtr::from_term(
-                translate_list(elems, i+1, list)
-            )
-        }
-    }
+    //     MComputation::Bind {
+    //         var: i.to_string(),
+    //         val: MComputationPtr::from_term(item),
+    //         body: MComputationPtr::from_term(
+    //             translate_list(elems, i+1, list)
+    //         )
+    //     }
+    // }
 }
 
 fn translate_nat(n: usize) -> MComputation {
-    if n == 0 {
-        MComputation::Zero
-    } else {
-        MComputation::Succ(TermPtr::from_term(translate_nat(n-1)))
+    let mut nat_val = MValue::Zero.into();
+    for i in (1..n) {
+        nat_val = MValue::Succ(nat_val).into();
     }
+    MComputation::Return(nat_val.into())
 }
 
-fn translate_pair(lhs: Stm, rhs: Stm) -> MComputation {
-    MComputation::Bind {
-        var: "x".to_string(),
-        val: MComputationPtr::from_term(translate_stm(lhs)),
-        body: MComputationPtr::from_term(Term::Bind {
-            var: "y".to_string(),
-            val: MComputationPtr::from_term(translate_stm(rhs)),
-            body: MComputationPtr::from_term(Term::Return(TermPtr::from_term(
-                MComputation::Pair(
-                    MComputationPtr::from_term(Term::Var("x".to_string())),
-                    MComputationPtr::from_term(Term::Var("y".to_string()))
-                )
-            )))
-        })
-    }
+fn translate_pair(fst: Stm, snd: Stm, env : &mut Env) -> MComputation {
+    MComputation::Bind { 
+        comp: translate_stm(fst, env).into(), 
+        cont: MComputation::Bind {
+            comp : translate_stm(snd, env).into(),
+            cont : MComputation::Return(MValue::Pair(MValue::Var(1).into(), MValue::Var(0).into()).into()).into()
+        }.into()
+    }.into()
 }

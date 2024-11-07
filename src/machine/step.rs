@@ -115,13 +115,21 @@ pub fn close_val(vclos : &VClosure) -> MValue {
                 MValue::Var(i) => close_val(&lookup_env(&env, *i)),
                 MValue::Zero => MValue::Zero,
                 MValue::Succ(v) => MValue::Succ(close_val(&VClosure::Clos { val: v.clone(), env : env.clone() }).into()),
-                MValue::Bool(b) => MValue::Bool(*b),
                 MValue::Nil => MValue::Nil,
                 MValue::Cons(v, w) => 
                     MValue::Cons(
                         close_val(&VClosure::Clos { val: v.clone(), env : env.clone() }).into(),
                         close_val(&VClosure::Clos { val: w.clone(), env : env.clone() }).into()
                     ),
+                MValue::Pair(fst, snd) => 
+                    MValue::Pair(
+                        close_val(&VClosure::Clos{ val : fst.clone(), env : env.clone ()}).into(),
+                        close_val(&VClosure::Clos{ val : snd.clone(), env : env.clone ()}).into(),
+                    ),
+                MValue::Inl(v) =>
+                    MValue::Inl(close_val(&VClosure::Clos{ val : v.clone(), env : env.clone() }).into()),
+                MValue::Inr(v) => 
+                    MValue::Inr(close_val(&VClosure::Clos{ val : v.clone(), env : env.clone() }).into()),
                 MValue::Thunk(_) => panic!("shouldn't be returning a thunk anyway"),
             }
         },
@@ -271,8 +279,9 @@ pub fn step(m : Machine) -> Vec<Machine> {
                             let old_env = env.clone();
                             let new_env = 
                                 extend_env(
-                                    &extend_env(&m.env, VClosure::Clos { val: MValue::Var(0).into(), env: old_env.clone() }.into()),
-                                    VClosure::Clos { val: MValue::Var(1).into(), env: old_env.clone() }.into());
+                                    &extend_env(&m.env, VClosure::Clos { val: v.clone(), env: old_env.clone() }.into()),
+                                    VClosure::Clos { val: w.clone(), env: old_env.clone() }.into()
+                                );
                             vec![Machine { comp: consk.clone(), env : new_env, ..m}]
                         },
                         _ => panic!("Match on non-list")
@@ -319,13 +328,69 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     vec![m_nil, m_cons]
                 }
             }
+        },
+        MComputation::Case { sum, inlk, inrk } => {
+            let vclos = VClosure::Clos { val : sum.clone(), env: m.env.clone() };
+            let closed_sum = close_head(&vclos);
+            match &*closed_sum {
+                VClosure::Clos { val, env } => {
+                    match &**val {
+                        MValue::Inl(v) => {
+                            let old_env = env.clone();
+                            let new_env = extend_env(&m.env, VClosure::Clos { val: v.clone(), env: old_env.clone() }.into());
+                            vec![Machine { comp: inlk.clone(), env : new_env, ..m}]
+                        },
+                        MValue::Inr(v) => {
+                            let old_env = env.clone();
+                            let new_env = extend_env(&m.env, VClosure::Clos { val: v.clone(), env: old_env.clone() }.into());
+                            vec![Machine { comp: inrk.clone(), env : new_env, ..m}]
+                        },
+                        _ => panic!("Match on non-list")
+                    }
+                },
+                VClosure::LogicVar { lvar } => {  // must be unresolved, by structure of close_head
+                                                  
+                    let (ptype1, ptype2) = match &lvar.ptype {
+                        ValueType::Sum(t1, t2) => (t1, t2),
+                        _ => panic!("case-ing on a non-sum logical variable")
+                    };
 
+                    let m_inl = {
+                        let env = Rc::new((*m.env).clone()); // deep clone env, including lvar
+                        let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
+                        let closed = close_head(&vclos); // re-find lvar in deep clone
+                        if let VClosure::LogicVar { lvar } = &*closed {
+                            // make a new lvar of inl type, and stick it into the new machine
+                            let lvar_inl = LogicVar::new(*(ptype1.clone()));
+                            let mut new_env = vec![];
+                            new_env.push(VClosure::LogicVar { lvar: lvar_inl });
+                            lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env.into())
+                        }
+                        Machine { comp: inlk.clone(), env, ..m.clone()}
+                    };
 
+                    let m_inr = {
+                        let env = Rc::new((*m.env).clone()); // deep clone env, including lvar
+                        let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
+                        let closed = close_head(&vclos); // re-find lvar in deep clone
+                        if let VClosure::LogicVar { lvar } = &*closed {
+                            // make a new lvar of inl type, and stick it into the new machine
+                            let lvar_inr = LogicVar::new(*(ptype2.clone()));
+                            let mut new_env = vec![];
+                            new_env.push(VClosure::LogicVar { lvar: lvar_inr });
+                            lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env.into())
+                        }
+                        Machine { comp: inlk.clone(), env, ..m.clone()}
+                    };
+                    
+                    vec![m_inl, m_inr]
+                }
+            }
         },
         MComputation::Rec { body } => {
             let new_env = extend_env_clos(&m.env,MValue::Thunk(m.comp.clone()).into(), m.env.clone());
             vec![Machine { comp : body.clone(), env : new_env, ..m }] 
-        }
+        },
     }
 }
 
