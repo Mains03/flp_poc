@@ -33,7 +33,7 @@ pub fn translate(ast: Vec<Decl>) -> (MComputation, Env) {
             Decl::FuncType { name: _, r#type: _ } => (),
             Decl::Func { name, args, body } => {
                 let result : Rc<MValue> = translate_func(&name, args, body, &mut tenv).into();
-                println!("[DEBUG] definition: {} = {:?}", name, *result);
+                println!("[DEBUG] definition: {} = {}", name, *result);
                 tenv.bind(&name);
                 let vclos = VClosure::Clos { val : result.clone(), env: env.clone().into() };
                 env.push(vclos);
@@ -158,6 +158,7 @@ fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
             let comp_head = translate_expr(*x, env).into();
             env.bind(&"_foo".to_string());
             let comp_tail = translate_expr(*xs, env).into();
+            env.unbind();
             MComputation::Bind { 
                 comp: comp_head,
                 cont: MComputation::Bind { 

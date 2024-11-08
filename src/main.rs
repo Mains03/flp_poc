@@ -50,6 +50,6 @@ fn interpret(src: &mut String, fuel: usize) {
 
     let ast = parser::parse(src).unwrap();
     let (main, env) = translate(ast);
-    let vals = machine::eval(main, env, fuel);
+    let vals = machine::eval(main, env.into(), fuel);
     println!("{:?}", vals);
 }

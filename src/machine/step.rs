@@ -1,5 +1,5 @@
 use std::{borrow::Borrow, cell::RefCell, collections::{HashMap, VecDeque}, ptr, rc::Rc};
-use crate::{cbpv::terms::ValueType, machine::{empty_env, extend_env, extend_env_clos}};
+use crate::{cbpv::terms::ValueType, machine::{deep_clone, empty_env, extend_env, extend_env_clos}};
 use super::{lookup_env, mterms::{MComputation, MValue}, Env, VClosure};
 
 #[derive(Debug)]
@@ -172,7 +172,6 @@ pub fn step(m : Machine) -> Vec<Machine> {
             vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
         MComputation::Force(v) => {
             let w = close_head(&VClosure::Clos { val: v.clone(), env: m.env.clone() });
-            // println!("[DEBUG] FORCING: {:?}", w);
             match &*w {
                 VClosure::Clos { val, env } => {
                     match &**val {
@@ -205,6 +204,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
         }
         MComputation::Equate { lhs, rhs, body } => {
           if unify(lhs, rhs, &m.env) {
+              println!("SUCKCESS");
             vec![Machine {comp : body.clone(), ..m }]
           } else {
             vec![]
@@ -224,7 +224,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 VClosure::LogicVar { .. } => {  // must be unresolved, by structure of close_head
                     let m_zero  = {
 
-                        let env_zero = Rc::new((*m.env).clone());
+                        let env_zero = deep_clone(m.env.clone());
                         let vclos_zero = VClosure::Clos { val : num.clone(), env: env_zero.clone() };
                         let closed_num_zero = close_head(&vclos_zero);
                         if let VClosure::LogicVar { lvar } = &*closed_num_zero {
@@ -240,7 +240,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         let mut lvar_env = vec![];
                         lvar_env.push(VClosure::LogicVar { lvar: lvar_succ });
 
-                        let env_succ = Rc::new((*m.env).clone());
+                        let env_succ = deep_clone(m.env.clone());
                         let vclos_succ = VClosure::Clos { val : num.clone(), env: env_succ.clone() };
                         let closed_num_succ = close_head(&vclos_succ);
                         if let VClosure::LogicVar { lvar } = &*closed_num_succ {
@@ -283,7 +283,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
 
                     let m_nil  = {
 
-                        let env_nil = Rc::new((*m.env).clone());
+                        let env_nil = deep_clone(m.env.clone());
                         let vclos_nil = VClosure::Clos { val : list.clone(), env: env_nil.clone() };
                         let closed_list_nil = close_head(&vclos_nil);
                         if let VClosure::LogicVar { lvar } = &*closed_list_nil {
@@ -301,7 +301,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         lvar_env.push(VClosure::LogicVar { lvar: lvar_tail });
                         lvar_env.push(VClosure::LogicVar { lvar: lvar_head });
 
-                        let env_cons = Rc::new((*m.env).clone());
+                        let env_cons = deep_clone(m.env.clone());
                         let vclos_cons = VClosure::Clos { val : list.clone(), env: env_cons.clone() };
                         let closed_num_cons = close_head(&vclos_cons);
                         if let VClosure::LogicVar { lvar } = &*closed_num_cons {
