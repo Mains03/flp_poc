@@ -129,7 +129,13 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
                     MComputation::Match { 
                         list: MValue::Var(env.find(&var)).into(),
                         nilk: translate_expr(list_case.empty.unwrap().expr, env).into(),
-                        consk: translate_expr(list_case.cons.unwrap().expr, env).into(),
+                        consk: {
+                            let case = list_case.cons.unwrap();
+                            env.bind(&case.x); env.bind(&case.xs);
+                            let k = translate_expr(case.expr, env).into();
+                            env.unbind(); env.unbind();
+                            k
+                        },
                     }
                 }
         },
@@ -186,10 +192,7 @@ fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
             }
         },
         Expr::BExpr(bexpr) => translate_bexpr(bexpr, env),
-        Expr::List(mut elems) => {
-            elems.reverse();
-            translate_list(elems, 0, vec![])
-        },
+        Expr::List(mut elems) => translate_list(elems, env),
         Expr::Ident(s) => MComputation::Return(MValue::Var(env.find(&s)).into()),
         Expr::Nat(n) => translate_nat(n),
         Expr::Bool(b) => todo!("no bools yet"),
@@ -208,29 +211,20 @@ fn translate_bexpr(bexpr: BExpr, env : &TEnv) -> MComputation {
     }
 }
 
-fn translate_list(mut elems: Vec<Expr>, i: usize, mut list: Vec<MComputation>) -> MComputation {
-    todo!("NOT YET DONE")
-    // if elems.len() == 0 {
-    //     list.reverse();
-
-    //     MComputation::Return(
-    //         list.into_iter()
-    //             .fold(MComputation::Nil, |acc, t| {
-    //                 MValue::Cons(TermPtr::from_term(t), TermPtr::from_term(acc))
-    //             })
-    //     )
-    // } else {
-    //     let item = translate_expr(elems.remove(elems.len()-1));
-    //     list.push(MComputation::Var(i.to_string()));
-
-    //     MComputation::Bind {
-    //         var: i.to_string(),
-    //         val: MComputationPtr::from_term(item),
-    //         body: MComputationPtr::from_term(
-    //             translate_list(elems, i+1, list)
-    //         )
-    //     }
-    // }
+fn translate_list(elems: Vec<Expr>, env : &mut TEnv) -> MComputation {
+    match elems.as_slice() {
+        [] => MComputation::Return(MValue::Nil.into()),
+        [head , tail@ ..] => {
+            let chead = translate_expr(head.clone(), env);
+            let ctail = translate_list(tail.to_vec(), env);
+            MComputation::Bind {
+                comp: chead.into(), 
+                cont: MComputation::Bind { 
+                    comp: ctail.into(),
+                    cont: MComputation::Return(MValue::Cons(MValue::Var(1).into(), MValue::Var(0).into()).into()).into() }.into()
+            }
+        }
+    }
 }
 
 fn translate_nat(n: usize) -> MComputation {

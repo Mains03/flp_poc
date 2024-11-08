@@ -6,7 +6,7 @@ use std::rc::Rc;
 use mterms::{MComputation, MValue};
 use step::{close_val, empty_stack, step, LogicVar, Machine};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum VClosure {
     Clos { val : Rc<MValue>, env : Rc<Env> },
     LogicVar { lvar : Rc<LogicVar> }
@@ -18,6 +18,15 @@ impl VClosure {
             val.to_string()
         }
         else { panic!() }
+    }
+}
+
+impl Clone for VClosure {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Clos { val, env } => Self::Clos { val: val.clone(), env: env.clone() },
+            Self::LogicVar { lvar } => Self::LogicVar { lvar: Rc::new((**lvar).clone()) },
+        }
     }
 }
 

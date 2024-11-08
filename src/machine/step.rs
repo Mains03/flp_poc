@@ -23,19 +23,21 @@ impl LogicVar {
         }
     }
     
-    fn clone(&self) -> Self  {
-        LogicVar {
-            ptype : self.ptype.clone(),
-            vclos : RefCell::new(self.vclos.borrow().clone())
-        }
-    }
-    
     fn set_val(&self, val : Rc<MValue>, env : Rc<Env>) {
         *(self.vclos.borrow_mut()) = Some(VClosure::Clos { val, env });
     }
     
     fn set_vclos(&self, vclos : &VClosure) {
         *(self.vclos.borrow_mut()) = Some(vclos.clone());
+    }
+}
+
+impl Clone for LogicVar {
+    fn clone(&self) -> Self  {
+        LogicVar {
+            ptype : self.ptype.clone(),
+            vclos : RefCell::new(self.vclos.borrow().clone())
+        }
     }
 }
 
@@ -287,7 +289,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         if let VClosure::LogicVar { lvar } = &*closed_list_nil {
                             lvar.set_val(MValue::Nil.into(), empty_env())
                         }
-                        else { unreachable!() } 
+                        else { unreachable!("closure was returned when closure shouldn't be returned") } 
 
                         Machine { comp: nilk.clone(), env : env_nil, ..m.clone()}
                     };
@@ -305,7 +307,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         if let VClosure::LogicVar { lvar } = &*closed_num_cons {
                             lvar.set_val(MValue::Cons(Rc::new(MValue::Var(0)), Rc::new(MValue::Var(1))).into(), lvar_env.into())
                         }
-                        else { unreachable!() } 
+                        else { unreachable!("closure was returned when closure shouldn't be returned: {:?}", close_head(&vclos_cons).val() ) } 
 
                         Machine { comp: consk.clone(), env : env_cons, ..m.clone()}
                     };

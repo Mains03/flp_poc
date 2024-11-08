@@ -94,7 +94,8 @@ impl Display for MComputation {
             MComputation::Ifz { num, zk, sk } => 
                 write!(f, "ifz({}, {}, {})", num, zk, sk),
             MComputation::Rec { body } => write!(f, "rec({})", body),
-            MComputation::Match { list, nilk, consk } => todo!(),
+            MComputation::Match { list, nilk, consk } => 
+                write!(f, "match({}, {}, {})", list, nilk, consk),
             _ => todo!()
         }
     }
