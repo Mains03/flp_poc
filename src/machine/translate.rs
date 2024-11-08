@@ -32,15 +32,15 @@ pub fn translate(ast: Vec<Decl>) -> (MComputation, Env) {
         .for_each(|decl| match decl {
             Decl::FuncType { name: _, r#type: _ } => (),
             Decl::Func { name, args, body } => {
-                let result : Rc<MValue> = translate_func(args, body, &mut tenv).into();
-                println!("[DEBUG] definition name : {}, body : {:?}", name, *result);
+                let result : Rc<MValue> = translate_func(&name, args, body, &mut tenv).into();
+                println!("[DEBUG] definition: {} = {:?}", name, *result);
                 tenv.bind(&name);
                 let vclos = VClosure::Clos { val : result.clone(), env: env.clone().into() };
                 env.push(vclos);
             },
             Decl::Stm(stm) => {
                 let stmt = translate_stm(stm, &mut tenv);
-                println!("[DEBUG] final stmt : {:?}", stmt);
+                println!("[DEBUG] final stmt : {}", stmt);
                 println!("[DEBUG] in env : {:?}", tenv.to_string());
                 main = Some(stmt)
             }
@@ -48,7 +48,9 @@ pub fn translate(ast: Vec<Decl>) -> (MComputation, Env) {
     (main.expect("empty program"), env)
 }
 
-fn translate_func(args: Vec<Arg>, body: Stm, env : &mut TEnv) -> MValue {
+fn translate_func(name : &String, args: Vec<Arg>, body: Stm, env : &mut TEnv) -> MValue {
+    
+    env.bind(name);
 
     let mut vars : Vec<String> = args.iter().map(|arg| match arg {
         Arg::Ident(var) => var.clone(),
@@ -59,12 +61,14 @@ fn translate_func(args: Vec<Arg>, body: Stm, env : &mut TEnv) -> MValue {
     let mbody = translate_stm(body, env);
     vars.iter().for_each(|s| env.unbind());
     
-    let mut mval = MValue::Thunk(MComputation::Lambda { body : mbody.into()}.into());
+    env.unbind();
+    
+    let mut c : MComputation = MComputation::Lambda { body : mbody.into()}.into();
     while vars.len() > 1 {
-        mval = MValue::Thunk(MComputation::Lambda { body : MComputation::Return(mval.into()).into() }.into());
+        c = MComputation::Lambda { body : MComputation::Return(MValue::Thunk(c.into()).into()).into() }.into();
         vars.pop();
     }
-    mval 
+    MValue::Thunk(MComputation::Rec { body: c.into() }.into())
 }
 
 fn translate_vtype(ptype : Type) -> ValueType { 
@@ -163,15 +167,23 @@ fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
                 arg::Arg::Pair(arg, arg1) => todo!(),
             }
         },
-        Expr::App(op, arg) => MComputation::Bind {
-            comp : translate_expr(*op, env).into(),
-            cont : MComputation::Bind {
-                comp : translate_expr(*arg, env).into(),
-                cont : MComputation::App { 
-                    op: MComputation::Force(MValue::Var(1).into()).into(),
-                    arg: MValue::Var(0).into()
+        Expr::App(op, arg) => {
+            let comp_op = translate_expr(*op, env).into();
+            
+            env.bind(&"_foo".to_string());
+            let comp_arg = translate_expr(*arg, env).into();
+            env.unbind();
+            
+            MComputation::Bind {
+                comp : comp_op,
+                cont : MComputation::Bind {
+                    comp : comp_arg,
+                    cont : MComputation::App { 
+                        op: MComputation::Force(MValue::Var(1).into()).into(),
+                        arg: MValue::Var(0).into()
+                    }.into()
                 }.into()
-            }.into()
+            }
         },
         Expr::BExpr(bexpr) => translate_bexpr(bexpr, env),
         Expr::List(mut elems) => {

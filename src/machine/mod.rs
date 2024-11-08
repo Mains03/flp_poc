@@ -12,6 +12,15 @@ pub enum VClosure {
     LogicVar { lvar : Rc<LogicVar> }
 }
 
+impl VClosure {
+    fn val(&self) -> String { 
+        if let VClosure::Clos { val, env } = self {
+            val.to_string()
+        }
+        else { panic!() }
+    }
+}
+
 pub type Env = Vec<VClosure>;
 
 pub fn empty_env() -> Rc<Env> { Rc::new(vec![]) }
@@ -42,9 +51,9 @@ pub fn eval(comp : MComputation, env : Env, mut fuel : usize) -> Vec<MValue> {
         let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
         println!("[DEBUG] machines: ");
         ms.iter().for_each(|m| {
-            println!("[DEBUG]   comp: {:?}", m.comp);
-            //println!("[DEBUG]   stack: {:?}", m.stack);
-            //println!("[DEBUG]   env: {:?}", m.env)
+            println!("[DEBUG]   comp: {}", m.comp);
+            println!("[DEBUG]   stack size: {:?}", m.stack.len());
+            println!("[DEBUG]   env size: {:?}", m.env.len())
         });
         values.append(&mut done);
         machines = ms;

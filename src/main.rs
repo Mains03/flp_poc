@@ -23,7 +23,7 @@ fn main() {
     let file_name = &args[1];
     let fuel = match args.get(2) {
         Some(n) => n.parse().unwrap(),
-        None => 10000
+        None => 1000
     };
 
     let mut file = match File::open(file_name) {

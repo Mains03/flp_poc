@@ -89,6 +89,7 @@ fn close_head(vclos : &VClosure) -> Rc<VClosure> {
 pub fn close_val(vclos : &VClosure) -> MValue {
     match vclos {
         VClosure::Clos { val,  env } => {
+            // println!("[DEBUG] CLOSING {} in env of size {}: {:#?}", val, env.len(), *env);
             match &**val {
                 MValue::Var(i) => close_val(&lookup_env(&env, *i)),
                 MValue::Zero => MValue::Zero,
@@ -108,7 +109,7 @@ pub fn close_val(vclos : &VClosure) -> MValue {
                     MValue::Inl(close_val(&VClosure::Clos{ val : v.clone(), env : env.clone() }).into()),
                 MValue::Inr(v) => 
                     MValue::Inr(close_val(&VClosure::Clos{ val : v.clone(), env : env.clone() }).into()),
-                MValue::Thunk(_) => panic!("shouldn't be returning a thunk anyway"),
+                MValue::Thunk(t) => panic!("shouldn't be returning a thunk anyway: {}", *t),
             }
         },
         VClosure::LogicVar { ref lvar } => {
@@ -158,7 +159,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 [tail @ .., clos] => {
                     let Closure { frame , env } = &*clos;
                     if let Frame::To(cont) = &**frame {
-                        let new_env = extend_env_clos(&m.env, val.clone(), m.env.clone());
+                        let new_env = extend_env_clos(env, val.clone(), m.env.clone());
                         vec![Machine { comp: cont.clone(), stack : Rc::new(tail.to_vec()), env : new_env, ..m }]
                     } else { panic!("return but no to frame in the stack") }
                 },
@@ -169,10 +170,11 @@ pub fn step(m : Machine) -> Vec<Machine> {
             vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
         MComputation::Force(v) => {
             let w = close_head(&VClosure::Clos { val: v.clone(), env: m.env.clone() });
+            // println!("[DEBUG] FORCING: {:?}", w);
             match &*w {
                 VClosure::Clos { val, env } => {
                     match &**val {
-                        MValue::Thunk(t) => vec![Machine { comp : t.clone(), ..m}],
+                        MValue::Thunk(t) => vec![Machine { comp : t.clone(), env : env.clone(), ..m}],
                     _ => panic!("shouldn't be forcing a non-thunk value")
                     } 
                 },
@@ -185,7 +187,8 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 [tail @ .., clos] => {
                     let Closure { frame , env} = &*clos;
                     if let Frame::Value(val) = &**frame {
-                        vec![Machine { comp: body.clone(), stack: Rc::new(tail.to_vec()), env : extend_env_clos(&*m.env, val.clone(), m.env.clone()), ..m}]
+                        let new_env = extend_env(&*m.env, VClosure::Clos { val: val.clone(), env: env.clone() });
+                        vec![Machine { comp: body.clone(), stack: Rc::new(tail.to_vec()), env : new_env, ..m}]
                     } else { panic!("lambda but no value frame in the stack") }
                 },
                 _ => unreachable!()
