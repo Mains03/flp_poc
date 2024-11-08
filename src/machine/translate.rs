@@ -101,14 +101,23 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
             let ptype = translate_vtype(r#type);
             MComputation::Exists { ptype, body: body }
         },
-        Stm::Equate { lhs, rhs, body } => MComputation::Bind {
-            comp: translate_expr(lhs, env).into(),
-            cont : MComputation::Bind {
-                comp: translate_expr(rhs, env).into(),
-                cont: MComputation::Equate {
-                    lhs : MValue::Var(1).into(),
-                    rhs : MValue::Var(0).into(),
-                    body : translate_stm(*body, env).into()
+        Stm::Equate { lhs, rhs, body } => {
+            let lhs_comp = translate_expr(lhs, env).into();
+            env.bind(&"_foo".to_string());
+            let rhs_comp = translate_expr(rhs, env).into();
+            env.bind(&"_foo2".to_string());
+            let body_comp = translate_stm(*body, env).into();
+            env.unbind();
+            env.unbind();
+            MComputation::Bind {
+                comp: lhs_comp,
+                cont : MComputation::Bind {
+                    comp: rhs_comp,
+                    cont: MComputation::Equate {
+                        lhs : MValue::Var(1).into(),
+                        rhs : MValue::Var(0).into(),
+                        body : body_comp
+                    }.into()
                 }.into()
             }.into()
         },
@@ -145,14 +154,18 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
 
 fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
     match expr {
-        Expr::Cons(x, xs) => 
+        Expr::Cons(x, xs) => {
+            let comp_head = translate_expr(*x, env).into();
+            env.bind(&"_foo".to_string());
+            let comp_tail = translate_expr(*xs, env).into();
             MComputation::Bind { 
-                comp: translate_expr(*x, env).into(),
+                comp: comp_head,
                 cont: MComputation::Bind { 
-                    comp: translate_expr(*xs, env).into(), 
+                    comp: comp_tail,
                     cont: MComputation::Return(MValue::Cons(MValue::Var(1).into(), MValue::Var(0).into()).into()).into(),
                 }.into()
-            },
+            }
+        },
         Expr::Add(arg1, arg2) =>
             MComputation::Bind { 
                 comp: translate_expr(*arg1, env).into(),
@@ -216,7 +229,9 @@ fn translate_list(elems: Vec<Expr>, env : &mut TEnv) -> MComputation {
         [] => MComputation::Return(MValue::Nil.into()),
         [head , tail@ ..] => {
             let chead = translate_expr(head.clone(), env);
+            env.bind(&"_foo".to_string());
             let ctail = translate_list(tail.to_vec(), env);
+            env.unbind();
             MComputation::Bind {
                 comp: chead.into(), 
                 cont: MComputation::Bind { 
