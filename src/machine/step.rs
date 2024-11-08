@@ -296,11 +296,11 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     };
                     
                     let m_cons = {
-                        let lvar_head = LogicVar::new(*(ptype.clone()));
-                        let lvar_tail = LogicVar::new(ValueType::List(ptype.clone()));
+                        let lvar_head = VClosure::LogicVar { lvar: LogicVar::new(*(ptype.clone())) };
+                        let lvar_tail = VClosure::LogicVar { lvar: LogicVar::new(ValueType::List(ptype.clone())) };
                         let mut lvar_env = vec![];
-                        lvar_env.push(VClosure::LogicVar { lvar: lvar_tail });
-                        lvar_env.push(VClosure::LogicVar { lvar: lvar_head });
+                        lvar_env.push(lvar_tail.clone());
+                        lvar_env.push(lvar_head.clone());
 
                         let env_cons = deep_clone(m.env.clone());
                         let vclos_cons = VClosure::Clos { val : list.clone(), env: env_cons.clone() };
@@ -309,9 +309,10 @@ pub fn step(m : Machine) -> Vec<Machine> {
                             lvar.set_val(MValue::Cons(Rc::new(MValue::Var(0)), Rc::new(MValue::Var(1))).into(), lvar_env.into())
                         }
                         else { unreachable!("closure was returned when closure shouldn't be returned: {:?}", close_head(&vclos_cons).val() ) } 
+                        let final_env = extend_env(&extend_env(&env_cons, lvar_tail), lvar_head);
                         
                         println!("env_cons: {:?}", env_cons.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
-                        Machine { comp: consk.clone(), env : env_cons, ..m.clone()}
+                        Machine { comp: consk.clone(), env : final_env, ..m.clone()}
                     };
                     vec![m_nil, m_cons]
                 }
