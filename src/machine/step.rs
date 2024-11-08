@@ -204,7 +204,6 @@ pub fn step(m : Machine) -> Vec<Machine> {
         }
         MComputation::Equate { lhs, rhs, body } => {
           if unify(lhs, rhs, &m.env) {
-              println!("SUCKCESS");
             vec![Machine {comp : body.clone(), ..m }]
           } else {
             vec![]
@@ -223,7 +222,6 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 },
                 VClosure::LogicVar { .. } => {  // must be unresolved, by structure of close_head
                     let m_zero  = {
-
                         let env_zero = deep_clone(m.env.clone());
                         let vclos_zero = VClosure::Clos { val : num.clone(), env: env_zero.clone() };
                         let closed_num_zero = close_head(&vclos_zero);
@@ -283,7 +281,9 @@ pub fn step(m : Machine) -> Vec<Machine> {
 
                     let m_nil  = {
 
+                        println!("[DEBUG] about to deep clone");
                         let env_nil = deep_clone(m.env.clone());
+                        println!("[DEBUG] just deep cloned");
                         let vclos_nil = VClosure::Clos { val : list.clone(), env: env_nil.clone() };
                         let closed_list_nil = close_head(&vclos_nil);
                         if let VClosure::LogicVar { lvar } = &*closed_list_nil {
@@ -291,7 +291,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         }
                         else { unreachable!("closure was returned when closure shouldn't be returned") } 
 
-                        println!("env_nil: {:?}", env_nil.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
+                        // println!("env_nil: {:?}", env_nil.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
                         Machine { comp: nilk.clone(), env : env_nil, ..m.clone()}
                     };
                     
@@ -309,9 +309,9 @@ pub fn step(m : Machine) -> Vec<Machine> {
                             lvar.set_val(MValue::Cons(Rc::new(MValue::Var(0)), Rc::new(MValue::Var(1))).into(), lvar_env.into())
                         }
                         else { unreachable!("closure was returned when closure shouldn't be returned: {:?}", close_head(&vclos_cons).val() ) } 
-                        let final_env = extend_env(&extend_env(&env_cons, lvar_tail), lvar_head);
+                        let final_env = extend_env(&extend_env(&env_cons, lvar_head), lvar_tail);
                         
-                        println!("env_cons: {:?}", env_cons.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
+                        // println!("env_cons: {:?}", env_cons.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
                         Machine { comp: consk.clone(), env : final_env, ..m.clone()}
                     };
                     vec![m_nil, m_cons]
