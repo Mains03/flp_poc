@@ -14,13 +14,24 @@ pub enum MValue {
     Cons(Rc<MValue>, Rc<MValue>),
     Thunk(Rc<MComputation>)
 }
+    
+fn print_nat(n : &MValue) -> String {
+    fn print_nat_aux(n : &MValue, i : usize) -> usize {
+        match n {
+            MValue::Zero => i,
+            MValue::Succ(v) => print_nat_aux(&v, i+1),
+            _ => panic!()
+        }
+    }
+    print_nat_aux(n, 0).to_string()
+}
 
 impl Display for MValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MValue::Var(i) => write!(f, "idx {}", i),
-            MValue::Zero => write!(f, "Zero"),
-            MValue::Succ(v) => write!(f, "Succ {}", *v),
+            MValue::Zero => write!(f, "{}", print_nat(&MValue::Zero)),
+            MValue::Succ(v) => write!(f,"{}", print_nat(self)),
             MValue::Nil => write!(f, "Nil"),
             MValue::Cons(v, w) => write!(f, "Cons({}, {})", v, w),
             MValue::Thunk(t) => write!(f, "Thunk({})", t),

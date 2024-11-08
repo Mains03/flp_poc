@@ -1,0 +1,4 @@
+zerohead :: [Nat] -> Nat
+zerohead xs = exists ys :: [Nat]. xs =:= (0:ys). ys.
+
+zerohead [0].

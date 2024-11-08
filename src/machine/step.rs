@@ -263,13 +263,13 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     match &**val {
                         MValue::Nil => vec![Machine { comp: nilk.clone(), ..m}],
                         MValue::Cons(v, w) => {
-                            let old_env = env.clone();
-                            let new_env = 
+                            let new_menv = 
                                 extend_env(
-                                    &extend_env(&m.env, VClosure::Clos { val: v.clone(), env: old_env.clone() }.into()),
-                                    VClosure::Clos { val: w.clone(), env: old_env.clone() }.into()
+                                &extend_env(&m.env,
+                                 VClosure::Clos { val: v.clone(), env: env.clone() }.into()),
+                            VClosure::Clos { val: w.clone(), env: env.clone() }.into()
                                 );
-                            vec![Machine { comp: consk.clone(), env : new_env, ..m}]
+                            vec![Machine { comp: consk.clone(), env : new_menv, ..m}]
                         },
                         _ => panic!("Match on non-list")
                     }
@@ -343,7 +343,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     };
 
                     let m_inl = {
-                        let env = Rc::new((*m.env).clone()); // deep clone env, including lvar
+                        let env = deep_clone(m.env.clone());
                         let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
                         let closed = close_head(&vclos); // re-find lvar in deep clone
                         if let VClosure::LogicVar { lvar } = &*closed {
@@ -357,7 +357,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     };
 
                     let m_inr = {
-                        let env = Rc::new((*m.env).clone()); // deep clone env, including lvar
+                        let env = deep_clone(m.env.clone());
                         let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
                         let closed = close_head(&vclos); // re-find lvar in deep clone
                         if let VClosure::LogicVar { lvar } = &*closed {

@@ -51,5 +51,6 @@ fn interpret(src: &mut String, fuel: usize) {
     let ast = parser::parse(src).unwrap();
     let (main, env) = translate(ast);
     let vals = machine::eval(main, env.into(), fuel);
-    println!("{:?}", vals);
+    let outs = vals.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(", ");
+    println!("[{}]", outs);
 }
