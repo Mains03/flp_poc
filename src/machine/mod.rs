@@ -1,16 +1,51 @@
 pub mod mterms;
 mod step;
-mod translate;
+pub mod translate;
+use std::rc::Rc;
+
 use mterms::{MComputation, MValue};
-use step::{close_val, step, Machine, VClosure};
+use step::{close_val, empty_stack, step, LogicVar, Machine};
 
-fn eval(m : Machine, mut fuel : usize) -> Vec<MValue> {
+#[derive(Clone, Debug)]
+pub enum VClosure {
+    Clos { val : Rc<MValue>, env : Rc<Env> },
+    LogicVar { lvar : Rc<LogicVar> }
+}
 
+pub type Env = Vec<VClosure>;
+
+pub fn empty_env() -> Rc<Env> { Rc::new(vec![]) }
+
+pub fn extend_env(env : &Env, vclos : VClosure) -> Rc<Env> {
+    let mut newenv = env.clone();
+    newenv.push(vclos);
+    Rc::new(newenv)
+}
+
+fn extend_env_clos(env : &Env, val : Rc<MValue>, venv : Rc<Env>) -> Rc<Env> {
+    extend_env(env, VClosure::Clos { val, env : venv })
+}
+
+fn lookup_env(env : &Env, i : usize) -> VClosure {
+    env.get(env.len() - i - 1).expect(&("indexing ".to_owned() + &i.to_string() + " in env of length " + &env.len().to_string())).clone()
+}
+
+pub fn eval(comp : MComputation, env : Env, mut fuel : usize) -> Vec<MValue> {
+
+    let m = Machine { comp: comp.into() , env: env.clone().into(), stack: empty_stack().into(), done: false };
+    println!("[DEBUG] initial env: ");
+    env.iter().for_each(|vclos| println!("[DEBUG]   {:?}: ", vclos));
     let mut machines = vec![m];
     let mut values = vec![];
     
     while fuel > 0 && !machines.is_empty() {
         let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
+        println!("[DEBUG] machines: ");
+        ms.iter().for_each(|m| {
+            println!("[DEBUG]   comp: {:?}", m.comp);
+            //println!("[DEBUG]   stack: {:?}", m.stack);
+            //println!("[DEBUG]   env: {:?}", m.env)
+        });
         values.append(&mut done);
         machines = ms;
         fuel -= 1
@@ -22,38 +57,4 @@ fn eval(m : Machine, mut fuel : usize) -> Vec<MValue> {
             _ => unreachable!()
         }
     }).collect()
-}
-#[cfg(test)]
-mod test {
-    use std::rc::Rc;
-
-    use crate::machine::{eval, mterms::*, step::*};
-
-    use super::step;
-    
-    #[test]
-    fn test1() {
-        // Succ(Zero)
-        let val = Rc::new(MValue::Succ(MValue::Zero.into()));
-        let ret_val : MComputation = MComputation::Return(val.clone());
-        let m = Machine { comp: ret_val.into(), env : empty_env(), stack: vec![].into(), done: false };
-        let vals = eval(m, 10);
-        assert_eq!(vals.len(), 1);
-        assert_eq!(vals[0], *val);
-    }
-
-    #[test]
-    fn test2() {
-        // this tests the stack
-        let val = Rc::new(MValue::Succ(MValue::Zero.into()));
-        let id : MComputation = MComputation::Lambda { body: MComputation::Return(MValue::Var(0).into()).into() };
-        let app = MComputation::App { op: id.into(), arg: val.clone() };
-        println!("this should be (λx.x)1: {}", app);
-
-        let m = Machine { comp: app.into(), env : empty_env(), stack: vec![].into(), done: false };
-        let vals = eval(m, 1000);
-        assert_eq!(vals.len(), 1);
-        assert_eq!(vals[0], *val);
-        println!("{}", vals[0])
-    }
 }

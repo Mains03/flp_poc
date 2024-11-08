@@ -1,7 +1,8 @@
 use std::{borrow::Borrow, cell::RefCell, collections::{HashMap, VecDeque}, ptr, rc::Rc};
-use crate::cbpv::terms::ValueType;
-use super::mterms::{MValue, MComputation};
+use crate::{cbpv::terms::ValueType, machine::{empty_env, extend_env, extend_env_clos}};
+use super::{lookup_env, mterms::{MComputation, MValue}, Env, VClosure};
 
+#[derive(Debug)]
 pub struct LogicVar {
     ptype : ValueType,
     vclos : RefCell<Option<VClosure>>
@@ -44,11 +45,6 @@ impl PartialEq for LogicVar {
     }
 }
     
-#[derive(Clone)]
-pub enum VClosure {
-    Clos { val : Rc<MValue>, env : Rc<Env> },
-    LogicVar { lvar : Rc<LogicVar> }
-}
 impl VClosure {
     fn occurs_lvar(&self, lvar : &LogicVar) -> bool {
         let vclos = close_head(&self);
@@ -67,24 +63,6 @@ impl VClosure {
             VClosure::LogicVar { lvar: _lvar } => *lvar == **_lvar,
         }
     }
-}
-
-pub type Env = Vec<VClosure>;
-
-pub fn empty_env() -> Rc<Env> { Rc::new(vec![]) }
-
-pub fn extend_env(env : &Env, vclos : VClosure) -> Rc<Env> {
-    let mut newenv = env.clone();
-    newenv.push(vclos);
-    Rc::new(newenv)
-}
-
-fn extend_env_clos(env : &Env, val : Rc<MValue>, venv : Rc<Env>) -> Rc<Env> {
-    extend_env(env, VClosure::Clos { val, env : venv })
-}
-
-fn lookup_env(env : &Env, i : usize) -> VClosure {
-    env[i].clone()
 }
 
 fn close_head(vclos : &VClosure) -> Rc<VClosure> {
@@ -142,18 +120,21 @@ pub fn close_val(vclos : &VClosure) -> MValue {
     }
 }
 
+#[derive(Debug)]
 enum Frame {
     Value(Rc<MValue>),
     To(Rc<MComputation>)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Closure {
     frame : Rc<Frame>,
     env : Rc<Env>
 }
 
 type Stack = Vec<Closure>;
+
+pub fn empty_stack() -> Stack { vec![] }
 
 fn push_closure(stack : &Stack, frame : Frame, env : Rc<Env>) -> Rc<Stack> {
     let mut stk = stack.clone();
@@ -177,7 +158,8 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 [tail @ .., clos] => {
                     let Closure { frame , env } = &*clos;
                     if let Frame::To(cont) = &**frame {
-                        vec![Machine { comp: cont.clone(), stack : Rc::new(tail.to_vec()), ..m }]
+                        let new_env = extend_env_clos(&m.env, val.clone(), m.env.clone());
+                        vec![Machine { comp: cont.clone(), stack : Rc::new(tail.to_vec()), env : new_env, ..m }]
                     } else { panic!("return but no to frame in the stack") }
                 },
                   _ => unreachable!()
@@ -203,7 +185,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 [tail @ .., clos] => {
                     let Closure { frame , env} = &*clos;
                     if let Frame::Value(val) = &**frame {
-                        vec![Machine { comp: body.clone(), stack: tail.to_vec().into(), env : extend_env_clos(&*m.env, val.clone(), m.env.clone()), ..m}]
+                        vec![Machine { comp: body.clone(), stack: Rc::new(tail.to_vec()), env : extend_env_clos(&*m.env, val.clone(), m.env.clone()), ..m}]
                     } else { panic!("lambda but no value frame in the stack") }
                 },
                 _ => unreachable!()

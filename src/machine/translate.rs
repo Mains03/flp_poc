@@ -1,15 +1,15 @@
 use std::{collections::HashMap, rc::Rc};
-use crate::{cbpv::terms::ValueType, parser::syntax::{arg, bexpr::BExpr, case::Case, expr::Expr, stm::Stm, r#type::Type}};
+use crate::{cbpv::terms::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, case::Case, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
 use crate::machine::translate::Expr::Ident;
-use super::mterms::{MComputation, MValue};
+use super::{empty_env, mterms::{MComputation, MValue}, Env, VClosure};
 
 type Idx = usize;
-struct Env { env : Vec<String> } 
+struct TEnv { env : Vec<String> } 
 
-impl Env {
-    fn new() -> Env { Env { env: vec![] } }
+impl TEnv {
+    fn new() -> TEnv { TEnv { env: vec![] } }
     fn find(&self, v : &String) -> usize {
-        self.env.iter().rev().position(|x| x == v).expect("Variable not found in environment")
+        self.env.iter().rev().position(|x| x == v).expect(&("Variable ".to_owned() + v + " not found in environment"))
     }
     fn bind(&mut self, v : &String) {
         self.env.push(v.clone())
@@ -17,18 +17,67 @@ impl Env {
     fn unbind(&mut self) {
         self.env.pop();
     }
+    fn to_string(&self) -> String {
+        "[ ".to_owned() + &self.env.join(" ") + " ]"
+    }
+}
+
+pub fn translate(ast: Vec<Decl>) -> (MComputation, Env) {
+    
+    let mut env = vec![];
+    let mut tenv = TEnv::new();
+    let mut main = None;
+
+    ast.into_iter()
+        .for_each(|decl| match decl {
+            Decl::FuncType { name: _, r#type: _ } => (),
+            Decl::Func { name, args, body } => {
+                let result : Rc<MValue> = translate_func(args, body, &mut tenv).into();
+                println!("[DEBUG] definition name : {}, body : {:?}", name, *result);
+                tenv.bind(&name);
+                let vclos = VClosure::Clos { val : result.clone(), env: env.clone().into() };
+                env.push(vclos);
+            },
+            Decl::Stm(stm) => {
+                let stmt = translate_stm(stm, &mut tenv);
+                println!("[DEBUG] final stmt : {:?}", stmt);
+                println!("[DEBUG] in env : {:?}", tenv.to_string());
+                main = Some(stmt)
+            }
+        });
+    (main.expect("empty program"), env)
+}
+
+fn translate_func(args: Vec<Arg>, body: Stm, env : &mut TEnv) -> MValue {
+
+    let mut vars : Vec<String> = args.iter().map(|arg| match arg {
+        Arg::Ident(var) => var.clone(),
+        _ => todo!()
+    }).collect();
+    
+    vars.iter().for_each(|s| env.bind(s));
+    let mbody = translate_stm(body, env);
+    vars.iter().for_each(|s| env.unbind());
+    
+    let mut mval = MValue::Thunk(MComputation::Lambda { body : mbody.into()}.into());
+    while vars.len() > 1 {
+        mval = MValue::Thunk(MComputation::Lambda { body : MComputation::Return(mval.into()).into() }.into());
+        vars.pop();
+    }
+    mval 
 }
 
 fn translate_vtype(ptype : Type) -> ValueType { 
     match ptype {
         Type::Arrow(_, _) => panic!("don't translate thunks"),
-        Type::Ident(_) => todo!(),
+        Type::Ident(s) => 
+            if s == "Nat" { ValueType::Nat } else { todo!() },
         Type::List(t) => ValueType::List(Box::new(translate_vtype(*t))),
         Type::Pair(t1, t2) => ValueType::Pair(Box::new(translate_vtype(*t1)), Box::new(translate_vtype(*t2)))
     }
 }
 
-fn translate_stm(stm: Stm, env : &mut Env) -> MComputation {
+fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
     match stm {
         Stm::If { cond, then, r#else } => MComputation::Bind {
             comp : translate_stm(*cond, env).into(),
@@ -84,7 +133,7 @@ fn translate_stm(stm: Stm, env : &mut Env) -> MComputation {
     }
 }
 
-fn translate_expr(expr: Expr, env : &mut Env) -> MComputation {
+fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
     match expr {
         Expr::Cons(x, xs) => 
             MComputation::Bind { 
@@ -137,7 +186,7 @@ fn translate_expr(expr: Expr, env : &mut Env) -> MComputation {
     }
 }
 
-fn translate_bexpr(bexpr: BExpr, env : &Env) -> MComputation {
+fn translate_bexpr(bexpr: BExpr, env : &TEnv) -> MComputation {
     match bexpr {
         BExpr::Eq(lhs, rhs) => todo!(),
         BExpr::NEq(lhs, rhs) => todo!(),
@@ -148,7 +197,7 @@ fn translate_bexpr(bexpr: BExpr, env : &Env) -> MComputation {
 }
 
 fn translate_list(mut elems: Vec<Expr>, i: usize, mut list: Vec<MComputation>) -> MComputation {
-    todo!()
+    todo!("NOT YET DONE")
     // if elems.len() == 0 {
     //     list.reverse();
 
@@ -174,13 +223,13 @@ fn translate_list(mut elems: Vec<Expr>, i: usize, mut list: Vec<MComputation>) -
 
 fn translate_nat(n: usize) -> MComputation {
     let mut nat_val = MValue::Zero.into();
-    for i in (1..n) {
+    for i in (0..n) {
         nat_val = MValue::Succ(nat_val).into();
     }
     MComputation::Return(nat_val.into())
 }
 
-fn translate_pair(fst: Stm, snd: Stm, env : &mut Env) -> MComputation {
+fn translate_pair(fst: Stm, snd: Stm, env : &mut TEnv) -> MComputation {
     MComputation::Bind { 
         comp: translate_stm(fst, env).into(), 
         cont: MComputation::Bind {
