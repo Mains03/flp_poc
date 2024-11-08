@@ -199,7 +199,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
         MComputation::Choice(choices) => 
           choices.iter().map(|c| Machine { comp: c.clone(), ..m.clone()}).collect(),
         MComputation::Exists { ptype, body } => {
-            vec![Machine { env : extend_env(&*m.env, VClosure::LogicVar { lvar: LogicVar::new(ptype.clone()) }), ..m}]
+            vec![Machine { comp : body.clone(), env : extend_env(&*m.env, VClosure::LogicVar { lvar: LogicVar::new(ptype.clone()) }), ..m}]
         }
         MComputation::Equate { lhs, rhs, body } => {
           if unify(lhs, rhs, &m.env) {
