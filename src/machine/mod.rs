@@ -14,10 +14,10 @@ pub enum VClosure {
 
 impl VClosure {
     fn val(&self) -> String { 
-        if let VClosure::Clos { val, env } = self {
-            val.to_string()
+        match self {
+            VClosure::Clos { val, env } => val.to_string(),
+            VClosure::LogicVar { lvar } => "logic var".to_string(),
         }
-        else { panic!() }
     }
     
     fn deep_clone(&self) -> Self {

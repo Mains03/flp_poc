@@ -291,6 +291,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         }
                         else { unreachable!("closure was returned when closure shouldn't be returned") } 
 
+                        println!("env_nil: {:?}", env_nil.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
                         Machine { comp: nilk.clone(), env : env_nil, ..m.clone()}
                     };
                     
@@ -308,10 +309,10 @@ pub fn step(m : Machine) -> Vec<Machine> {
                             lvar.set_val(MValue::Cons(Rc::new(MValue::Var(0)), Rc::new(MValue::Var(1))).into(), lvar_env.into())
                         }
                         else { unreachable!("closure was returned when closure shouldn't be returned: {:?}", close_head(&vclos_cons).val() ) } 
-
+                        
+                        println!("env_cons: {:?}", env_cons.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
                         Machine { comp: consk.clone(), env : env_cons, ..m.clone()}
                     };
-
                     vec![m_nil, m_cons]
                 }
             }

@@ -135,17 +135,14 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
                     }
                 },
                 Case::List(list_case) => {
-                    MComputation::Match { 
-                        list: MValue::Var(env.find(&var)).into(),
-                        nilk: translate_expr(list_case.empty.unwrap().expr, env).into(),
-                        consk: {
-                            let case = list_case.cons.unwrap();
-                            env.bind(&case.x); env.bind(&case.xs);
-                            let k = translate_expr(case.expr, env).into();
-                            env.unbind(); env.unbind();
-                            k
-                        },
-                    }
+                    let nilk = translate_expr(list_case.empty.unwrap().expr, env).into();
+                    let case = list_case.cons.unwrap();
+                    env.bind(&case.x); 
+                    env.bind(&case.xs);
+                    let consk = translate_expr(case.expr, env).into();
+                    env.unbind(); 
+                    env.unbind();
+                    MComputation::Match { list: MValue::Var(env.find(&var)).into(), nilk, consk }
                 }
         },
         Stm::Expr(e) => translate_expr(e, env)
