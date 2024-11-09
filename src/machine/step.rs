@@ -235,8 +235,8 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     
                     let m_succ = {
                         let lvar_succ = LogicVar::new(ValueType::Nat);
-                        let mut lvar_env = vec![];
-                        lvar_env.push(VClosure::LogicVar { lvar: lvar_succ });
+                        let mut lvar_env = empty_env();
+                        extend_env(&lvar_env, VClosure::LogicVar { lvar: lvar_succ });
 
                         let env_succ = deep_clone(m.env.clone());
                         let vclos_succ = VClosure::Clos { val : num.clone(), env: env_succ.clone() };
@@ -298,15 +298,16 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     let m_cons = {
                         let lvar_head = VClosure::LogicVar { lvar: LogicVar::new(*(ptype.clone())) };
                         let lvar_tail = VClosure::LogicVar { lvar: LogicVar::new(ValueType::List(ptype.clone())) };
-                        let mut lvar_env = vec![];
-                        lvar_env.push(lvar_tail.clone());
+                        let mut lvar_env = empty_env();
+                        extend_env_lvar(&extend_env_lvar(&lvar_env, lvar_head), lvar_tail);
                         lvar_env.push(lvar_head.clone());
+                        lvar_env.push(lvar_tail.clone());
 
                         let env_cons = deep_clone(m.env.clone());
                         let vclos_cons = VClosure::Clos { val : list.clone(), env: env_cons.clone() };
                         let closed_num_cons = close_head(&vclos_cons);
                         if let VClosure::LogicVar { lvar } = &*closed_num_cons {
-                            lvar.set_val(MValue::Cons(Rc::new(MValue::Var(0)), Rc::new(MValue::Var(1))).into(), lvar_env.into())
+                            lvar.set_val(MValue::Cons(Rc::new(MValue::Var(1)), Rc::new(MValue::Var(0))).into(), lvar_env.into())
                         }
                         else { unreachable!("closure was returned when closure shouldn't be returned: {:?}", close_head(&vclos_cons).val() ) } 
                         let final_env = extend_env(&extend_env(&env_cons, lvar_head), lvar_tail);

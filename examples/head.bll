@@ -1,4 +1,4 @@
-zerohead :: [Nat] -> Nat
-zerohead xs = exists ys :: [Nat]. xs =:= (1:ys). ys.
+head :: [Nat] -> Nat
+head xs = exists y :: Nat. exists ys :: [Nat]. (y:ys) =:= xs. y.
 
-zerohead [0].
+head [3, 2, 1].

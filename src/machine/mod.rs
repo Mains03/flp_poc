@@ -2,6 +2,7 @@ pub mod mterms;
 mod step;
 pub mod translate;
 use std::rc::Rc;
+use im::vector::Vector;
 
 use mterms::{MComputation, MValue};
 use step::{close_val, empty_stack, step, LogicVar, Machine};
@@ -22,33 +23,43 @@ impl VClosure {
     
     fn deep_clone(&self) -> Self {
         match self {
-            Self::Clos { val, env } => Self::Clos { val: val.clone(), env: deep_clone(env.clone()) },
+            Self::Clos { val, env } => Self::Clos { val: val.clone(), env: env.deep_clone() },
             Self::LogicVar { lvar } => Self::LogicVar { lvar: Rc::new((**lvar).clone()) },
         }
     }
 }
 
-pub type Env = Vec<VClosure>;
-
-pub fn deep_clone(env : Rc<Env>) -> Rc<Env> {
-    let new_env : Env = env.iter().map(|vclos| vclos.deep_clone()).collect();
-    new_env.into()
+pub struct Env {
+    env : Vector<VClosure>
 }
 
-pub fn empty_env() -> Rc<Env> { Rc::new(vec![]) }
+impl Env {
+    pub fn empty_env() -> Env { 
+        Env { env : Vector::new() }
+    }
 
-pub fn extend_env(env : &Env, vclos : VClosure) -> Rc<Env> {
-    let mut newenv = env.clone();
-    newenv.push(vclos);
-    Rc::new(newenv)
-}
+    fn lookup_env(&self, i : usize) -> &VClosure {
+        self.env.get(self.env.len() - i - 1).expect("indexing error")
+    }
+    
+    pub fn extend_env(&self, vclos : VClosure) -> Env {
+        let vector = self.env.push_back(vclos)
+        Env { env : self.env.push_front(vclos) }
+    }
 
-fn extend_env_clos(env : &Env, val : Rc<MValue>, venv : Rc<Env>) -> Rc<Env> {
-    extend_env(env, VClosure::Clos { val, env : venv })
-}
+    fn extend_env_clos(&self, val : Rc<MValue>, venv : Rc<Env>) -> Rc<Env> {
+        self.extend_env( VClosure::Clos { val, env : venv })
+    }
 
-fn lookup_env(env : &Env, i : usize) -> VClosure {
-    env.get(env.len() - i - 1).expect(&("indexing ".to_owned() + &i.to_string() + " in env of length " + &env.len().to_string())).clone()
+    fn extend_env_lvar(&self, lvar : Rc<LogicVar>) -> Rc<Env> {
+        self.extend_env(VClosure::LogicVar { lvar })
+    }
+
+    pub fn deep_clone(env : Rc<Env>) -> Rc<Env> {
+        let new_env : Env = env.iter().map(|vclos| vclos.deep_clone()).collect();
+        new_env.into()
+    }
+
 }
 
 pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) -> Vec<MValue> {

@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 pest = "2.6"
 pest_derive = "2.6"
+im = "15.1.0"
 
 [lints.rust]
 unused = "allow"
