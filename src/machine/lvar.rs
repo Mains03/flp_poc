@@ -50,7 +50,7 @@ impl Clone for LogicVar {
         LogicVar {
             ptype : self.ptype.clone(),
             vclos : RefCell::new(self.vclos.borrow().clone())
-        }.into()
+        }
     }
 }
 

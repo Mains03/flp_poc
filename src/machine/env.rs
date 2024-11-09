@@ -37,7 +37,7 @@ impl Env {
         self.extend(VClosure::LogicVar { lvar }.into()).into()
     }
     
-    fn has_unresolved_lvars(&self) -> bool {
+    pub fn has_unresolved_lvars(&self) -> bool {
         let vec = &self.vec;
         vec.iter().any(|vclos| (**vclos).has_unresolved_lvars())
     }
@@ -45,9 +45,9 @@ impl Env {
     pub fn deep_clone(self : &Rc<Self>) -> Rc<Env> {
         if self.has_unresolved_lvars() {
             let mut new_env = self.vec.clone();
-            for mut vclos in new_env.iter_mut() {
+            for vclos in new_env.iter_mut() {
                 if vclos.has_unresolved_lvars() {
-                    vclos = &mut vclos.deep_clone()
+                    *vclos = vclos.deep_clone()
                 }
             }
             Rc::new(Env { vec : new_env })

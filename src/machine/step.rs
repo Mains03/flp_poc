@@ -38,7 +38,14 @@ pub fn step(m : Machine) -> Vec<Machine> {
     match &*(m.comp) {
         MComputation::Return(val) => {
             match &*(m.stack).as_slice() {
-                [] => vec![Machine { done: true, ..m }],
+                [] => {
+                    if (VClosure::Clos { val : val.clone(), env : m.env.clone() }).has_unresolved_lvars() {
+                        vec![]
+                    }
+                    else {
+                        vec![Machine { done: true, ..m }]
+                    }
+                },
                 [tail @ .., clos] => {
                     let Closure { frame , env } = &*clos;
                     if let Frame::To(cont) = &**frame {

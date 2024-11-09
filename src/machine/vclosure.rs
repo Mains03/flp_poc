@@ -30,7 +30,7 @@ impl VClosure {
     
     pub fn has_unresolved_lvars(&self) -> bool {
         match self {
-            Self::Clos { .. } => false,
+            Self::Clos { val, env } => env.has_unresolved_lvars(),
             Self::LogicVar { lvar } => !lvar.resolved()
         }
     }
