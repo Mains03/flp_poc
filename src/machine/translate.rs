@@ -1,7 +1,7 @@
 use std::{collections::HashMap, rc::Rc};
 use crate::{cbpv::terms::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, case::Case, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
 use crate::machine::translate::Expr::Ident;
-use super::{empty_env, mterms::{MComputation, MValue}, Env, VClosure};
+use super::{mterms::{MComputation, MValue}, Env, VClosure};
 
 type Idx = usize;
 struct TEnv { env : Vec<String> } 
@@ -22,9 +22,9 @@ impl TEnv {
     }
 }
 
-pub fn translate(ast: Vec<Decl>) -> (MComputation, Env) {
+pub fn translate(ast: Vec<Decl>) -> (MComputation, Rc<Env>) {
     
-    let mut env = vec![];
+    let mut env = Env::empty();
     let mut tenv = TEnv::new();
     let mut main = None;
 
@@ -35,8 +35,7 @@ pub fn translate(ast: Vec<Decl>) -> (MComputation, Env) {
                 let result : Rc<MValue> = translate_func(&name, args, body, &mut tenv).into();
                 println!("[DEBUG] definition: {} = {}", name, *result);
                 tenv.bind(&name);
-                let vclos = VClosure::Clos { val : result.clone(), env: env.clone().into() };
-                env.push(vclos);
+                env = env.extend_clos(result.clone(), env.clone())
             },
             Decl::Stm(stm) => {
                 let stmt = translate_stm(stm, &mut tenv);
