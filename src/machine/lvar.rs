@@ -42,6 +42,12 @@ impl LogicVar {
     pub fn set_vclos(&self, vclos : &VClosure) {
         *(self.vclos.borrow_mut()) = Some(vclos.clone());
     }
+
+    pub fn set_lvar(&self, lvar : &LogicVar) {
+        let mut lhs: *mut Option<VClosure> = &mut *self.vclos.borrow_mut();
+        let mut rhs: *mut Option<VClosure> = &mut *lvar.vclos.borrow_mut();
+        unsafe { lhs = rhs }
+    }
     
 }
 

@@ -49,6 +49,7 @@ impl Env {
                 if vclos.has_unresolved_lvars() {
                     *vclos = vclos.deep_clone()
                 }
+                else { println!("[DEBUG] shouldn't deep clone!!!")}
             }
             Rc::new(Env { vec : new_env })
         }

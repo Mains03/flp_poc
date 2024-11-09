@@ -15,7 +15,7 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>) -> bool {
         match (&*lhs, &*rhs) {
             (VClosure::LogicVar { lvar: lhsvar }, VClosure::LogicVar {lvar : rhsvar}) => { 
                 // both are variables! equalize them anyway
-                lhsvar.set_vclos(&*rhs);
+                lhsvar.set_lvar(rhsvar);
             },
             (VClosure::LogicVar { lvar }, _) => { 
                 // the head of the LHS has been closed, so it must be a free logic variable
