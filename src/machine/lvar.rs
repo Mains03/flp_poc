@@ -2,7 +2,7 @@ use std::{cell::RefCell, ptr, rc::Rc};
 
 use crate::cbpv::terms::ValueType;
 
-use super::{env::Env, mterms::MValue, DeepClone, VClosure};
+use super::{env::Env, mterms::MValue, VClosure};
 
 
 #[derive(Debug)]

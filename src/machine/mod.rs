@@ -1,6 +1,8 @@
 pub mod mterms;
+mod vclosure;
 mod lvar;
 mod env;
+mod unify;
 mod step;
 pub mod translate;
 use std::rc::Rc;
@@ -8,45 +10,8 @@ use env::Env;
 use im::vector::Vector;
 use lvar::LogicVar;
 use mterms::{MComputation, MValue};
-use step::{close_val, empty_stack, step, Machine};
-pub trait DeepClone {
-    fn deep_clone(&self) -> Rc<Self>;
-}
-
-#[derive(Clone, Debug)]
-pub enum VClosure {
-    Clos { val : Rc<MValue>, env : Rc<Env> },
-    LogicVar { lvar : Rc<LogicVar> } // by making this Rc we ensure that cloning is never deep
-}
-
-impl VClosure {
-    fn val(&self) -> String { 
-        match self {
-            VClosure::Clos { val, env } => val.to_string(),
-            VClosure::LogicVar { lvar } => "logic var".to_string(),
-        }
-    }
-    
-    fn deep_clone(self: &Rc<Self>) -> Rc<Self> {
-        if self.has_unresolved_lvars() {
-            match &**self {
-                Self::Clos { val, env } => Self::Clos { val: val.clone(), env: env.deep_clone() },
-                Self::LogicVar { lvar } => Self::LogicVar { lvar: Rc::new((**lvar).clone()) },
-            }.into()
-        }
-        else {
-            self.clone()
-        }
-    }
-    
-    pub fn has_unresolved_lvars(&self) -> bool {
-        match self {
-            Self::Clos { .. } => false,
-            Self::LogicVar { lvar } => !lvar.resolved()
-        }
-    }
-}
-
+use step::{empty_stack, step, Machine};
+use vclosure::VClosure;
 
 pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) -> Vec<MValue> {
 
@@ -70,7 +35,7 @@ pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) -> Vec<MValue>
     
     values.iter().map(|m| {
         match &*m.comp {
-            MComputation::Return(v) => close_val(&VClosure::Clos { val: v.clone(), env: m.env.clone() }),
+            MComputation::Return(v) => VClosure::Clos { val: v.clone(), env: m.env.clone() }.close_val(),
             _ => unreachable!()
         }
     }).collect()
