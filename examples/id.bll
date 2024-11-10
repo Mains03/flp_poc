@@ -1,4 +1,4 @@
 f :: Nat -> Nat
-f x z = exists y :: Nat. (y =:= y. x).
+f x z = exists y :: Nat. (2 =:= y. y).
 
 f 2 4.

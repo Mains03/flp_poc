@@ -1,67 +1,63 @@
 use std::{cell::RefCell, ptr, rc::Rc};
 
+use im::HashMap;
+
+use union_find::{QuickFindUf, UnionBySize, UnionFind};
+
 use crate::cbpv::terms::ValueType;
 
-use super::{env::Env, mterms::MValue, VClosure};
+use super::{env::Env, mterms::MValue, Ident, VClosure};
 
-
-#[derive(Debug)]
-pub struct LogicVar {
-    ptype : ValueType,
-    vclos : RefCell<Option<VClosure>>
+#[derive(Clone)]
+pub struct LogicEnv {
+    map : HashMap<Ident, (ValueType, Option<Rc<VClosure>>)>,
+    union_vars : QuickFindUf::<UnionBySize>,
+    next : usize
 }
 
-impl LogicVar {
-    pub fn new(ptype : ValueType) -> Rc<Self> {
-        Rc::new(LogicVar { ptype: ptype.clone(), vclos : RefCell::new(None) })
-    }
-    
-    pub fn get_type(&self) -> ValueType {
-        self.ptype.clone()
-    }
-    
-    pub fn get(&self) -> Option<VClosure> {
-        self.vclos.borrow().clone()
-    }
-    
-    pub fn resolved(&self) -> bool {
-        self.vclos.borrow().is_some()
-    }
+impl LogicEnv {
 
-    fn with_val_new(ptype : &ValueType, val : &Rc<MValue>, env : &Rc<Env>) -> Self {
-        LogicVar {
-            ptype: ptype.clone(), 
-            vclos : RefCell::new(Some(VClosure::Clos { val: val.clone(), env : env.clone() }))
+    pub fn new() -> LogicEnv {
+        LogicEnv {
+            map : HashMap::new(),
+            union_vars : QuickFindUf::new(100),
+            next : 0 
         }
     }
-    
-    pub fn set_val(&self, val : Rc<MValue>, env : Rc<Env>) {
-        *(self.vclos.borrow_mut()) = Some(VClosure::Clos { val, env });
-    }
-    
-    pub fn set_vclos(&self, vclos : &VClosure) {
-        *(self.vclos.borrow_mut()) = Some(vclos.clone());
-    }
 
-    pub fn set_lvar(&self, lvar : &LogicVar) {
-        let mut lhs: *mut Option<VClosure> = &mut *self.vclos.borrow_mut();
-        let mut rhs: *mut Option<VClosure> = &mut *lvar.vclos.borrow_mut();
-        unsafe { lhs = rhs }
+    // pub fn split(self : Rc<Self>) -> Rc<Self> {
+    //     LogicEnv {
+    //         map : self.map.clone(),
+    //         next : self.next
+    //     }.into()
+    // }
+    
+    pub fn fresh(&mut self, ptype : ValueType) -> Ident {
+        let next = self.next;
+        self.map.insert(next, (ptype, None));
+        self.next = next + 1;
+        next
     }
     
-}
-
-impl Clone for LogicVar {
-    fn clone(&self) -> LogicVar  {
-        LogicVar {
-            ptype : self.ptype.clone(),
-            vclos : RefCell::new(self.vclos.borrow().clone())
+    pub fn lookup(&self, ident : &Ident) -> Option<Rc<VClosure>> {
+        // let root = self.union_vars.find(*ident);
+        if let Some((_, Some(vclos))) = self.map.get(ident) { 
+            return Some(vclos.clone())
         }
+        else { return None }
     }
-}
-
-impl PartialEq for LogicVar {
-    fn eq(&self, other : &Self) -> bool {
-        self.ptype == other.ptype && ptr::eq(&self.vclos, &other.vclos) 
+    
+    pub fn set_vclos(&mut self, ident : &Ident, vclos : &Rc<VClosure>) {
+        let ptype = self.get_type(ident);
+        self.map.insert(*ident, (ptype, Some(vclos.clone())));
+    }
+    
+    pub fn get_type(&self, ident : &Ident) -> ValueType {
+        if let Some((ptype, _)) = self.map.get(ident) { return ptype.clone() }
+        else { panic!() }
+    }
+    
+    pub fn identify(&mut self, ident1 : &Ident, ident2 : &Ident) {
+        self.union_vars.union(*ident1, *ident2);
     }
 }

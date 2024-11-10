@@ -1,9 +1,8 @@
 use std::{borrow::Borrow, cell::RefCell, collections::{HashMap, VecDeque}, ptr, rc::Rc};
-use crate::cbpv::terms::ValueType;
-use super::{lvar::LogicVar, mterms::{MComputation, MValue}, Env, VClosure};
+use crate::{cbpv::terms::{Value, ValueType}, machine::lvar};
+use super::{lvar::LogicEnv, mterms::{MComputation, MValue}, Env, VClosure};
 use crate::machine::unify::unify;
     
-
 #[derive(Debug)]
 enum Frame {
     Value(Rc<MValue>),
@@ -30,6 +29,7 @@ fn push_closure(stack : &Stack, frame : Frame, env : Rc<Env>) -> Rc<Stack> {
 pub struct Machine {
     pub comp : Rc<MComputation>,
     pub env  : Rc<Env>,
+    pub lenv : LogicEnv,
     pub stack : Rc<Stack>,
     pub done : bool
 }
@@ -38,14 +38,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
     match &*(m.comp) {
         MComputation::Return(val) => {
             match &*(m.stack).as_slice() {
-                [] => {
-                    if (VClosure::Clos { val : val.clone(), env : m.env.clone() }).has_unresolved_lvars() {
-                        vec![]
-                    }
-                    else {
-                        vec![Machine { done: true, ..m }]
-                    }
-                },
+                [] => vec![Machine { done: true, ..m }],
                 [tail @ .., clos] => {
                     let Closure { frame , env } = &*clos;
                     if let Frame::To(cont) = &**frame {
@@ -59,7 +52,8 @@ pub fn step(m : Machine) -> Vec<Machine> {
         MComputation::Bind { comp, cont } => 
             vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
         MComputation::Force(v) => {
-            let w = VClosure::Clos { val: v.clone(), env: m.env.clone() }.close_head();
+            let vclos = VClosure::Clos { val: v.clone(), env: m.env.clone() };
+            let w = vclos.close_head(&m.lenv);
             match &*w {
                 VClosure::Clos { val, env } => {
                     match &**val {
@@ -67,7 +61,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
                     _ => panic!("shouldn't be forcing a non-thunk value")
                     } 
                 },
-                VClosure::LogicVar { lvar } => panic!("shouldn't be forcing a logic variable"),
+                VClosure::LogicVar { ident } => panic!("shouldn't be forcing a logic variable"),
             }
         },
         MComputation::Lambda { body } => {
@@ -88,18 +82,21 @@ pub fn step(m : Machine) -> Vec<Machine> {
         MComputation::Choice(choices) => 
           choices.iter().map(|c| Machine { comp: c.clone(), ..m.clone()}).collect(),
         MComputation::Exists { ptype, body } => {
-            vec![Machine { comp : body.clone(), env : m.env.extend_lvar(LogicVar::new(ptype.clone())), ..m}]
+            let mut lenv = m.lenv;
+            let ident = lenv.fresh(ptype.clone());
+            vec![Machine { comp : body.clone(), env : m.env.extend_lvar(ident), lenv : lenv, ..m}]
         }
         MComputation::Equate { lhs, rhs, body } => {
-          if unify(lhs, rhs, &m.env) {
-            vec![Machine {comp : body.clone(), ..m }]
-          } else {
-            vec![]
-          }
+            let lenv = m.lenv.clone();
+            if unify(lhs, rhs, &m.env, lenv) {
+                vec![Machine {comp : body.clone(), ..m }]
+            } else {
+                vec![]
+            }
         },
         MComputation::Ifz { num, zk, sk } => {
             let vclos = VClosure::Clos { val : num.clone(), env: m.env.clone() };
-            let closed_num = vclos.close_head();
+            let closed_num = vclos.close_head(&m.lenv);
             match &*closed_num {
                 VClosure::Clos { val, env } => {
                     match &**val {
@@ -108,33 +105,27 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         _ => panic!("Ifz on something non-numerical")
                     }
                 },
-                VClosure::LogicVar { .. } => {  // must be unresolved, by structure of close_head
+                VClosure::LogicVar { ident } => {  // must be unresolved, by structure of close_head
                     let m_zero  = {
-                        let env_zero = m.env.deep_clone();
-                        let vclos_zero = VClosure::Clos { val : num.clone(), env: env_zero.clone() };
-                        let closed_num_zero = vclos_zero.close_head();
-                        if let VClosure::LogicVar { lvar } = &*closed_num_zero {
-                            lvar.set_val(MValue::Zero.into(), Env::empty())
-                        }
-                        else { unreachable!() } 
+                        let mut lenv = m.lenv.clone(); // make a new logic env
+                        lenv.set_vclos(&ident, &VClosure::Clos {
+                           val: MValue::Zero.into(), 
+                           env: Env::empty() 
+                        }.into());
 
-                        Machine { comp: zk.clone(), env : env_zero, ..m.clone()}
+                        Machine { comp: zk.clone(), lenv : lenv, ..m.clone()}
                     };
                     
                     let m_succ = {
-                        let lvar_succ = LogicVar::new(ValueType::Nat);
-                        let mut lvar_env = Env::empty();
-                        lvar_env.extend_lvar(lvar_succ);
+                        let mut lenv = m.lenv.clone();
+                        let ident_lvar_succ = lenv.fresh(ValueType::Nat);
+                        
+                        lenv.set_vclos(&ident, &VClosure::Clos { 
+                            val : MValue::Succ(Rc::new(MValue::Var(0))).into(), 
+                            env : Env::empty().extend_lvar(ident_lvar_succ)
+                        }.into());
 
-                        let env_succ = m.env.deep_clone();
-                        let vclos_succ = VClosure::Clos { val : num.clone(), env: env_succ.clone() };
-                        let closed_num_succ = vclos_succ.close_head();
-                        if let VClosure::LogicVar { lvar } = &*closed_num_succ {
-                            lvar.set_val(MValue::Succ(Rc::new(MValue::Var(0))).into(), lvar_env.into())
-                        }
-                        else { unreachable!() } 
-
-                        Machine { comp: sk.clone(), env : env_succ, ..m.clone()}
+                        Machine { comp: sk.clone(), lenv : lenv, ..m.clone()}
                     };
 
                     vec![m_zero, m_succ]
@@ -143,7 +134,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
         },
         MComputation::Match { list, nilk, consk } => {
             let vclos = VClosure::Clos { val : list.clone(), env: m.env.clone() };
-            let closed_list = vclos.close_head();
+            let closed_list = vclos.close_head(&m.lenv);
             match &*closed_list {
                 VClosure::Clos { val, env } => {
                     match &**val {
@@ -156,45 +147,35 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         _ => panic!("Match on non-list")
                     }
                 },
-                VClosure::LogicVar { lvar } => {  // must be unresolved, by structure of close_head
+                VClosure::LogicVar { ident } => {  // must be unresolved, by structure of close_head
                                                   
-                    let ptype = match lvar.get_type() {
+                    let ptype = match m.lenv.get_type(&ident) {
                         ValueType::List(t) => t,
                         _ => panic!("matching on a non-list logical variable")
                     };
 
                     let m_nil  = {
+                        
+                        let mut lenv = m.lenv.clone();
+                        lenv.set_vclos(&ident, &VClosure::Clos { val: MValue::Nil.into(), env: Env::empty() }.into());
 
-                        println!("[DEBUG] about to deep clone");
-                        let env_nil = m.env.deep_clone();
-                        println!("[DEBUG] just deep cloned");
-                        let vclos_nil = VClosure::Clos { val : list.clone(), env: env_nil.clone() };
-                        let closed_list_nil = vclos_nil.close_head();
-                        if let VClosure::LogicVar { lvar } = &*closed_list_nil {
-                            lvar.set_val(MValue::Nil.into(), Env::empty())
-                        }
-                        else { unreachable!("closure was returned when closure shouldn't be returned") } 
-
-                        // println!("env_nil: {:?}", env_nil.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
-                        Machine { comp: nilk.clone(), env : env_nil, ..m.clone()}
+                        Machine { comp: nilk.clone(), lenv : lenv, ..m.clone()}
                     };
                     
                     let m_cons = {
-                        let lvar_head = LogicVar::new(*(ptype.clone()));
-                        let lvar_tail = LogicVar::new(ValueType::List(ptype.clone()));
-                        let lvar_env = Env::empty().extend_lvar(lvar_head.clone()).extend_lvar(lvar_tail.clone());
-
-                        let env_cons = m.env.deep_clone();
-                        let vclos_cons = VClosure::Clos { val : list.clone(), env: env_cons.clone() };
-                        let closed_num_cons = vclos_cons.close_head();
-                        if let VClosure::LogicVar { lvar } = &*closed_num_cons {
-                            lvar.set_val(MValue::Cons(Rc::new(MValue::Var(1)), Rc::new(MValue::Var(0))).into(), lvar_env)
-                        }
-                        else { unreachable!("closure was returned when closure shouldn't be returned: {:?}", vclos_cons.close_head().val() ) } 
-                        let final_env = env_cons.extend_lvar(lvar_head).extend_lvar(lvar_tail);
                         
-                        // println!("env_cons: {:?}", env_cons.iter().map(|vclos| vclos.val()).collect::<Vec<String>>());
-                        Machine { comp: consk.clone(), env : final_env, ..m.clone()}
+                        let mut lenv = m.lenv.clone();
+                        let head_ident = lenv.fresh(*ptype.clone());
+                        let tail_ident = lenv.fresh(ValueType::List(ptype));
+                        
+                        lenv.set_vclos(&ident, &VClosure::Clos {
+                            val: MValue::Cons(Rc::new(MValue::Var(1)), Rc::new(MValue::Var(0))).into(),
+                            env: Env::empty().extend_lvar(head_ident).extend_lvar(tail_ident)
+                        }.into());
+                        
+                        let env = m.env.extend_lvar(head_ident).extend_lvar(tail_ident);
+
+                        Machine { comp: consk.clone(), lenv : lenv, env : env, ..m.clone()}
                     };
                     vec![m_nil, m_cons]
                 }
@@ -202,7 +183,7 @@ pub fn step(m : Machine) -> Vec<Machine> {
         },
         MComputation::Case { sum, inlk, inrk } => {
             let vclos = VClosure::Clos { val : sum.clone(), env: m.env.clone() };
-            let closed_sum = vclos.close_head();
+            let closed_sum = vclos.close_head(&m.lenv);
             match &*closed_sum {
                 VClosure::Clos { val, env } => {
                     match &**val {
@@ -219,37 +200,39 @@ pub fn step(m : Machine) -> Vec<Machine> {
                         _ => panic!("Match on non-list")
                     }
                 },
-                VClosure::LogicVar { lvar } => {  // must be unresolved, by structure of close_head
+                VClosure::LogicVar { ident } => {  // must be unresolved, by structure of close_head
                                                   
-                    let (ptype1, ptype2) = match lvar.get_type() {
+                    let (ptype1, ptype2) = match m.lenv.get_type(&ident) {
                         ValueType::Sum(t1, t2) => (t1, t2),
                         _ => panic!("case-ing on a non-sum logical variable")
                     };
 
                     let m_inl = {
-                        let env = m.env.deep_clone();
-                        let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
-                        let closed = vclos.close_head(); // re-find lvar in deep clone
-                        if let VClosure::LogicVar { lvar } = &*closed {
-                            // make a new lvar of inl type, and stick it into the new machine
-                            let lvar_inl = LogicVar::new(*(ptype1.clone()));
-                            let mut new_env = Env::empty().extend_lvar(lvar_inl);
-                            lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env)
-                        }
-                        Machine { comp: inlk.clone(), env, ..m.clone()}
+                        // let env = m.env.deep_clone();
+                        // let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
+                        // let closed = vclos.close_head(); // re-find lvar in deep clone
+                        // if let VClosure::LogicVar { lvar } = &*closed {
+                        //     // make a new lvar of inl type, and stick it into the new machine
+                        //     let lvar_inl = LogicVar::new(*(ptype1.clone()));
+                        //     let mut new_env = Env::empty().extend_lvar(lvar_inl);
+                        //     lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env)
+                        // }
+                        // Machine { comp: inlk.clone(), env, ..m.clone()}
+                        todo!()
                     };
 
                     let m_inr = {
-                        let env = m.env.deep_clone();
-                        let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
-                        let closed = vclos.close_head(); // re-find lvar in deep clone
-                        if let VClosure::LogicVar { lvar } = &*closed {
-                            // make a new lvar of inl type, and stick it into the new machine
-                            let lvar_inr = LogicVar::new(*(ptype2.clone()));
-                            let mut new_env = Env::empty().extend_lvar(lvar_inr);
-                            lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env)
-                        }
-                        Machine { comp: inlk.clone(), env, ..m.clone()}
+                        // let env = m.env.deep_clone();
+                        // let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
+                        // let closed = vclos.close_head(); // re-find lvar in deep clone
+                        // if let VClosure::LogicVar { lvar } = &*closed {
+                        //     // make a new lvar of inl type, and stick it into the new machine
+                        //     let lvar_inr = LogicVar::new(*(ptype2.clone()));
+                        //     let mut new_env = Env::empty().extend_lvar(lvar_inr);
+                        //     lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env)
+                        // }
+                        // Machine { comp: inlk.clone(), env, ..m.clone()}
+                        todo!()
                     };
                     
                     vec![m_inl, m_inr]

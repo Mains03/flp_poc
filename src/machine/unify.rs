@@ -1,8 +1,8 @@
 use std::{collections::VecDeque, rc::Rc};
 
-use super::{env::Env, mterms::MValue, VClosure};
+use super::{env::Env, lvar::LogicEnv, mterms::MValue, VClosure};
 
-pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>) -> bool { 
+pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, mut lenv : LogicEnv) -> bool { 
     let mut q : VecDeque<(Rc<VClosure>, Rc<VClosure>)> = VecDeque::new();
     
     let lhs_clos = VClosure::Clos { val: lhs.clone(), env: env.clone() }.into();
@@ -10,21 +10,21 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>) -> bool {
     
     q.push_back((lhs_clos, rhs_clos));
     while let Some((lhs, rhs)) = q.pop_front() {
-        let lhs = lhs.close_head();
-        let rhs = rhs.close_head();
+        let lhs = lhs.close_head(&lenv);
+        let rhs = rhs.close_head(&lenv);
         match (&*lhs, &*rhs) {
-            (VClosure::LogicVar { lvar: lhsvar }, VClosure::LogicVar {lvar : rhsvar}) => { 
+            (VClosure::LogicVar { ident : ident_lhs}, VClosure::LogicVar { ident : ident_rhs}) => { 
                 // both are variables! equalize them anyway
-                lhsvar.set_lvar(rhsvar);
+                lenv.identify(ident_lhs, ident_rhs);
             },
-            (VClosure::LogicVar { lvar }, _) => { 
+            (VClosure::LogicVar { ident }, _) => { 
                 // the head of the LHS has been closed, so it must be a free logic variable
-                if rhs.occurs_lvar(lvar) { return false }
-                lvar.set_vclos(&rhs);
+                if rhs.occurs_lvar(&lenv, ident) { return false }
+                lenv.set_vclos(ident, &rhs);
             },
-            (_, VClosure::LogicVar { lvar }) => { 
-                if lhs.occurs_lvar(lvar) { return false }
-                lvar.set_vclos(&lhs);
+            (_, VClosure::LogicVar { ident }) => { 
+                if lhs.occurs_lvar(&lenv, ident) { return false }
+                lenv.set_vclos(ident, &lhs);
             },
             (VClosure::Clos { val : lhs_val, env: lhs_env}, VClosure::Clos { val : rhs_val, env : rhs_env }) =>
                 match (&**lhs_val, &**rhs_val) {

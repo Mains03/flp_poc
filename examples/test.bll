@@ -1,6 +1,6 @@
 hello :: [Nat] -> [Nat]
 hello xs = exists ys :: [Nat]. case ys of 
-                [] -> 5.
-                (z:zs) -> xs.
-
+                [] -> 4.
+                (z:zs) -> 5.
+                
 hello [1, 2, 3].

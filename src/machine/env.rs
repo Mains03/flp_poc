@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use im::Vector;
 
-use super::lvar::LogicVar;
+use super::Ident;
 use super::{mterms::MValue, VClosure};
 
 #[derive(Clone, Debug)]
@@ -33,28 +33,7 @@ impl Env {
         self.extend( VClosure::Clos { val, env : venv }.into()).into()
     }
 
-    pub fn extend_lvar(&self, lvar : Rc<LogicVar>) -> Rc<Env> {
-        self.extend(VClosure::LogicVar { lvar }.into()).into()
-    }
-    
-    pub fn has_unresolved_lvars(&self) -> bool {
-        let vec = &self.vec;
-        vec.iter().any(|vclos| (**vclos).has_unresolved_lvars())
-    }
-
-    pub fn deep_clone(self : &Rc<Self>) -> Rc<Env> {
-        if self.has_unresolved_lvars() {
-            let mut new_env = self.vec.clone();
-            for vclos in new_env.iter_mut() {
-                if vclos.has_unresolved_lvars() {
-                    *vclos = vclos.deep_clone()
-                }
-                else { println!("[DEBUG] shouldn't deep clone!!!")}
-            }
-            Rc::new(Env { vec : new_env })
-        }
-        else {
-            self.clone()
-        }
+    pub fn extend_lvar(&self, ident : Ident) -> Rc<Env> {
+        self.extend(VClosure::LogicVar { ident }.into()).into()
     }
 }
