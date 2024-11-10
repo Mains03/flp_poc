@@ -4,6 +4,7 @@ mod lvar;
 mod env;
 mod unify;
 mod step;
+mod union_find;
 pub mod translate;
 use std::rc::Rc;
 use env::Env;

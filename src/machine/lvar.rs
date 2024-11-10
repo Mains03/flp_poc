@@ -2,16 +2,14 @@ use std::{cell::RefCell, ptr, rc::Rc};
 
 use im::HashMap;
 
-use union_find::{QuickFindUf, UnionBySize, UnionFind};
-
 use crate::cbpv::terms::ValueType;
 
-use super::{env::Env, mterms::MValue, Ident, VClosure};
+use super::{env::Env, mterms::MValue, union_find::UnionFind, Ident, VClosure};
 
 #[derive(Clone)]
 pub struct LogicEnv {
     map : HashMap<Ident, (ValueType, Option<Rc<VClosure>>)>,
-    union_vars : QuickFindUf::<UnionBySize>,
+    union_vars : UnionFind,
     next : usize
 }
 
@@ -20,7 +18,7 @@ impl LogicEnv {
     pub fn new() -> LogicEnv {
         LogicEnv {
             map : HashMap::new(),
-            union_vars : QuickFindUf::new(100),
+            union_vars : UnionFind::new(),
             next : 0 
         }
     }
@@ -34,13 +32,14 @@ impl LogicEnv {
     
     pub fn fresh(&mut self, ptype : ValueType) -> Ident {
         let next = self.next;
+        self.union_vars.register(next);
         self.map.insert(next, (ptype, None));
         self.next = next + 1;
         next
     }
     
     pub fn lookup(&self, ident : &Ident) -> Option<Rc<VClosure>> {
-        // let root = self.union_vars.find(*ident);
+        let root = self.union_vars.find(*ident);
         if let Some((_, Some(vclos))) = self.map.get(ident) { 
             return Some(vclos.clone())
         }
