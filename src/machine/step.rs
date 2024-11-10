@@ -87,9 +87,9 @@ pub fn step(m : Machine) -> Vec<Machine> {
             vec![Machine { comp : body.clone(), env : m.env.extend_lvar(ident), lenv : lenv, ..m}]
         }
         MComputation::Equate { lhs, rhs, body } => {
-            let lenv = m.lenv.clone();
-            if unify(lhs, rhs, &m.env, lenv) {
-                vec![Machine {comp : body.clone(), ..m }]
+            let mut lenv = m.lenv;
+            if unify(lhs, rhs, &m.env, &mut lenv) {
+                vec![Machine {comp : body.clone(), lenv : lenv, ..m }]
             } else {
                 vec![]
             }

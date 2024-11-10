@@ -11,7 +11,7 @@ pub enum VClosure {
 impl VClosure {
     pub fn val(&self) -> String { 
         match self {
-            VClosure::Clos { val, env } => val.to_string(),
+            VClosure::Clos { val, env } => format!("value: {}", val.to_string()),
             VClosure::LogicVar { ident } => format!("logic var: {}", ident)
         }
     }

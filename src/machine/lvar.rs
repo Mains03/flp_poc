@@ -33,22 +33,29 @@ impl LogicEnv {
     pub fn fresh(&mut self, ptype : ValueType) -> Ident {
         let next = self.next;
         self.union_vars.register(next);
-        self.map.insert(next, (ptype, None));
+        self.map.insert(next, (ptype.clone(), None));
+        // println!("generated {} of type {}", next, ptype);
         self.next = next + 1;
         next
     }
     
     pub fn lookup(&self, ident : &Ident) -> Option<Rc<VClosure>> {
-        let root = self.union_vars.find(*ident);
+        // let root = self.union_vars.find(*ident);
         if let Some((_, Some(vclos))) = self.map.get(ident) { 
+            // println!("[DEBUG] looked up {} to be {}", ident, vclos.clone().val());
             return Some(vclos.clone())
         }
-        else { return None }
+        else { 
+            // println!("[DEBUG] LENV failed to find {}", ident);
+            return None
+         }
     }
     
     pub fn set_vclos(&mut self, ident : &Ident, vclos : &Rc<VClosure>) {
         let ptype = self.get_type(ident);
+        // println!("[DEBUG] setting {} to be {}", ident, vclos.val());
         self.map.insert(*ident, (ptype, Some(vclos.clone())));
+        self.lookup(ident);
     }
     
     pub fn get_type(&self, ident : &Ident) -> ValueType {

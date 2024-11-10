@@ -26,7 +26,6 @@ impl UnionFind {
     
     pub fn register(&mut self, i : usize) {
         assert!(i >= self.array.len());
-        println!("RESIZED");
         self.array.resize_with(i+1, || { Node::new() });
     }
     

@@ -25,12 +25,12 @@ pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) -> Vec<MValue>
     
     while fuel > 0 && !machines.is_empty() {
         let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
-        println!("[DEBUG] machines: ");
-        ms.iter().for_each(|m| {
-            println!("[DEBUG]   comp: {}", m.comp);
-            println!("[DEBUG]   stack size: {:?}", m.stack.len());
-            println!("[DEBUG]   env size: {:?}", m.env.size())
-        });
+        // println!("[DEBUG] machines: ");
+        // ms.iter().for_each(|m| {
+            // println!("[DEBUG]   comp: {}", m.comp);
+            // println!("[DEBUG]   stack size: {:?}", m.stack.len());
+            // println!("[DEBUG]   env size: {:?}", m.env.size())
+        // });
         values.append(&mut done);
         machines = ms;
         fuel -= 1

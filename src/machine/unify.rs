@@ -2,7 +2,7 @@ use std::{collections::VecDeque, rc::Rc};
 
 use super::{env::Env, lvar::LogicEnv, mterms::MValue, VClosure};
 
-pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, mut lenv : LogicEnv) -> bool { 
+pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut LogicEnv) -> bool { 
     let mut q : VecDeque<(Rc<VClosure>, Rc<VClosure>)> = VecDeque::new();
     
     let lhs_clos = VClosure::Clos { val: lhs.clone(), env: env.clone() }.into();
