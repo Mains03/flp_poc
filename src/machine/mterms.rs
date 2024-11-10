@@ -20,7 +20,7 @@ fn print_nat(n : &MValue) -> String {
         match n {
             MValue::Zero => i,
             MValue::Succ(v) => print_nat_aux(&v, i+1),
-            _ => panic!()
+            _ => panic!("tried to print this as nat: {}", n)
         }
     }
     print_nat_aux(n, 0).to_string()

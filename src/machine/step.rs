@@ -101,7 +101,10 @@ pub fn step(m : Machine) -> Vec<Machine> {
                 VClosure::Clos { val, env } => {
                     match &**val {
                         MValue::Zero => vec![Machine { comp: zk.clone(), ..m}],
-                        MValue::Succ(_) => vec![Machine { comp: sk.clone(), ..m}],
+                        MValue::Succ(v) => {
+                            let new_menv = m.env.extend_clos(v.clone(), env.clone());
+                            vec![Machine { comp: sk.clone(), env : new_menv, ..m}]
+                        }
                         _ => panic!("Ifz on something non-numerical")
                     }
                 },

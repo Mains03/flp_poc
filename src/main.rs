@@ -23,7 +23,7 @@ fn main() {
     let file_name = &args[1];
     let fuel = match args.get(2) {
         Some(n) => n.parse().unwrap(),
-        None => 1000
+        None => 10000
     };
 
     let mut file = match File::open(file_name) {
@@ -50,7 +50,5 @@ fn interpret(src: &mut String, fuel: usize) {
 
     let ast = parser::parse(src).unwrap();
     let (main, env) = translate(ast);
-    let vals = machine::eval(main, env.into(), fuel);
-    let outs = vals.iter().map(|v| v.to_string()).collect::<Vec<String>>().join(", ");
-    println!("[{}]", outs);
+    machine::eval(main, env.into(), fuel);
 }

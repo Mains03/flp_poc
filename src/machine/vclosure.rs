@@ -40,7 +40,7 @@ impl VClosure {
             vclos = match vclos {
                 VClosure::Clos { ref val, ref env } => {
                     match **val {
-                        MValue::Var(i) => env.lookup(i).clone().clone(),
+                        MValue::Var(i) => env.lookup(i).clone(),
                         _ => break
                     }
                 },

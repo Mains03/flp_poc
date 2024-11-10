@@ -33,14 +33,14 @@ pub fn translate(ast: Vec<Decl>) -> (MComputation, Rc<Env>) {
             Decl::FuncType { name: _, r#type: _ } => (),
             Decl::Func { name, args, body } => {
                 let result : Rc<MValue> = translate_func(&name, args, body, &mut tenv).into();
-                println!("[DEBUG] definition: {} = {}", name, *result);
+                // println!("[DEBUG] definition: {} = {}", name, *result);
                 tenv.bind(&name);
                 env = env.extend_clos(result.clone(), env.clone())
             },
             Decl::Stm(stm) => {
                 let stmt = translate_stm(stm, &mut tenv);
-                println!("[DEBUG] final stmt : {}", stmt);
-                println!("[DEBUG] in env : {:?}", tenv.to_string());
+                // println!("[DEBUG] final stmt : {}", stmt);
+                // println!("[DEBUG] in env : {:?}", tenv.to_string());
                 main = Some(stmt)
             }
         });
@@ -127,18 +127,19 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
         Stm::Case(var, case) => 
             match case {
                 Case::Nat(nat_case) => {
-                    MComputation::Ifz { 
-                        num: MValue::Var(env.find(&var)).into(),
-                        zk: translate_expr(nat_case.zero.unwrap().expr, env).into(),
-                        sk: translate_expr(nat_case.succ.unwrap().expr, env).into(),
-                    }
+                    let zk = translate_expr(nat_case.zero.unwrap().expr, env).into();
+                    let succ_case = nat_case.succ.unwrap();
+                    env.bind(&succ_case.var); 
+                    let sk = translate_expr(succ_case.expr, env).into();
+                    env.unbind(); 
+                    MComputation::Ifz { num: MValue::Var(env.find(&var)).into(), zk, sk }
                 },
                 Case::List(list_case) => {
                     let nilk = translate_expr(list_case.empty.unwrap().expr, env).into();
-                    let case = list_case.cons.unwrap();
-                    env.bind(&case.x); 
-                    env.bind(&case.xs);
-                    let consk = translate_expr(case.expr, env).into();
+                    let cons_case = list_case.cons.unwrap();
+                    env.bind(&cons_case.x); 
+                    env.bind(&cons_case.xs);
+                    let consk = translate_expr(cons_case.expr, env).into();
                     env.unbind(); 
                     env.unbind();
                     MComputation::Match { list: MValue::Var(env.find(&var)).into(), nilk, consk }
@@ -163,14 +164,12 @@ fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
                 }.into()
             }
         },
-        Expr::Add(arg1, arg2) =>
+        Expr::Succ(body) => {
             MComputation::Bind { 
-                comp: translate_expr(*arg1, env).into(),
-                cont: MComputation::Bind { 
-                    comp: translate_expr(*arg2, env).into(), 
-                    cont: todo!(),
-                }.into()
-            },
+                comp: translate_expr(*body, env).into(),
+                cont: MComputation::Return(MValue::Succ(MValue::Var(0).into()).into()).into()
+            }
+        },
         Expr::Lambda(arg, body) => {
             match arg {
                 arg::Arg::Ident(var) => {

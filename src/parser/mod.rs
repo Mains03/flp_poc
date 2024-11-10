@@ -162,11 +162,11 @@ fn parse_pattern(mut pairs: pest::iterators::Pairs<Rule>, expr: Expr) -> Case {
         Rule::nat_pattern => {
             let pair = pair.into_inner().next().unwrap();
             Case::Nat(match pair.as_rule() {
-                Rule::zero => NatCase {
+                Rule::zero_pattern => NatCase {
                     zero: Some(NatZeroCase { expr }),
                     succ: None
                 },
-                Rule::succ => NatCase {
+                Rule::succ_pattern => NatCase {
                     zero: None,
                     succ: Some(NatSuccCase {
                         var: pair.into_inner().next().unwrap().as_str().to_string(),
@@ -225,13 +225,10 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
                 Box::new(parse_expr(pairs.next().unwrap().into_inner()))
             )
         },
-        Rule::add => {
+        Rule::succ => {
             let mut pairs = pair.into_inner();
 
-            Expr::Add(
-                Box::new(parse_expr(pairs.next().unwrap().into_inner())),
-                Box::new(parse_expr(pairs))
-            )
+            Expr::Succ(Box::new(parse_expr(pairs.next().unwrap().into_inner())))
         },
         Rule::app => {
             let mut pairs = pair.into_inner();
@@ -609,42 +606,42 @@ id x = x.
         )
     }
 
-    #[test]
-    fn test8() {
-        let src = "5 + 2.";
+    // #[test]
+    // fn test8() {
+    //     let src = "5 + 2.";
 
-        let ast = parse(src).unwrap();
+    //     let ast = parse(src).unwrap();
 
-        assert_eq!(
-            ast,
-            vec![
-                Decl::Stm(Stm::Expr(Expr::Add(
-                    Box::new(Expr::Nat(5)),
-                    Box::new(Expr::Nat(2))
-                )))
-            ]
-        );
-    }
+    //     assert_eq!(
+    //         ast,
+    //         vec![
+    //             Decl::Stm(Stm::Expr(Expr::Add(
+    //                 Box::new(Expr::Nat(5)),
+    //                 Box::new(Expr::Nat(2))
+    //             )))
+    //         ]
+    //     );
+    // }
 
-    #[test]
-    fn test9() {
-        let src = "1 + 2 + 3.";
+    // #[test]
+    // fn test9() {
+    //     let src = "1 + 2 + 3.";
 
-        let ast = parse(src).unwrap();
+    //     let ast = parse(src).unwrap();
 
-        assert_eq!(
-            ast,
-            vec![
-                Decl::Stm(Stm::Expr(Expr::Add(
-                    Box::new(Expr::Nat(1)),
-                    Box::new(Expr::Add(
-                        Box::new(Expr::Nat(2)),
-                        Box::new(Expr::Nat(3))
-                    ))
-                )))
-            ]
-        )
-    }
+    //     assert_eq!(
+    //         ast,
+    //         vec![
+    //             Decl::Stm(Stm::Expr(Expr::Add(
+    //                 Box::new(Expr::Nat(1)),
+    //                 Box::new(Expr::Add(
+    //                     Box::new(Expr::Nat(2)),
+    //                     Box::new(Expr::Nat(3))
+    //                 ))
+    //             )))
+    //         ]
+    //     )
+    // }
 
     #[test]
     fn test10() {
@@ -722,55 +719,55 @@ id x = x.
         )
     }
 
-    #[test]
-    fn test14() {
-        let src = "add_pair (x,y) = x+y.";
+    // #[test]
+    // fn test14() {
+    //     let src = "add_pair (x,y) = x+y.";
 
-        let ast = parse(src).unwrap();
+    //     let ast = parse(src).unwrap();
 
-        assert_eq!(
-            ast,
-            vec![Decl::Func {
-                name: "add_pair".to_string(),
-                args: vec![Arg::Pair(
-                    Box::new(Arg::Ident("x".to_string())),
-                    Box::new(Arg::Ident("y".to_string()))
-                )],
-                body: Stm::Expr(Expr::Add(
-                    Box::new(Expr::Ident("x".to_string())),
-                    Box::new(Expr::Ident("y".to_string()))
-                ))
-            }]
-        )
-    }
+    //     assert_eq!(
+    //         ast,
+    //         vec![Decl::Func {
+    //             name: "add_pair".to_string(),
+    //             args: vec![Arg::Pair(
+    //                 Box::new(Arg::Ident("x".to_string())),
+    //                 Box::new(Arg::Ident("y".to_string()))
+    //             )],
+    //             body: Stm::Expr(Expr::Add(
+    //                 Box::new(Expr::Ident("x".to_string())),
+    //                 Box::new(Expr::Ident("y".to_string()))
+    //             ))
+    //         }]
+    //     )
+    // }
 
-    #[test]
-    fn test15() {
-        let src = "add (x,(y,z)) = x+y+z.";
+    // #[test]
+    // fn test15() {
+    //     let src = "add (x,(y,z)) = x+y+z.";
 
-        let ast = parse(src).unwrap();
+    //     let ast = parse(src).unwrap();
 
-        assert_eq!(
-            ast,
-            vec![Decl::Func {
-                name: "add".to_string(),
-                args: vec![Arg::Pair(
-                    Box::new(Arg::Ident("x".to_string())),
-                    Box::new(Arg::Pair(
-                        Box::new(Arg::Ident("y".to_string())),
-                        Box::new(Arg::Ident("z".to_string()))
-                    ))
-                )],
-                body: Stm::Expr(Expr::Add(
-                    Box::new(Expr::Ident("x".to_string())),
-                    Box::new(Expr::Add(
-                        Box::new(Expr::Ident("y".to_string())),
-                        Box::new(Expr::Ident("z".to_string()))
-                    ))
-                ))
-            }]
-        )
-    }
+    //     assert_eq!(
+    //         ast,
+    //         vec![Decl::Func {
+    //             name: "add".to_string(),
+    //             args: vec![Arg::Pair(
+    //                 Box::new(Arg::Ident("x".to_string())),
+    //                 Box::new(Arg::Pair(
+    //                     Box::new(Arg::Ident("y".to_string())),
+    //                     Box::new(Arg::Ident("z".to_string()))
+    //                 ))
+    //             )],
+    //             body: Stm::Expr(Expr::Add(
+    //                 Box::new(Expr::Ident("x".to_string())),
+    //                 Box::new(Expr::Add(
+    //                     Box::new(Expr::Ident("y".to_string())),
+    //                     Box::new(Expr::Ident("z".to_string()))
+    //                 ))
+    //             ))
+    //         }]
+    //     )
+    // }
 
     #[test]
     fn test16() {
@@ -817,34 +814,34 @@ id x = x.
         )
     }
 
-    #[test]
-    fn test18() {
-        let src = "length xs = case xs of [] -> 0. (x:xs) -> 1 + (length xs).";
+    // #[test]
+    // fn test18() {
+    //     let src = "length xs = case xs of [] -> 0. (x:xs) -> 1 + (length xs).";
 
-        let ast = parse(src).unwrap();
+    //     let ast = parse(src).unwrap();
 
-        assert_eq!(
-            ast,
-            vec![Decl::Func {
-                name: "length".to_string(),
-                args: vec![Arg::Ident("xs".to_string())],
-                body: Stm::Case("xs".to_string(), Case::List(ListCase {
-                    empty: Some(ListEmptyCase { expr: Expr::Nat(0) }),
-                    cons: Some(ListConsCase {
-                        x: "x".to_string(),
-                        xs: "xs".to_string(),
-                        expr: Expr::Add(
-                            Box::new(Expr::Nat(1)),
-                            Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::App(
-                                Box::new(Expr::Ident("length".to_string())),
-                                Box::new(Expr::Ident("xs".to_string()))
-                            ))))
-                        ))
-                    })
-                }))
-            }]
-        )
-    }
+    //     assert_eq!(
+    //         ast,
+    //         vec![Decl::Func {
+    //             name: "length".to_string(),
+    //             args: vec![Arg::Ident("xs".to_string())],
+    //             body: Stm::Case("xs".to_string(), Case::List(ListCase {
+    //                 empty: Some(ListEmptyCase { expr: Expr::Nat(0) }),
+    //                 cons: Some(ListConsCase {
+    //                     x: "x".to_string(),
+    //                     xs: "xs".to_string(),
+    //                     expr: Expr::Add(
+    //                         Box::new(Expr::Nat(1)),
+    //                         Box::new(Expr::Stm(Box::new(Stm::Expr(Expr::App(
+    //                             Box::new(Expr::Ident("length".to_string())),
+    //                             Box::new(Expr::Ident("xs".to_string()))
+    //                         ))))
+    //                     ))
+    //                 })
+    //             }))
+    //         }]
+    //     )
+    // }
 
     #[test]
     fn test19() {

@@ -1,7 +1,7 @@
 cat :: [Nat] -> [Nat] -> [Nat]
 cat xs ys = case xs of
-    [] -> ys.
-    (x:xs) -> x : (cat xs ys).
+      [] -> ys
+    | (x:xs) -> x : (cat xs ys).
 
 last :: [Nat] -> Nat
 last xs = exists ys :: [Nat]. exists y :: Nat.
