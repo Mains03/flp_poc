@@ -7,4 +7,4 @@ last :: [Nat] -> Nat
 last xs = exists ys :: [Nat]. exists y :: Nat.
     cat ys [y] =:= xs. y.
 
-last [1, 2, 3, 4, 5, 6, 7].
+last [1, 2, 3, 4, 5, 6, 7, 8].
