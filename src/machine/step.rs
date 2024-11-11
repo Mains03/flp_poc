@@ -127,8 +127,10 @@ pub fn step(m : Machine) -> Vec<Machine> {
                             val : MValue::Succ(Rc::new(MValue::Var(0))).into(), 
                             env : Env::empty().extend_lvar(ident_lvar_succ)
                         }.into());
+                        
+                        let new_env = m.env.extend_lvar(ident_lvar_succ);
 
-                        Machine { comp: sk.clone(), lenv : lenv, ..m.clone()}
+                        Machine { comp: sk.clone(), lenv : lenv, env : new_env, ..m.clone()}
                     };
 
                     vec![m_zero, m_succ]
