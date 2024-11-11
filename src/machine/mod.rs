@@ -19,9 +19,9 @@ pub type Ident = usize;
 
 pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
 
+    println!("[DEBUG] final stmt: {}", comp.clone()) ;
     let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack().into(), lenv : LogicEnv::new().into(), done: false };
     let mut machines = vec![m];
-    
     print!("[");
     while fuel > 0 && !machines.is_empty() {
         let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);

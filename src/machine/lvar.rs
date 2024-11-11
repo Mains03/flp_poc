@@ -40,8 +40,8 @@ impl LogicEnv {
     }
     
     pub fn lookup(&self, ident : &Ident) -> Option<Rc<VClosure>> {
-        // let root = self.union_vars.find(*ident);
-        if let Some((_, Some(vclos))) = self.map.get(ident) { 
+        let root = self.union_vars.find(*ident);
+        if let Some((_, Some(vclos))) = self.map.get(&root) { 
             // println!("[DEBUG] looked up {} to be {}", ident, vclos.clone().val());
             return Some(vclos.clone())
         }
