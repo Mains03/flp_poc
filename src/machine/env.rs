@@ -15,8 +15,8 @@ impl Env {
         Env { vec : Vector::new() }.into()
     }
 
-    pub fn lookup(&self, i : usize) -> &VClosure {
-        self.vec.get(i).expect(&format!("indexing {} in an environment of length {}", i, self.size()))
+    pub fn lookup(&self, i : usize) -> Option<&VClosure> {
+        self.vec.get(i).map(|v| &**v)
     }
     
     pub fn size(&self) -> usize {

@@ -40,7 +40,7 @@ impl VClosure {
             vclos = match vclos {
                 VClosure::Clos { ref val, ref env } => {
                     match **val {
-                        MValue::Var(i) => env.lookup(i).clone(),
+                        MValue::Var(i) => env.lookup(i).expect("failed to find index").clone(),
                         _ => break
                     }
                 },
@@ -55,12 +55,38 @@ impl VClosure {
         vclos.into()
     }
 
+    pub fn close_head_err(&self, lenv : &LogicEnv) -> Result<Rc<VClosure>, ()> {
+        let mut vclos = self.clone();
+        loop {
+            vclos = match vclos {
+                VClosure::Clos { ref val, ref env } => {
+                    match **val {
+                        MValue::Var(i) => {
+                            match env.lookup(i) {
+                                Some(vclos) => vclos.clone(),
+                                None => return Err(()),
+                            }
+                        },
+                        _ => break
+                    }
+                },
+                VClosure::LogicVar { ref ident } => {
+                    match lenv.lookup(ident) {
+                        Some(vclos) => (*vclos).clone(),
+                        None => break,
+                    }
+                }
+            }
+        }
+        Ok(vclos.into())
+    }
+
     pub fn close_val(&self, lenv : &LogicEnv) -> Option<MValue> {
         match self {
             VClosure::Clos { val,  env } => {
                 // println!("[DEBUG] CLOSING {:?} in env of size {}", val, env.size());
                 match &**val {
-                    MValue::Var(i) => env.lookup(*i).close_val(lenv),
+                    MValue::Var(i) => env.lookup(*i)?.close_val(lenv),
                     MValue::Zero => Some(MValue::Zero),
                     MValue::Succ(v) => Some(MValue::Succ(VClosure::Clos { val: v.clone(), env : env.clone() }.close_val(lenv)?.into())),
                     MValue::Nil => Some(MValue::Nil),
