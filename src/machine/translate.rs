@@ -113,8 +113,8 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
                 cont : MComputation::Bind {
                     comp: rhs_comp,
                     cont: MComputation::Equate {
-                        lhs : MValue::Var(1).into(),
-                        rhs : MValue::Var(0).into(),
+                        lhs : MValue::Var(0).into(),
+                        rhs : MValue::Var(1).into(),
                         body : body_comp
                     }.into()
                 }.into()
@@ -247,11 +247,15 @@ fn translate_nat(n: usize) -> MComputation {
 }
 
 fn translate_pair(fst: Stm, snd: Stm, env : &mut TEnv) -> MComputation {
+    let fst_comp = translate_stm(fst, env).into();
+    env.bind(&"_foo".to_string());
+    let snd_comp = translate_stm(snd, env).into();
+    env.unbind();
     MComputation::Bind { 
-        comp: translate_stm(fst, env).into(), 
+        comp: fst_comp,
         cont: MComputation::Bind {
-            comp : translate_stm(snd, env).into(),
-            cont : MComputation::Return(MValue::Pair(MValue::Var(1).into(), MValue::Var(0).into()).into()).into()
+            comp : snd_comp,
+            cont : MComputation::Return(MValue::Pair(MValue::Var(0).into(), MValue::Var(1).into()).into()).into()
         }.into()
     }.into()
 }

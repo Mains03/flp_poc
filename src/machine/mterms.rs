@@ -15,23 +15,28 @@ pub enum MValue {
     Thunk(Rc<MComputation>)
 }
     
-fn print_nat(n : &MValue) -> String {
-    fn print_nat_aux(n : &MValue, i : usize) -> usize {
+fn print_nat(n : &MValue) -> Option<String> {
+    fn print_nat_aux(n : &MValue, i : usize) -> Option<usize> {
         match n {
-            MValue::Zero => i,
+            MValue::Zero => Some(i),
             MValue::Succ(v) => print_nat_aux(&v, i+1),
-            _ => panic!("tried to print this as nat: {}", n)
+            _ => None
         }
     }
-    print_nat_aux(n, 0).to_string()
+    Some(print_nat_aux(n, 0)?.to_string())
 }
 
 impl Display for MValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             MValue::Var(i) => write!(f, "idx {}", i),
-            MValue::Zero => write!(f, "{}", print_nat(&MValue::Zero)),
-            MValue::Succ(v) => write!(f,"{}", print_nat(self)),
+            MValue::Zero => write!(f, "{}", print_nat(&MValue::Zero).expect("foo")),
+            MValue::Succ(v) => {
+                match print_nat(self) {
+                    Some(n) => write!(f, "{}", n),
+                    None => write!(f, "Succ({})", v),
+                }
+            },
             MValue::Nil => write!(f, "Nil"),
             MValue::Cons(v, w) => write!(f, "Cons({}, {})", v, w),
             MValue::Thunk(t) => write!(f, "Thunk({})", t),

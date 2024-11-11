@@ -58,7 +58,7 @@ impl VClosure {
     pub fn close_val(&self, lenv : &LogicEnv) -> Option<MValue> {
         match self {
             VClosure::Clos { val,  env } => {
-                // println!("[DEBUG] CLOSING {} in env of size {}: {:#?}", val, env.size(), *env);
+                // println!("[DEBUG] CLOSING {:?} in env of size {}", val, env.size());
                 match &**val {
                     MValue::Var(i) => env.lookup(*i).close_val(lenv),
                     MValue::Zero => Some(MValue::Zero),

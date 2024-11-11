@@ -1,4 +1,4 @@
 f :: Nat -> Nat
 f n m = n + 1.
 
-exists x :: Nat. f x x =:= 11. (x, (x, (x, (x, (x, x))))).
+exists x :: Nat. exists y :: Nat. (f x y) =:= 11. (x, x).
