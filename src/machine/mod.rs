@@ -19,7 +19,7 @@ pub type Ident = usize;
 
 pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
 
-    println!("[DEBUG] final stmt: {}", comp.clone()) ;
+    // println!("[DEBUG] final stmt: {}", comp.clone()) ;
     let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack().into(), lenv : LogicEnv::new().into(), done: false };
     let mut machines = vec![m];
     print!("[");
