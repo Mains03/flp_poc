@@ -41,7 +41,7 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
                         q.push_back((VClosure::Clos { val: xs.clone(), env: lhs_env.clone() }.into(), VClosure::Clos { val : ys.clone(), env : rhs_env.clone()}.into()));
                     }
                     (MValue::Cons(_, _), _) => { return false }
-                    _ => continue
+                    _ => { return false }
                 }
         }
     }

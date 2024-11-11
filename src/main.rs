@@ -14,7 +14,7 @@ mod machine;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-     if args.len() == 0 || args.len() > 2 {
+     if args.len() < 2 || args.len() > 3 {
         eprintln!("Error: Expected between 1 and 2 arguments, but got {}.", args.len() - 1);
         eprintln!("Usage: {} source_file [number of solutions]", args[0]);
         process::exit(1);

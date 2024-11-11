@@ -10,6 +10,3 @@ im = "15.1.0"
 
 [lints.rust]
 unused = "allow"
-
-[profile.release]
-debug = true

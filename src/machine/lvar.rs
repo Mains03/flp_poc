@@ -22,6 +22,8 @@ impl LogicEnv {
             next : 0 
         }
     }
+    
+    pub fn size(&self) -> usize { self.map.len() }
 
     // pub fn split(self : Rc<Self>) -> Rc<Self> {
     //     LogicEnv {

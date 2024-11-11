@@ -56,18 +56,25 @@ fn translate_func(name : &String, args: Vec<Arg>, body: Stm, env : &mut TEnv) ->
         _ => todo!()
     }).collect();
     
+    let arg_no = vars.len();
+    
     vars.iter().for_each(|s| env.bind(s));
     let mbody = translate_stm(body, env);
     vars.iter().for_each(|s| env.unbind());
     
     env.unbind();
     
-    let mut c : MComputation = MComputation::Lambda { body : mbody.into()}.into();
-    while vars.len() > 1 {
-        c = MComputation::Lambda { body : MComputation::Return(MValue::Thunk(c.into()).into()).into() }.into();
-        vars.pop();
+    if arg_no > 0 {
+        let mut c : MComputation = MComputation::Lambda { body : mbody.into()}.into();
+        while vars.len() > 1 {
+            c = MComputation::Lambda { body : MComputation::Return(MValue::Thunk(c.into()).into()).into() }.into();
+            vars.pop();
+        }
+        MValue::Thunk(MComputation::Rec { body: c.into() }.into())
     }
-    MValue::Thunk(MComputation::Rec { body: c.into() }.into())
+    else {
+        MValue::Thunk(MComputation::Rec { body: mbody.into() }.into())
+    }
 }
 
 fn translate_vtype(ptype : Type) -> ValueType { 

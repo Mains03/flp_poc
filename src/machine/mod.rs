@@ -19,29 +19,28 @@ pub type Ident = usize;
 
 pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
 
-    // println!("[DEBUG] final stmt: {}", comp.clone()) ;
+    println!("[DEBUG] main stmt: {}", comp.clone()) ;
     let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack().into(), lenv : LogicEnv::new().into(), done: false };
     let mut machines = vec![m];
-    print!("[");
+    let mut solns = 0;
     while fuel > 0 && !machines.is_empty() {
-        let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
-        // println!("[DEBUG] machines: ");
-        // ms.iter().for_each(|m| {
-        //     println!("[DEBUG]   comp: {}", m.comp);
-        //     println!("[DEBUG]   stack size: {:?}", m.stack.len());
-        //     println!("[DEBUG]   env size: {:?}", m.env.size())
-        // });
-        let mut dones = done.iter().peekable();
+        let (done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
+        println!("[DEBUG] machines: ");
+        ms.iter().for_each(|m| {
+             println!("[DEBUG]   comp: {}", m.comp);
+             println!("[DEBUG]   stack size: {:?}", m.stack.len());
+             println!("[DEBUG]   env size: {:?}", m.env.size());
+             println!("[DEBUG]   lenv size: {:?}", m.lenv.size())
+         });
+        let mut dones = done.iter();
         while let Some(m) = dones.next() {
             match &*m.comp {
                 MComputation::Return(v) => {
                     let out = output(v.clone(), m.env.clone(), &m.lenv);
                     match out {
-                        Some(xs) => print!("{}", xs),
+                        Some(xs) => { println!("> {}", xs); solns += 1 }
                         None => ()
                     }
-                    if dones.peek().is_some() { println!(", ") }
-                    stdout().flush().expect("Failed to flush stdout");
                 },
                 _ => unreachable!()
             }
@@ -49,7 +48,8 @@ pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
         machines = ms;
         fuel -= 1
     }
-    print!("]");
+    
+    println!(">>> {} solutions", solns);
     
     // values.iter().flat_map(|m| {
     //     match &*m.comp {

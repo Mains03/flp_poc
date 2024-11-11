@@ -26,6 +26,26 @@ fn print_nat(n : &MValue) -> Option<String> {
     Some(print_nat_aux(n, 0)?.to_string())
 }
 
+fn print_list(xs : &MValue) -> Option<String> {
+    fn print_list_aux(n : &MValue, outs : &mut Vec<String>) -> bool {
+        match n {
+            MValue :: Nil => true,
+            MValue::Cons(v, w) => {
+                let value = v.to_string();
+                outs.push(value);
+                print_list_aux(&w, outs)
+            },
+            _ => false
+        }
+    }
+    let mut outs = vec![];
+    let result = print_list_aux(xs, &mut outs);
+    if result {
+        let output = outs.join(", ");
+        Some("[".to_owned() + &output + "]")
+    } else { None }
+}
+
 impl Display for MValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -37,8 +57,18 @@ impl Display for MValue {
                     None => write!(f, "Succ({})", v),
                 }
             },
-            MValue::Nil => write!(f, "Nil"),
-            MValue::Cons(v, w) => write!(f, "Cons({}, {})", v, w),
+            MValue::Nil => {
+                match print_list(self) {
+                    Some(xs) => write!(f, "{}", xs),
+                    None => write!(f, "Nil")
+                }
+            }
+            MValue::Cons(v, w) => {
+                match print_list(self) {
+                    Some(xs) => write!(f, "{}", xs),
+                    None => write!(f, "Cons({}, {})", v, w)
+                }
+            },
             MValue::Thunk(t) => write!(f, "Thunk({})", t),
             MValue::Pair(v, w) => write!(f, "({}, {})", v, w),
             MValue::Inl(v) => write!(f, "inl({})", v),
