@@ -1,0 +1,4 @@
+add :: Nat -> Nat -> Nat
+add n m = case n of
+              0 -> m
+            | z + 1 -> (add z m) + 1.

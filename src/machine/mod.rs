@@ -6,7 +6,7 @@ mod unify;
 mod step;
 mod union_find;
 pub mod translate;
-use std::{io::Write, os::windows::io, rc::Rc};
+use std::{io::Write, rc::Rc};
 use env::Env;
 use im::vector::Vector;
 use lvar::LogicEnv;
