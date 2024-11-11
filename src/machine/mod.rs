@@ -20,17 +20,26 @@ pub type Ident = usize;
 pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
 
     let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack().into(), lenv : LogicEnv::new().into(), done: false };
-    println!("[DEBUG] initial env: ");
     let mut machines = vec![m];
     
     print!("[");
     while fuel > 0 && !machines.is_empty() {
         let (mut done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter().flat_map(|m| step(m)).partition(|m| m.done);
+        // println!("[DEBUG] machines: ");
+        // ms.iter().for_each(|m| {
+        //     println!("[DEBUG]   comp: {}", m.comp);
+        //     println!("[DEBUG]   stack size: {:?}", m.stack.len());
+        //     println!("[DEBUG]   env size: {:?}", m.env.size())
+        // });
         let mut dones = done.iter().peekable();
         while let Some(m) = dones.next() {
             match &*m.comp {
                 MComputation::Return(v) => {
-                    print!("{}", output(v.clone(), m.env.clone(), &m.lenv));
+                    let out = output(v.clone(), m.env.clone(), &m.lenv);
+                    match out {
+                        Some(xs) => print!("{}", xs),
+                        None => ()
+                    }
                     if dones.peek().is_some() { println!(", ") }
                     stdout().flush().expect("Failed to flush stdout");
                 },
@@ -50,6 +59,6 @@ pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
     // }).collect()
 }
 
-fn output(val : Rc<MValue>, env : Rc<Env>, lenv : &LogicEnv) -> String {
-    VClosure::Clos { val, env }.close_val(lenv).expect("value not closed").to_string()
+fn output(val : Rc<MValue>, env : Rc<Env>, lenv : &LogicEnv) -> Option<String> {
+    Some(VClosure::Clos { val, env }.close_val(lenv)?.to_string())
 }

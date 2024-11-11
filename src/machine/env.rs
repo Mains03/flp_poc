@@ -16,7 +16,7 @@ impl Env {
     }
 
     pub fn lookup(&self, i : usize) -> &VClosure {
-        self.vec.get(i).expect("indexing error")
+        self.vec.get(i).expect(&format!("indexing {} in an environment of length {}", i, self.size()))
     }
     
     pub fn size(&self) -> usize {

@@ -11,3 +11,6 @@ union-find = "0.4.3"
 
 [lints.rust]
 unused = "allow"
+
+[profile.release]
+debug = true

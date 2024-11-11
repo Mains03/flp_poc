@@ -1,6 +1,6 @@
 use std::{fmt::Display, rc::Rc};
 
-use crate::cbpv::terms::ValueType;
+use crate::{cbpv::terms::ValueType, machine::vclosure::VClosure};
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum MValue {
@@ -35,7 +35,9 @@ impl Display for MValue {
             MValue::Nil => write!(f, "Nil"),
             MValue::Cons(v, w) => write!(f, "Cons({}, {})", v, w),
             MValue::Thunk(t) => write!(f, "Thunk({})", t),
-            _ => todo!()
+            MValue::Pair(v, w) => write!(f, "({}, {})", v, w),
+            MValue::Inl(v) => write!(f, "inl({})", v),
+            MValue::Inr(w) => write!(f, "inr({})", w)
         }
     }
 }
