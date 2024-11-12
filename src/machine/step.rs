@@ -38,7 +38,7 @@ impl Machine {
     pub fn step(self) -> Vec<Machine> {
         let m = self;
         
-        if m.will_necessarily_fail() { return vec![] };
+        if m.will_eventually_fail() { return vec![] }
 
         match &*(m.comp) {
             MComputation::Return(val) => {
@@ -54,8 +54,18 @@ impl Machine {
                       _ => unreachable!()
                   }
             },
-            MComputation::Bind { comp, cont } => 
-                vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
+            MComputation::Bind { comp, cont } => {
+                match &**comp {
+                    MComputation::Bind { comp : comp_fst, cont : cont_fst } =>
+                        vec![Machine { 
+                            comp: MComputation::Bind { 
+                                comp : comp_fst.clone(), 
+                                cont: MComputation::Bind { comp: cont_fst.clone(), cont: cont.up(1).into() }.into() 
+                            }.into(),
+                            ..m }],
+                    _ => vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
+                }
+            },
             MComputation::Force(v) => {
                 let vclos = VClosure::Clos { val: v.clone(), env: m.env.clone() };
                 let w = vclos.close_head(&m.lenv);
@@ -255,15 +265,27 @@ impl Machine {
         }
     }
     
-    fn will_necessarily_fail(&self) -> bool {
+    fn will_eventually_fail(&self) -> bool {
         let mut c = &self.comp;
         let mut lenv = self.lenv.clone();
         let mut env = self.env.clone();
         loop {
             c = match &**c {
                 MComputation::Bind { comp, cont } => {
-                    env = env.clone().extend_clos(MValue::Var(999).into(), env);
-                    cont
+                    match &**comp {
+                        MComputation::Return(v) => {
+                            env = env.clone().extend_clos(v.clone(), env);
+                            cont
+                        },
+                        MComputation::Bind { comp: comp_fst, cont : cont_fst} => {
+                            env = env.clone().extend_clos(MValue::Var(999).into(), env);
+                            cont
+                        },
+                        MComputation::Choice(vec) => {
+                            return !vec.is_empty()
+                        },
+                        _ => comp
+                    }
                 },
                 MComputation::Equate { lhs, rhs, body } => {
                     match unify(&lhs, &rhs, &env, &mut lenv) {

@@ -14,6 +14,23 @@ pub enum MValue {
     Cons(Rc<MValue>, Rc<MValue>),
     Thunk(Rc<MComputation>)
 }
+
+impl MValue {
+    pub fn up(&self, offset : usize) -> MValue {
+        match self {
+            MValue::Var(i) if *i < offset => MValue::Var(*i),
+            MValue::Var(i) => MValue::Var(*i + 1),
+            MValue::Zero => MValue::Zero,
+            MValue::Succ(rc) => MValue::Succ(rc.up(offset).into()),
+            MValue::Pair(rc, rc1) => MValue::Pair(rc.up(offset).into(), rc1.up(offset).into()),
+            MValue::Inl(v) => MValue::Inl(v.up(offset).into()),
+            MValue::Inr(v) => MValue::Inr(v.up(offset).into()),
+            MValue::Nil => MValue::Nil,
+            MValue::Cons(v, w) => MValue::Cons(v.up(offset).into(), w.up(offset).into()),
+            MValue::Thunk(rc) => MValue::Thunk(rc.up(offset).into()),
+        }
+    }
+}
     
 fn print_nat(n : &MValue) -> Option<String> {
     fn print_nat_aux(n : &MValue, i : usize) -> Option<usize> {
@@ -122,6 +139,29 @@ pub enum MComputation {
     Rec {
         body : Rc<MComputation>
     },
+}
+
+impl MComputation {
+    pub fn up(&self, offset : usize) -> MComputation {
+        match self {
+            MComputation::Ifz { num, zk, sk } => 
+                MComputation::Ifz { num: num.up(offset).into(), zk: zk.up(offset).into(), sk: sk.up(offset).into() },
+            MComputation::Match { list, nilk, consk } => 
+                MComputation::Match { list: list.up(offset).into(), nilk: nilk.up(offset).into(), consk: consk.up(offset).into() },
+            MComputation::Case { sum, inlk, inrk } => 
+                MComputation::Case { sum: sum.up(offset).into(), inlk: inlk.up(offset).into(), inrk: inrk.up(offset).into() },
+            MComputation::Return(rc) => MComputation::Return(rc.up(offset).into()),
+            MComputation::Bind { comp, cont } => MComputation::Bind { comp: comp.up(offset).into(), cont: cont.up(offset + 1).into() },
+            MComputation::Force(rc) => MComputation::Force(rc.up(offset).into()),
+            MComputation::Lambda { body } => MComputation::Lambda { body: body.up(offset + 1).into() },
+            MComputation::App { op, arg } => MComputation::App { op: op.up(offset).into(), arg: arg.up(offset).into() },
+            MComputation::Choice(vec) => MComputation::Choice(vec.iter().map(|c| c.up(offset).into()).collect()),
+            MComputation::Exists { ptype, body } => MComputation::Exists { ptype: ptype.clone(), body: body.up(offset+1).into() },
+            MComputation::Equate { lhs, rhs, body } => 
+                MComputation::Equate { lhs: lhs.up(offset).into(), rhs: rhs.up(offset).into(), body: body.up(offset).into() },
+            MComputation::Rec { body } => MComputation::Rec { body: body.up(offset+1).into() },
+        }
+    }
 }
 
 impl Display for MComputation {
