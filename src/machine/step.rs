@@ -17,13 +17,17 @@ pub struct Closure {
 
 type Stack = Vec<Closure>;
 
-pub fn empty_stack() -> Stack { vec![] }
+pub fn empty_stack() -> Stack { 
+    vec![]
+}
 
 fn push_closure(stack : &Stack, frame : Frame, env : Rc<Env>) -> Rc<Stack> {
     let mut stk = stack.clone();
     stk.push(Closure { frame: frame.into(), env });
     Rc::new(stk)
 }
+
+fn pop_closure(stack : &mut Stack) -> Closure { stack.remove(stack.len() - 1) }
 
 #[derive(Clone)]
 pub struct Machine {
@@ -36,10 +40,32 @@ pub struct Machine {
 
 impl Machine {
     pub fn step(self) -> Vec<Machine> {
-        let m = self;
-        
-        if m.will_eventually_fail() { return vec![] }
+        let mut m = self;
 
+        if m.will_eventually_fail() { return vec![] }
+        
+        // // OPTIMIZER LOOP - VERY SLOW
+        // let (mut c, mut env) = (m.comp, m.env);
+        // loop {
+        //     let prev = c.clone();
+        //     (c, env) = optimizer(&c, &env);
+        //     if *prev == *c { break }
+        // }
+        // m = Machine { comp : c.clone(), env: env.clone(), ..m };
+        
+        if let Some((c, ret)) = peeker(&m.comp) {
+            let mut stk: Vec<Closure> = (**m.stack).to_vec();
+            if let Some(clos) = stk.pop() {
+                match &*clos.frame {
+                    Frame::Value(v) => (),
+                    Frame::To(cont) => {
+                        push_closure(&stk, Frame::To(cont.clone()), clos.env.extend_clos(ret, m.env.clone()));
+                    },
+                }
+                m = Machine { comp : c, stack : stk.into(), ..m };
+            }
+        }
+        
         match &*(m.comp) {
             MComputation::Return(val) => {
                 match &*(m.stack).as_slice() {
@@ -54,18 +80,20 @@ impl Machine {
                       _ => unreachable!()
                   }
             },
-            MComputation::Bind { comp, cont } => {
-                match &**comp {
-                    MComputation::Bind { comp : comp_fst, cont : cont_fst } =>
-                        vec![Machine { 
-                            comp: MComputation::Bind { 
-                                comp : comp_fst.clone(), 
-                                cont: MComputation::Bind { comp: cont_fst.clone(), cont: cont.up(1).into() }.into() 
-                            }.into(),
-                            ..m }],
-                    _ => vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
-                }
-            },
+            MComputation::Bind { comp, cont } => // {
+                // match &**comp {
+                //     MComputation::Bind { comp : comp_fst, cont : cont_fst } =>
+                //         vec![Machine { 
+                //             comp: MComputation::Bind { 
+                //                 comp : comp_fst.clone(), 
+                //                 cont: MComputation::Bind { comp: cont_fst.clone(), cont: cont.up(1).into() }.into() 
+                //             }.into(),
+                //             ..m }],
+                //     _ => 
+                    // vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
+                    vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
+                // }
+            // },
             MComputation::Force(v) => {
                 let vclos = VClosure::Clos { val: v.clone(), env: m.env.clone() };
                 let w = vclos.close_head(&m.lenv);
@@ -312,5 +340,46 @@ impl Machine {
                 _ => return false
             }
         }
+    }
+}
+
+fn optimizer(c : &Rc<MComputation>, env : &Rc<Env>) -> (Rc<MComputation>, Rc<Env>) {
+    match &**c {
+        MComputation::Bind { comp, cont } => {
+            match &**comp {
+                MComputation::Return(v) => (cont.clone(), env.extend_clos(v.clone(), env.clone())),
+                MComputation::Bind { comp: comp_fst, cont: cont_fst } => {
+                    (MComputation::Bind {
+                        comp : comp_fst.clone(),
+                        cont : MComputation::Bind { comp: cont_fst.clone(), cont : cont.up(1).into() }.into()
+                    }.into(), env.clone())
+                },
+                // MComputation::Choice(vec) => todo!(),
+                MComputation::Exists { ptype, body } => {
+                    (MComputation::Exists { 
+                        ptype: ptype.clone(), 
+                        body: MComputation::Bind { comp : comp.up(1).into(), cont: cont.up(1).into() }.into() 
+                    }.into(), env.clone())
+                },
+                _ => (c.clone(), env.clone())
+            }
+        },
+        _ => (c.clone(), env.clone())
+    }
+}
+
+fn peeker(c : &Rc<MComputation>) -> Option<(Rc<MComputation>, Rc<MValue>)> {
+    match &**c {
+        MComputation::Bind { comp, cont } => {
+            match &**cont {
+                MComputation::Return(v) => Some((comp.clone(), v.clone())),
+                MComputation::Bind { comp: comp_snd, cont: cont_snd } => {
+                    let (c, ret) = peeker(cont_snd)?;
+                    Some((MComputation::Bind { comp: comp_snd.clone(), cont: c }.into(), ret))
+                },
+                _ => None
+            }
+        },
+        _ => None
     }
 }

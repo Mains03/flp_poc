@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use super::{env::Env, lvar::LogicEnv, mterms::MValue, Ident};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum VClosure {
     Clos { val : Rc<MValue>, env : Rc<Env> },
     LogicVar { ident : Ident }

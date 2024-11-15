@@ -5,7 +5,7 @@ use im::Vector;
 use super::Ident;
 use super::{mterms::MValue, VClosure};
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub struct Env {
     vec : Vector<Rc<VClosure>>
 }
