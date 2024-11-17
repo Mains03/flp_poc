@@ -42,7 +42,34 @@ impl VClosure {
                     VClosure::LogicVar { ident } => lenv.lookup(ident).expect("oops").occurs_lvar(lenv, senv, &ident) ,
                     VClosure::Susp { ident } => todo!(),
                 },
-            Err(i) => panic!("shouldn't be doing occurs in a suspension"),
+            Err(i) => panic!("shouldn't be doing occurs to a suspension"),
+        }
+    }
+    
+    pub fn find_susp(&self, lenv : &LogicEnv, senv : &SuspEnv) -> Option<SuspAt> {
+        match self.close_head(lenv, senv) {
+            Ok(vclos) => 
+                match &*vclos {
+                    VClosure::Clos { val, env } => 
+                        match &**val {
+                            MValue::Var(i) => env.lookup(*i).expect("oops").find_susp(lenv, senv),
+                            MValue::Zero => None,
+                            MValue::Succ(v) => VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv),
+                            MValue::Pair(v, w) => 
+                                VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv)
+                                .or(VClosure::Clos { val: w.clone(), env: env.clone() }.find_susp(lenv, senv)),
+                            MValue::Inl(v) => VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv),
+                            MValue::Inr(v) => VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv),
+                            MValue::Nil => None,
+                            MValue::Cons(v, w) =>
+                                VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv)
+                                .or(VClosure::Clos { val: w.clone(), env: env.clone() }.find_susp(lenv, senv)),
+                            MValue::Thunk(t) => None,
+                        },
+                    VClosure::LogicVar { ident } => lenv.lookup(ident).expect("oops").find_susp(lenv, senv),
+                    VClosure::Susp { .. } => vclos.find_susp(lenv, senv)
+                },
+            Err(a) => Some(a),
         }
     }
 

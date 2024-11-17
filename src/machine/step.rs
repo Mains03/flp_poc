@@ -47,7 +47,12 @@ impl Machine {
         match &*(m.comp) {
             MComputation::Return(val) => {
                 match &*(m.stack).as_slice() {
-                    [] => vec![Machine { done: true, ..m }],
+                    [] => {
+                        match (VClosure::Clos { val : val.clone(), env: m.env.clone() }).find_susp(&m.lenv, &m.senv) {
+                            Some(a) => vec![Machine { comp : a.comp, env : a.env, stack : push_susp(&m.stack, a.ident, m.comp, m.env), ..m  }],
+                            None => vec![Machine { done: true, ..m }]
+                        }
+                    },
                     [tail @ .., clos] => {
                         let Closure { frame , env } = &*clos;
                         match &**frame {
