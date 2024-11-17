@@ -72,11 +72,19 @@ impl Machine {
                   }
             },
             MComputation::Bind { comp, cont } => {
-                let mut senv = m.senv;
-                let env = &m.env;
-                let ident = senv.fresh(comp, &m.env);
-                let new_env = env.extend_susp(ident);
-                vec![Machine { comp : cont.clone(), env : new_env, senv : senv, ..m}]
+                match &**comp {
+                    MComputation::Return(v) => {
+                        let new_env = m.env.extend_clos(v.clone(), m.env.clone());
+                        vec![Machine { comp : cont.clone(), env : new_env, ..m }]
+                    },
+                    _ => {
+                        let mut senv = m.senv;
+                        let env = &m.env;
+                        let ident = senv.fresh(comp, &m.env);
+                        let new_env = env.extend_susp(ident);
+                        vec![Machine { comp : cont.clone(), env : new_env, senv : senv, ..m}]
+                    }
+                }
             },
             MComputation::Force(v) => {
                 let vclos = VClosure::Clos { val: v.clone(), env: m.env.clone() };
