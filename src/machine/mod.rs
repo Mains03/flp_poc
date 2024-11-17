@@ -57,7 +57,7 @@ pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
             }
         }
         machines = ms;
-        fuel -= 1
+        // fuel -= 1   DO NOT NEED FUEL ANYMORE!!!
     }
     
     println!(">>> {} solutions", solns);
