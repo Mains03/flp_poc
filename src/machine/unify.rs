@@ -1,15 +1,16 @@
 use std::{collections::VecDeque, rc::Rc};
 
-use super::{env::Env, lvar::LogicEnv, mterms::MValue, VClosure};
+use super::{env::Env, lvar::LogicEnv, mterms::MValue, senv::SuspEnv, vclosure::SuspAt, VClosure};
 
 pub enum UnifyError {
     Open,
     Occurs,
     Fail,
-    Other
+    Susp(SuspAt),
+    Other,
 }
 
-pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut LogicEnv) -> Result<(),UnifyError> { 
+pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut LogicEnv, senv : &SuspEnv) -> Result<(),UnifyError> { 
     let mut q : VecDeque<(Rc<VClosure>, Rc<VClosure>)> = VecDeque::new();
     
     let lhs_clos = VClosure::Clos { val: lhs.clone(), env: env.clone() }.into();
@@ -17,8 +18,8 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
     
     q.push_back((lhs_clos, rhs_clos));
     while let Some((lhs, rhs)) = q.pop_front() {
-        let lhs = lhs.close_head_err(&lenv).map_err(|_| UnifyError::Open)?;
-        let rhs = rhs.close_head_err(&lenv).map_err(|_| UnifyError::Open)?;
+        let lhs = lhs.close_head(&lenv, senv).map_err(|a| UnifyError::Susp(a))?;
+        let rhs = rhs.close_head(&lenv, senv).map_err(|a| UnifyError::Susp(a))?;
         // println!("[DEBUG] about to unify {} and {}", lhs.val(), rhs.val());
         match (&*lhs, &*rhs) {
             (VClosure::LogicVar { ident : ident_lhs}, VClosure::LogicVar { ident : ident_rhs}) => { 
@@ -27,11 +28,11 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
             },
             (VClosure::LogicVar { ident }, _) => { 
                 // the head of the LHS has been closed, so it must be a free logic variable
-                if rhs.occurs_lvar(&lenv, ident) { return Err(UnifyError::Occurs) }
+                if rhs.occurs_lvar(&lenv, senv, &ident) { return Err(UnifyError::Occurs) }
                 lenv.set_vclos(ident, &rhs);
             },
             (_, VClosure::LogicVar { ident }) => { 
-                if lhs.occurs_lvar(&lenv, ident) { return Err(UnifyError::Occurs) }
+                if lhs.occurs_lvar(&lenv, senv, ident) { return Err(UnifyError::Occurs) }
                 lenv.set_vclos(ident, &lhs);
             },
             (VClosure::Clos { val : lhs_val, env: lhs_env}, VClosure::Clos { val : rhs_val, env : rhs_env }) =>
@@ -51,6 +52,8 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
                     (MValue::Cons(_, _), _) => { return Err(UnifyError::Fail) }
                     _ => { panic!("what are you trying to unify?") } //return Err(UnifyError::Other) }
                 }
+            (_, VClosure::Susp { ident }) => todo!(),
+            (VClosure::Susp { ident }, _) => todo!(),
         }
     }
     return Ok(())

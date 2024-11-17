@@ -1,40 +1,52 @@
 use std::rc::Rc;
 
-use super::{env::Env, lvar::LogicEnv, mterms::MValue, Ident};
+use super::{env::Env, lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, ComputationInEnv, Ident};
 
 #[derive(Clone, Debug)]
 pub enum VClosure {
     Clos { val : Rc<MValue>, env : Rc<Env> },
-    LogicVar { ident : Ident }
+    LogicVar { ident : Ident },
+    Susp { ident : Ident }
+}
+
+pub struct SuspAt {
+    pub ident : Ident,
+    pub comp : Rc<MComputation>,
+    pub env : Rc<Env>
 }
 
 impl VClosure {
     pub fn val(&self) -> String { 
         match self {
             VClosure::Clos { val, env } => format!("value: {}", val.to_string()),
-            VClosure::LogicVar { ident } => format!("logic var: {}", ident)
+            VClosure::LogicVar { ident } => format!("logic var: {}", ident),
+            VClosure::Susp { ident } => format!("suspension: {}", ident),
         }
     }
     
-    pub fn occurs_lvar(&self, lenv : &LogicEnv, ident : &Ident) -> bool {
-        let vclos = self.close_head(lenv);
-        match &*vclos {
-            VClosure::Clos { val, env } => {
-                match &**val {
-                    MValue::Succ(v) => VClosure::Clos {val : v.clone(), env: env.clone() }.occurs_lvar(lenv, ident),
-                    MValue::Cons(v, w) => 
-                        VClosure::Clos { val : v.clone(), env: env.clone()}.occurs_lvar(lenv, ident)
-                        || VClosure::Clos { val : w.clone(), env : env.clone()}.occurs_lvar(lenv, ident),
-                    MValue::Var(_) => unreachable!("value should be head-closed in occurs check"),
-                    MValue::Thunk(_) => panic!("mustn't be doing occurs to a computation"),
-                    _ => false
-                }
-            },
-            VClosure::LogicVar { ident } => lenv.lookup(ident).expect("oops").occurs_lvar(lenv, ident) , // *lvar == **_lvar,
+    pub fn occurs_lvar(&self, lenv : &LogicEnv, senv : &SuspEnv, ident : &Ident) -> bool {
+        match self.close_head(lenv, &senv) {
+            Ok(vclos) => 
+                match &*vclos {
+                    VClosure::Clos { val, env } => {
+                        match &**val {
+                            MValue::Succ(v) => VClosure::Clos {val : v.clone(), env: env.clone() }.occurs_lvar(lenv, senv, ident),
+                            MValue::Cons(v, w) => 
+                                VClosure::Clos { val : v.clone(), env: env.clone()}.occurs_lvar(lenv, senv, ident)
+                                || VClosure::Clos { val : w.clone(), env : env.clone()}.occurs_lvar(lenv, senv, ident),
+                            MValue::Var(_) => unreachable!("value should be head-closed in occurs check"),
+                            MValue::Thunk(_) => panic!("mustn't be doing occurs to a computation"),
+                            _ => false
+                        }
+                    },
+                    VClosure::LogicVar { ident } => lenv.lookup(ident).expect("oops").occurs_lvar(lenv, senv, &ident) ,
+                    VClosure::Susp { ident } => todo!(),
+                },
+            Err(i) => panic!("shouldn't be doing occurs in a suspension"),
         }
     }
 
-    pub fn close_head(&self, lenv : &LogicEnv) -> Rc<VClosure> {
+    pub fn close_head(&self, lenv : &LogicEnv, senv : &SuspEnv) -> Result<Rc<VClosure>, SuspAt> {
         let mut vclos = self.clone();
         loop {
             vclos = match vclos {
@@ -50,9 +62,15 @@ impl VClosure {
                         None => break,
                     }
                 }
+                VClosure::Susp { ref ident } => {
+                    match senv.lookup(ident) {
+                        Ok((v, env)) => VClosure::Clos { val: v.clone(), env: env.clone() },
+                        Err((comp, env)) => return Err(SuspAt { ident: *ident, comp: comp.clone(), env: env.clone() }),
+                    }
+                },
             }
         }
-        vclos.into()
+        Ok(vclos.into())
     }
 
     pub fn close_head_err(&self, lenv : &LogicEnv) -> Result<Rc<VClosure>, ()> {
@@ -76,6 +94,7 @@ impl VClosure {
                         None => break,
                     }
                 }
+                VClosure::Susp { ident } => todo!(),
             }
         }
         Ok(vclos.into())
@@ -113,6 +132,7 @@ impl VClosure {
                     None => None,
                 }
             }
+            VClosure::Susp { ident } => panic!("closing something with a suspension"),
         }
     }
 

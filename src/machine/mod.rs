@@ -1,7 +1,8 @@
 pub mod mterms;
 mod vclosure;
-mod lvar;
 mod env;
+mod lvar;
+mod senv;
 mod unify;
 mod step;
 mod union_find;
@@ -11,16 +12,20 @@ use env::Env;
 use im::vector::Vector;
 use lvar::LogicEnv;
 use mterms::{MComputation, MValue};
+use senv::SuspEnv;
 use step::{empty_stack, Machine};
 use vclosure::VClosure;
 use std::io::stdout;
 
 pub type Ident = usize;
+type ValueInEnv = (Rc<MValue>, Rc<Env>);
+type ComputationInEnv = (Rc<MComputation>, Rc<Env>);
+
 
 pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
 
     // println!("[DEBUG] main stmt: {}", comp.clone()) ;
-    let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack().into(), lenv : LogicEnv::new().into(), done: false };
+    let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack().into(), lenv : LogicEnv::new().into(), senv : SuspEnv::new().into(), done: false };
     let mut machines = vec![m];
     let mut solns = 0;
     while fuel > 0 && !machines.is_empty() {
