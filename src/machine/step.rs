@@ -44,8 +44,6 @@ impl Machine {
     pub fn step(self) -> Vec<Machine> {
         let m = self;
         
-        // if m.will_eventually_fail() { return vec![] }
-
         match &*(m.comp) {
             MComputation::Return(val) => {
                 match &*(m.stack).as_slice() {
@@ -301,52 +299,4 @@ impl Machine {
         }
     }
     
-    fn will_eventually_fail(&self) -> bool {
-        let mut c = &self.comp;
-        let mut lenv = self.lenv.clone();
-        let mut env = self.env.clone();
-        loop {
-            c = match &**c {
-                MComputation::Bind { comp, cont } => {
-                    match &**comp {
-                        MComputation::Return(v) => {
-                            env = env.clone().extend_clos(v.clone(), env);
-                            cont
-                        },
-                        MComputation::Bind { comp: comp_fst, cont : cont_fst} => {
-                            env = env.clone().extend_clos(MValue::Var(999).into(), env);
-                            cont
-                        },
-                        MComputation::Choice(vec) => {
-                            return !vec.is_empty()
-                        },
-                        _ => comp
-                    }
-                },
-                MComputation::Equate { lhs, rhs, body } => {
-                    match unify(&lhs, &rhs, &env, &mut lenv, &self.senv) {
-                        Err(UnifyError::Fail) => { return true },
-                        Err(UnifyError::Occurs) => { return true },
-                        Err(UnifyError::Open) => { return false }
-                        _ => { return false }
-                    }
-                },
-                MComputation::Lambda { body } => {
-                    env = env.clone().extend_clos(MValue::Var(9999).into(), env);
-                    body
-                },
-                MComputation::Exists { ptype, body } => {
-                    let ident = lenv.fresh(ptype.clone());
-                    env = env.clone().extend_lvar(ident);
-                    body
-                },
-                MComputation::Rec { body } => {
-                    env = env.clone().extend_clos(MValue::Var(9999).into(), env);
-                    body
-                },
-                MComputation::App { op, arg } => op,
-                _ => return false
-            }
-        }
-    }
 }
