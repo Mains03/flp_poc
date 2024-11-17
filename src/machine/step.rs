@@ -69,16 +69,11 @@ impl Machine {
                   }
             },
             MComputation::Bind { comp, cont } => {
-                match &**comp {
-                    MComputation::Bind { comp : comp_fst, cont : cont_fst } =>
-                        vec![Machine { 
-                            comp: MComputation::Bind { 
-                                comp : comp_fst.clone(), 
-                                cont: MComputation::Bind { comp: cont_fst.clone(), cont: cont.up(1).into() }.into() 
-                            }.into(),
-                            ..m }],
-                    _ => vec![Machine { comp: comp.clone(), stack: push_closure(&m.stack, Frame::To(cont.clone()), m.env.clone()), ..m}],
-                }
+                let mut senv = m.senv;
+                let env = &m.env;
+                let ident = senv.fresh(comp, &m.env);
+                let new_env = env.extend_susp(ident);
+                vec![Machine { comp : cont.clone(), env : new_env, senv : senv, ..m}]
             },
             MComputation::Force(v) => {
                 let vclos = VClosure::Clos { val: v.clone(), env: m.env.clone() };

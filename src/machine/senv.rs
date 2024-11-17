@@ -24,9 +24,9 @@ impl SuspEnv {
     
     pub fn size(&self) -> usize { self.map.len() }
 
-    pub fn fresh(&mut self, c : Rc<MComputation>, env : Rc<Env>) -> Ident {
+    pub fn fresh(&mut self, c : &Rc<MComputation>, env : &Rc<Env>) -> Ident {
         let next = self.next;
-        self.map.insert(next, Err((c, env)));
+        self.map.insert(next, Err((c.clone(), env.clone())));
         self.next = next + 1;
         next
     }

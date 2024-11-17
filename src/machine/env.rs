@@ -36,4 +36,8 @@ impl Env {
     pub fn extend_lvar(&self, ident : Ident) -> Rc<Env> {
         self.extend(VClosure::LogicVar { ident }.into()).into()
     }
+
+    pub fn extend_susp(&self, ident : Ident) -> Rc<Env> {
+        self.extend(VClosure::Susp { ident }.into()).into()
+    }
 }

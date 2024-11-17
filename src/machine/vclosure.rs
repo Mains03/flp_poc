@@ -100,39 +100,44 @@ impl VClosure {
         Ok(vclos.into())
     }
 
-    pub fn close_val(&self, lenv : &LogicEnv) -> Option<MValue> {
+    pub fn close_val(&self, lenv : &LogicEnv, senv : &SuspEnv) -> Option<MValue> {
         match self {
             VClosure::Clos { val,  env } => {
                 // println!("[DEBUG] CLOSING {:?} in env of size {}", val, env.size());
                 match &**val {
-                    MValue::Var(i) => env.lookup(*i)?.close_val(lenv),
+                    MValue::Var(i) => env.lookup(*i)?.close_val(lenv, senv),
                     MValue::Zero => Some(MValue::Zero),
-                    MValue::Succ(v) => Some(MValue::Succ(VClosure::Clos { val: v.clone(), env : env.clone() }.close_val(lenv)?.into())),
+                    MValue::Succ(v) => Some(MValue::Succ(VClosure::Clos { val: v.clone(), env : env.clone() }.close_val(lenv, senv)?.into())),
                     MValue::Nil => Some(MValue::Nil),
                     MValue::Cons(v, w) => 
                         Some(MValue::Cons(
-                            VClosure::Clos { val: v.clone(), env : env.clone() }.close_val(lenv)?.into(),
-                            VClosure::Clos { val: w.clone(), env : env.clone() }.close_val(lenv)?.into()
+                            VClosure::Clos { val: v.clone(), env : env.clone() }.close_val(lenv, senv)?.into(),
+                            VClosure::Clos { val: w.clone(), env : env.clone() }.close_val(lenv, senv)?.into()
                         )),
                     MValue::Pair(fst, snd) => 
                         Some(MValue::Pair(
-                            VClosure::Clos{ val : fst.clone(), env : env.clone()}.close_val(lenv)?.into(),
-                            VClosure::Clos{ val : snd.clone(), env : env.clone() }.close_val(lenv)?.into(),
+                            VClosure::Clos{ val : fst.clone(), env : env.clone()}.close_val(lenv, senv)?.into(),
+                            VClosure::Clos{ val : snd.clone(), env : env.clone() }.close_val(lenv, senv)?.into(),
                         )),
                     MValue::Inl(v) =>
-                        Some(MValue::Inl(VClosure::Clos{ val : v.clone(), env : env.clone() }.close_val(lenv)?.into())),
+                        Some(MValue::Inl(VClosure::Clos{ val : v.clone(), env : env.clone() }.close_val(lenv, senv)?.into())),
                     MValue::Inr(v) => 
-                        Some(MValue::Inr(VClosure::Clos{ val : v.clone(), env : env.clone() }.close_val(lenv)?.into())),
+                        Some(MValue::Inr(VClosure::Clos{ val : v.clone(), env : env.clone() }.close_val(lenv, senv)?.into())),
                     MValue::Thunk(t) => panic!("shouldn't be returning a thunk anyway: {}", *t),
                 }
             },
             VClosure::LogicVar { ref ident } => {
                 match lenv.lookup(ident) {
-                    Some(v) => v.close_val(lenv),
+                    Some(v) => v.close_val(lenv, senv),
                     None => None,
                 }
             }
-            VClosure::Susp { ident } => panic!("closing something with a suspension"),
+            VClosure::Susp { ident } => {
+                match senv.lookup(ident) {
+                    Ok((val, env)) => VClosure::Clos { val: val.clone(), env: env.clone() }.close_val(lenv, senv),
+                    Err(_) => panic!("trying to close value with unresolved suspension"),
+                }
+            },
         }
     }
 
