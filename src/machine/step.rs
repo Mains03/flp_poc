@@ -88,10 +88,9 @@ impl Machine {
             },
             MComputation::Force(v) => {
                 let vclos = VClosure::Clos { val: v.clone(), env: m.env.clone() };
-                let ch = vclos.close_head(&m.lenv, &m.senv);
-                match ch {
-                    Ok(w) => 
-                        match &*w {
+                match vclos.close_head(&m.lenv, &m.senv){
+                    Ok(vclos) => 
+                        match &*vclos {
                             VClosure::Clos { val, env } => {
                                 match &**val {
                                     MValue::Thunk(t) => vec![Machine { comp : t.clone(), env : env.clone(), ..m}],
@@ -99,7 +98,7 @@ impl Machine {
                                 } 
                             },
                             VClosure::LogicVar { ident } => panic!("shouldn't be forcing a logic variable"),
-                            VClosure::Susp { ident } => todo!(),
+                            VClosure::Susp { ident } => unreachable!("shouldn't be forcing a suspension"),
                         }
                     Err(a) => {
                         vec![Machine { comp : a.comp, env : a.env, stack : push_susp(&m.stack, a.ident, m.comp, m.env), ..m  }]
