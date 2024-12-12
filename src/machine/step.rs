@@ -48,8 +48,14 @@ impl Machine {
             MComputation::Return(val) => {
                 match &*(m.stack).as_slice() {
                     [] => {
-                        match (VClosure::Clos { val : val.clone(), env: m.env.clone() }).find_susp(&m.lenv, &m.senv) {
-                            Some(a) => vec![Machine { comp : a.comp, env : a.env, stack : push_susp(&m.stack, a.ident, m.comp, m.env), ..m  }],
+                        // match (VClosure::Clos { val : val.clone(), env: m.env.clone() }).find_susp(&m.lenv, &m.senv) {
+                            // Some(a) => vec![Machine { comp : a.comp, env : a.env, stack : push_susp(&m.stack, a.ident, m.comp, m.env), ..m  }],
+                            // None => vec![Machine { done: true, ..m }]
+                        // }
+                        match m.senv.next() {
+                            Some((ident, (c, env))) =>
+                                vec![Machine { comp : c.clone(), env : env.clone(), stack : push_susp(&m.stack, *ident, m.comp, m.env), ..m  }]
+                            ,
                             None => vec![Machine { done: true, ..m }]
                         }
                     },

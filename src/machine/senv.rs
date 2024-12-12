@@ -38,5 +38,14 @@ impl SuspEnv {
     pub fn set(&mut self, ident : &Ident, val : Rc<MValue>, env : Rc<Env>) {
         self.map.insert(*ident, Ok((val, env)));
         self.lookup(ident);
+    
     }
+    
+    pub fn next(&self) -> Option<(&Ident, &ComputationInEnv)> {
+        if let Some((i, Err(cenv))) = self.map.iter().find(|(_, w)| w.is_err()) {
+            Some((i, cenv))
+        }
+        else { None }
+    }
+    
 }
