@@ -66,7 +66,7 @@ impl VClosure {
                                 .or(VClosure::Clos { val: w.clone(), env: env.clone() }.find_susp(lenv, senv)),
                             MValue::Thunk(t) => None,
                         },
-                    VClosure::LogicVar { ident } => lenv.lookup(ident).expect("oops").find_susp(lenv, senv),
+                    VClosure::LogicVar { ident } => lenv.lookup(ident)?.find_susp(lenv, senv),
                     VClosure::Susp { .. } => vclos.find_susp(lenv, senv)
                 },
             Err(a) => Some(a),
