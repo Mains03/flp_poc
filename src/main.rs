@@ -14,8 +14,8 @@ mod machine;
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-     if args.len() < 2 || args.len() > 3 {
-        eprintln!("Error: Expected between 1 and 2 arguments, but got {}.", args.len() - 1);
+     if args.len() < 1 || args.len() > 2 {
+        eprintln!("Error: Expected one argument, but got {}.", args.len() - 1);
         eprintln!("Usage: {} source_file [number of solutions]", args[0]);
         process::exit(1);
     }
@@ -50,5 +50,5 @@ fn interpret(src: &mut String, fuel: usize) {
 
     let ast = parser::parse(src).unwrap();
     let (main, env) = translate(ast);
-    machine::eval(main, env.into(), fuel);
+    machine::eval(main, env.into());
 }

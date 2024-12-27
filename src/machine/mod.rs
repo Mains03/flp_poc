@@ -22,13 +22,13 @@ type ValueInEnv = (Rc<MValue>, Rc<Env>);
 type ComputationInEnv = (Rc<MComputation>, Rc<Env>);
 
 
-pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
+pub fn eval(comp : MComputation, env : Rc<Env>) {
 
     // println!("[DEBUG] main stmt: {}", comp.clone()) ;
     let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack().into(), lenv : LogicEnv::new().into(), senv : SuspEnv::new().into(), done: false };
     let mut machines = vec![m];
     let mut solns = 0;
-    while fuel > 0 && !machines.is_empty() {
+    while !machines.is_empty() {
 
         let (done, ms) : (Vec<Machine>, Vec<Machine>) = machines.into_iter()
             .flat_map(|m| m.step())
@@ -57,17 +57,9 @@ pub fn eval(comp : MComputation, env : Rc<Env>, mut fuel : usize) {
             }
         }
         machines = ms;
-        // fuel -= 1   DO NOT NEED FUEL ANYMORE!!!
     }
     
     println!(">>> {} solutions", solns);
-    
-    // values.iter().flat_map(|m| {
-    //     match &*m.comp {
-    //         MComputation::Return(v) => VClosure::Clos { val: v.clone(), env: m.env.clone() }.close_val(&m.lenv),
-    //         _ => unreachable!()
-    //     }
-    // }).collect()
 }
 
 fn output(val : Rc<MValue>, env : Rc<Env>, lenv : &LogicEnv, senv : &SuspEnv) -> Option<String> {
