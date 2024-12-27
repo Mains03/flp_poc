@@ -21,10 +21,6 @@ fn main() {
     }
 
     let file_name = &args[1];
-    let fuel = match args.get(2) {
-        Some(n) => n.parse().unwrap(),
-        None => 1000
-    };
 
     let mut file = match File::open(file_name) {
         Ok(file) => file,
@@ -38,7 +34,7 @@ fn main() {
 
     // Try to read the file contents
     match file.read_to_string(&mut src) {
-        Ok(_) => { interpret(&mut src, fuel); }
+        Ok(_) => { interpret(&mut src); }
         Err(error) => {
             eprintln!("Error: Could not read file '{}': {}", file_name, error);
             process::exit(1);
@@ -46,7 +42,7 @@ fn main() {
     };
 }
 
-fn interpret(src: &mut String, fuel: usize) {
+fn interpret(src: &mut String) {
 
     let ast = parser::parse(src).unwrap();
     let (main, env) = translate(ast);
