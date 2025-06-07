@@ -4,11 +4,8 @@ use std::fs::File;
 use std::io::{self, Read};
 
 use crate::machine::translate::translate;
-use cbpv::terms;
 
 mod parser;
-mod cbpv;
-mod eval;
 mod machine;
 
 fn main() {

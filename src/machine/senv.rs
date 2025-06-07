@@ -2,10 +2,7 @@ use std::rc::Rc;
 
 use im::HashMap;
 
-use crate::cbpv::terms::ValueType;
-
 use super::{env::Env, mterms::{MComputation, MValue}, union_find::UnionFind, ComputationInEnv, Ident, VClosure, ValueInEnv};
-
 
 #[derive(Clone)]
 pub struct SuspEnv {
