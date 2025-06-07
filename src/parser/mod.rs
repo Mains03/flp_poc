@@ -1,7 +1,9 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{arg::Arg, bexpr::BExpr, case::{Case, ListCase, ListConsCase, ListEmptyCase, NatCase, NatSuccCase, NatZeroCase}, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
+use syntax::{arg::Arg, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
+
+use crate::parser::syntax::case_arm::CaseArm;
 
 pub mod syntax;
 
@@ -15,11 +17,11 @@ pub fn parse(src: &str) -> Result<Vec<Decl>, Error<Rule>> {
     let pairs = FLPParser::parse(Rule::program, src)?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::decl => {
+            Rule::declaration => {
                 let pair: pest::iterators::Pair<Rule> = pair.into_inner().next().unwrap();
 
                 prog.push(match pair.as_rule() {
-                    Rule::func_type => {
+                    Rule::function_type => {
                         let mut pair = pair.into_inner();
 
                         let name = pair.next().unwrap().as_str();
@@ -27,7 +29,7 @@ pub fn parse(src: &str) -> Result<Vec<Decl>, Error<Rule>> {
 
                         Decl::FuncType { name: name.to_string(), r#type }
                     },
-                    Rule::func => {
+                    Rule::function => {
                         let mut pair = pair.into_inner();
 
                         let name = pair.next().unwrap().as_str();
@@ -38,7 +40,7 @@ pub fn parse(src: &str) -> Result<Vec<Decl>, Error<Rule>> {
                             let pair = pair.next().unwrap();
 
                             match pair.as_rule() {
-                                Rule::arg => args.push(parse_arg(pair.into_inner())),
+                                Rule::argument => args.push(parse_argument(pair.into_inner())),
                                 _ => {
                                     body = pair;
                                     break;
@@ -46,11 +48,11 @@ pub fn parse(src: &str) -> Result<Vec<Decl>, Error<Rule>> {
                             }
                         };
 
-                        let body = parse_stm(body.into_inner());
+                        let body = parse_statement(body.into_inner());
 
                         Decl::Func { name: name.to_string(), args, body }
                     },
-                    Rule::stm => Decl::Stm(parse_stm(pair.into_inner())),
+                    Rule::statement => Decl::Stm(parse_statement(pair.into_inner())),
                     _ => unreachable!()
                 })
             },
@@ -61,159 +63,90 @@ pub fn parse(src: &str) -> Result<Vec<Decl>, Error<Rule>> {
     Ok(prog)
 }
 
-fn parse_arg(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
+fn parse_argument(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
-        Rule::ident => Arg::Ident(pair.as_str().to_string()),
-        Rule::arg_pair => parse_arg_pair(pair.into_inner()),
+        Rule::identifier => Arg::Ident(pair.as_str().to_string()),
+        Rule::argument_pair => parse_argument_pair(pair.into_inner()),
         _ => unreachable!()
     }
 }
 
-fn parse_arg_pair(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
+fn parse_argument_pair(mut pairs: pest::iterators::Pairs<Rule>) -> Arg {
     Arg::Pair(
-        Box::new(parse_arg(pairs.next().unwrap().into_inner())),
-        Box::new(parse_arg(pairs.next().unwrap().into_inner()))
+        Box::new(parse_argument(pairs.next().unwrap().into_inner())),
+        Box::new(parse_argument(pairs.next().unwrap().into_inner()))
     )
 }
 
-fn parse_stm(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
+fn parse_statement(mut pairs: pest::iterators::Pairs<Rule>) -> Stm {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
-        Rule::if_stm => {
+        Rule::_if => {
             let mut pairs = pair.into_inner();
 
-            let cond = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
-            let then = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
-            let r#else = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let cond = Box::new(parse_statement(pairs.next().unwrap().into_inner()));
+            let then = Box::new(parse_statement(pairs.next().unwrap().into_inner()));
+            let r#else = Box::new(parse_statement(pairs.next().unwrap().into_inner()));
 
             Stm::If { cond, then, r#else }
         },
-        Rule::let_stm => {
+        Rule::_let => {
             let mut pairs = pair.into_inner();
 
             let var = pairs.next().unwrap().as_str();
-            let val = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
-            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let val = Box::new(parse_statement(pairs.next().unwrap().into_inner()));
+            let body = Box::new(parse_statement(pairs.next().unwrap().into_inner()));
 
             Stm::Let { var: var.to_string(), val, body }
         },
-        Rule::exists_stm => {
+        Rule::exists => {
             let mut pairs = pair.into_inner();
 
             let var = pairs.next().unwrap().as_str();
             let r#type = parse_type(pairs.next().unwrap().into_inner());
-            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let body = Box::new(parse_statement(pairs.next().unwrap().into_inner()));
 
             Stm::Exists { var: var.to_string(), r#type, body }
         },
-        Rule::equate_stm => {
+        Rule::equate => {
             let mut pairs = pair.into_inner();
 
-            let lhs = parse_expr(pairs.next().unwrap().into_inner());
-            let rhs = parse_expr(pairs.next().unwrap().into_inner());
-            let body = Box::new(parse_stm(pairs.next().unwrap().into_inner()));
+            let lhs = parse_expression(pairs.next().unwrap().into_inner());
+            let rhs = parse_expression(pairs.next().unwrap().into_inner());
+            let body = Box::new(parse_statement(pairs.next().unwrap().into_inner()));
 
             Stm::Equate { lhs, rhs, body }
         },
-        Rule::choice_stm => {
+        Rule::choice => {
             let mut pairs = pair.into_inner();
 
             let mut choice = vec![];
             loop {
                 match pairs.next() {
-                    Some(p) => choice.push(parse_expr(p.into_inner())),
+                    Some(p) => choice.push(parse_expression(p.into_inner())),
                     None => break
                 }
             }
 
             Stm::Choice(choice)
         },
-        Rule::case_stm => {
+        Rule::case => {
             let mut pairs = pair.into_inner();
 
-            let var = pairs.next().unwrap().as_str().to_string();
+            let expr = parse_expression(pairs.next().unwrap().into_inner());
+            let cases = parse_cases(pairs.next().unwrap().into_inner());
 
-            let mut cases = vec![];
-            loop {
-                match pairs.next() {
-                    Some(pair) => {
-                        let expr = parse_expr(pairs.next().unwrap().into_inner());
-                        let pattern = parse_pattern(pair.into_inner(), expr);
-                        cases.push(pattern);
-                    },
-                    None => break
-                }
-            }
-
-            Stm::Case(var, collect_cases(cases))
+            Stm::Case { expr, cases }
         },
-        Rule::expr => Stm::Expr(parse_expr(pair.into_inner())),
+        Rule::expression => Stm::Expr(parse_expression(pair.into_inner())),
         _ => unreachable!()
     }
 }
 
-fn parse_pattern(mut pairs: pest::iterators::Pairs<Rule>, expr: Expr) -> Case {
-    let pair = pairs.next().unwrap();
-
-    match pair.as_rule() {
-        Rule::nat_pattern => {
-            let pair = pair.into_inner().next().unwrap();
-            Case::Nat(match pair.as_rule() {
-                Rule::zero_pattern => NatCase {
-                    zero: Some(NatZeroCase { expr }),
-                    succ: None
-                },
-                Rule::succ_pattern => NatCase {
-                    zero: None,
-                    succ: Some(NatSuccCase {
-                        var: pair.into_inner().next().unwrap().as_str().to_string(),
-                        expr
-                    })
-                },
-                _ => unreachable!()
-            })
-        },
-        Rule::list_pattern => {
-            let pair = pair.into_inner().next().unwrap();
-            Case::List(match pair.as_rule() {
-                Rule::empty_list => ListCase {
-                    empty: Some(ListEmptyCase { expr }),
-                    cons: None
-                },
-                Rule::cons_pattern => {
-                    let mut pairs = pair.into_inner();
-                    ListCase {
-                        empty: None,
-                        cons: Some(ListConsCase {
-                            x: pairs.next().unwrap().as_str().to_string(),
-                            xs: pairs.next().unwrap().as_str().to_string(),
-                            expr
-                        })
-                    }
-                },
-                _ => unreachable!()
-            })
-        },
-        _ => unreachable!()
-    }
-}
-
-fn collect_cases(cases: Vec<Case>) -> Case {
-    let init = match cases.get(0).unwrap() {
-        Case::Nat(_) => Case::Nat(NatCase { zero: None, succ: None }),
-        Case::List(_) => Case::List(ListCase { empty: None, cons: None })
-    };
-
-    cases.into_iter()
-        .fold(init, |acc, case| {
-            acc.combine(case)
-        })
-}
-
-fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
+fn parse_expression(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
@@ -221,22 +154,22 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
             let mut pairs = pair.into_inner();
 
             Expr::Cons(
-                Box::new(parse_expr(pairs.next().unwrap().into_inner())),
-                Box::new(parse_expr(pairs.next().unwrap().into_inner()))
+                Box::new(parse_expression(pairs.next().unwrap().into_inner())),
+                Box::new(parse_expression(pairs.next().unwrap().into_inner()))
             )
         },
         Rule::succ => {
             let mut pairs = pair.into_inner();
 
-            Expr::Succ(Box::new(parse_expr(pairs.next().unwrap().into_inner())))
+            Expr::Succ(Box::new(parse_expression(pairs.next().unwrap().into_inner())))
         },
-        Rule::app => {
+        Rule::application => {
             let mut pairs = pair.into_inner();
 
             let mut exprs = vec![];
             loop {
                 match pairs.next() {
-                    Some(e) => exprs.push(parse_expr(e.into_inner())),
+                    Some(e) => exprs.push(parse_expression(e.into_inner())),
                     None => break,
                 }
             }
@@ -253,36 +186,51 @@ fn parse_expr(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
                 }
             }).unwrap()
         },
-        Rule::bexpr => Expr::BExpr(parse_bexpr(pair.into_inner())),
+        Rule::boolean_expr => Expr::BExpr(parse_boolean_expression(pair.into_inner())),
         Rule::pair => {
             let mut pairs = pair.into_inner();
 
             Expr::Pair(
-                Box::new(parse_stm(pairs.next().unwrap().into_inner())),
-                Box::new(parse_stm(pairs.next().unwrap().into_inner()))
+                Box::new(parse_statement(pairs.next().unwrap().into_inner())),
+                Box::new(parse_statement(pairs.next().unwrap().into_inner()))
             )
         },
         Rule::list => Expr::List(parse_list(pair.into_inner())),
         Rule::lambda => {
             let mut pairs = pair.into_inner();
             Expr::Lambda(
-                parse_arg(pairs.next().unwrap().into_inner()),
-                Box::new(parse_stm(pairs.next().unwrap().into_inner()))
+                parse_argument(pairs.next().unwrap().into_inner()),
+                Box::new(parse_statement(pairs.next().unwrap().into_inner()))
             )
         },
-        Rule::primary_expr => parse_expr(pair.into_inner()),
-        Rule::ident => Expr::Ident(pair.as_str().to_string()),
-        Rule::nat => Expr::Nat(pair.as_str().parse().unwrap()),
-        Rule::bool => Expr::Bool(parse_bool(pair.as_str())),
-        Rule::stm => Expr::Stm(Box::new(parse_stm(pair.into_inner()))),
+        Rule::primary_expr => parse_expression(pair.into_inner()),
+        Rule::identifier => Expr::Ident(pair.as_str().to_string()),
+        Rule::number => Expr::Nat(pair.as_str().parse().unwrap()),
+        Rule::boolean => Expr::Bool(parse_bool(pair.as_str())),
+        Rule::statement => Expr::Stm(Box::new(parse_statement(pair.into_inner()))),
         _ => unreachable!()
     }
 }
 
-fn parse_bexpr(mut pairs: pest::iterators::Pairs<Rule>) -> BExpr {
+fn parse_cases(mut pairs: pest::iterators::Pairs<Rule>) -> Vec<CaseArm> {
+    let mut cases = vec![];
+    loop {
+        match pairs.next() {
+            Some(p) => cases.push(CaseArm {
+                pattern: parse_expression(p.into_inner()),
+                expression: parse_expression(pairs.next().unwrap().into_inner())
+            }),
+            None => break
+        }
+    }
+
+    cases
+}
+
+fn parse_boolean_expression(mut pairs: pest::iterators::Pairs<Rule>) -> BExpr {
     let pair = pairs.next().unwrap();
 
-    let lhs = parse_expr(pair.into_inner());
+    let lhs = parse_expression(pair.into_inner());
 
     let pair = pairs.next();
     match pair {
@@ -290,7 +238,7 @@ fn parse_bexpr(mut pairs: pest::iterators::Pairs<Rule>) -> BExpr {
             let op = pair.as_str();
 
             let pair = pairs.next().unwrap();
-            let rhs  = parse_expr(pair.into_inner());
+            let rhs  = parse_expression(pair.into_inner());
 
             if op == "==" {
                 BExpr::Eq(Box::new(lhs), Box::new(rhs))
@@ -313,7 +261,7 @@ fn parse_list(mut pairs: pest::iterators::Pairs<Rule>) -> Vec<Expr> {
 
     loop {
         match pairs.next() {
-            Some(pair) => list.push(parse_expr(pair.into_inner())),
+            Some(pair) => list.push(parse_expression(pair.into_inner())),
             None => break
         }
     }
@@ -352,7 +300,7 @@ fn parse_primary_type(mut pairs: pest::iterators::Pairs<Rule>) -> Type {
     let pair = pairs.next().unwrap();
 
     match pair.as_rule() {
-        Rule::ident => Type::Ident(pair.as_str().to_string()),
+        Rule::identifier => Type::Ident(pair.as_str().to_string()),
         Rule::list_type => Type::List(Box::new(parse_type(pair.into_inner().next().unwrap().into_inner()))),
         Rule::pair_type => {
             let mut pair = pair.into_inner();
@@ -865,39 +813,6 @@ id x = x.
 
     #[test]
     fn test20() {
-        let src = "case xs of [] -> []. (x:xs) -> (case xs of [] -> []. (y:ys) -> y:ys).";
-
-        let ast = parse(src).unwrap();
-
-        assert_eq!(
-            ast,
-            vec![Decl::Stm(Stm::Case("xs".to_string(), Case::List(ListCase {
-                empty: Some(ListEmptyCase {
-                    expr: Expr::List(vec![])
-                }),
-                cons: Some(ListConsCase {
-                    x: "x".to_string(),
-                    xs: "xs".to_string(),
-                    expr: Expr::Stm(Box::new(Stm::Case("xs".to_string(), Case::List(ListCase {
-                        empty: Some(ListEmptyCase {
-                            expr: Expr::List(vec![])
-                        }),
-                        cons: Some(ListConsCase {
-                            x: "y".to_string(),
-                            xs: "ys".to_string(),
-                            expr: Expr::Cons(
-                                Box::new(Expr::Ident("y".to_string())),
-                                Box::new(Expr::Ident("ys".to_string()))
-                            )
-                        })
-                    }))))
-                })
-            })))]
-        )
-    }
-
-    #[test]
-    fn test21() {
         let src = "true && (false || true).";
 
         let ast = parse(src).unwrap();

@@ -1,5 +1,5 @@
 use std::{collections::HashMap, rc::Rc};
-use crate::{cbpv::terms::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, case::Case, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
+use crate::{cbpv::terms::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
 use crate::machine::translate::Expr::Ident;
 use super::{mterms::{MComputation, MValue}, Env, VClosure};
 
@@ -131,26 +131,10 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
             exprs.into_iter()
                 .map(|e| translate_expr(e, env).into()).collect()
         ),
-        Stm::Case(var, case) => 
-            match case {
-                Case::Nat(nat_case) => {
-                    let zk = translate_expr(nat_case.zero.unwrap().expr, env).into();
-                    let succ_case = nat_case.succ.unwrap();
-                    env.bind(&succ_case.var); 
-                    let sk = translate_expr(succ_case.expr, env).into();
-                    env.unbind(); 
-                    MComputation::Ifz { num: MValue::Var(env.find(&var)).into(), zk, sk }
-                },
-                Case::List(list_case) => {
-                    let nilk = translate_expr(list_case.empty.unwrap().expr, env).into();
-                    let cons_case = list_case.cons.unwrap();
-                    env.bind(&cons_case.x); 
-                    env.bind(&cons_case.xs);
-                    let consk = translate_expr(cons_case.expr, env).into();
-                    env.unbind(); 
-                    env.unbind();
-                    MComputation::Match { list: MValue::Var(env.find(&var)).into(), nilk, consk }
-                }
+        Stm::Case { expr, cases } => {
+
+            
+            todo!()
         },
         Stm::Expr(e) => translate_expr(e, env)
     }
