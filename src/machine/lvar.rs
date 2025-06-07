@@ -2,7 +2,7 @@ use std::{cell::RefCell, ptr, rc::Rc};
 
 use im::HashMap;
 
-use crate::cbpv::terms::ValueType;
+use crate::machine::value_type::ValueType;
 
 use super::{env::Env, mterms::MValue, union_find::UnionFind, Ident, VClosure};
 

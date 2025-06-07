@@ -1,5 +1,5 @@
 use std::{borrow::Borrow, cell::RefCell, collections::{HashMap, VecDeque}, ptr, rc::Rc};
-use crate::{cbpv::terms::{Value, ValueType}, machine::{lvar, senv}};
+use crate::machine::{lvar, senv, value_type::ValueType};
 use super::{lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, unify::UnifyError, Env, Ident, VClosure};
 use crate::machine::unify::unify;
     

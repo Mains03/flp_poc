@@ -1,5 +1,5 @@
 use std::{collections::HashMap, rc::Rc};
-use crate::{cbpv::terms::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
+use crate::{machine::value_type::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
 use crate::machine::translate::Expr::Ident;
 use super::{mterms::{MComputation, MValue}, Env, VClosure};
 

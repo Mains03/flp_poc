@@ -6,6 +6,7 @@ mod senv;
 mod unify;
 mod step;
 mod union_find;
+mod value_type;
 pub mod translate;
 use std::{io::Write, rc::Rc};
 use env::Env;
