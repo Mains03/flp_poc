@@ -1,0 +1,4 @@
+f :: Nat -> Nat
+f x = exists y :: Nat. (y =:= x. y).
+
+f 1.

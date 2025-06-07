@@ -1,0 +1,20 @@
+insert :: [Int] -> Int
+insert x xs = case xs of
+                  [] -> [x]
+                | (z:zs) -> ((x : z : zs) <> (z : insert x zs)).
+
+perm :: [Int] -> [Int]
+perm xs = case xs of 
+               [] -> []
+            |  (z:zs) -> insert z (perm zs).
+
+cat :: [Nat] -> [Nat] -> [Nat]
+cat xs ys = case xs of
+      [] -> ys
+    | (x:xs) -> x : (cat xs ys).
+
+last :: [Nat] -> Nat
+last xs = exists ys :: [Nat]. exists y :: Nat.
+    cat ys [y] =:= xs. y.
+
+let xs = perm [1,2,3,4,5,6,7] in last xs =:= 1. xs.

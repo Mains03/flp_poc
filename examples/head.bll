@@ -1,0 +1,4 @@
+head :: [Nat] -> Nat
+head xs = exists y :: Nat. exists ys :: [Nat]. (y:ys) =:= xs. y.
+
+head [3, 2, 1].
