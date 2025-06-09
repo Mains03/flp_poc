@@ -204,6 +204,8 @@ fn parse_expression(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
             )
         },
         Rule::primary_expr => parse_expression(pair.into_inner()),
+        Rule::nat_zero => Expr::Zero,
+        Rule::list_nil => Expr::Nil,
         Rule::identifier => Expr::Ident(pair.as_str().to_string()),
         Rule::number => Expr::Nat(pair.as_str().parse().unwrap()),
         Rule::boolean => Expr::Bool(parse_bool(pair.as_str())),
@@ -221,7 +223,7 @@ fn parse_cases(mut pairs: pest::iterators::Pairs<Rule>) -> Cases {
                 let expr = parse_expression(p.into_inner());
                 let body = parse_expression(pairs.next().unwrap().into_inner());
 
-                match expr {
+                match expr.strip_parentheses() {
                     Expr::Zero => {
                         cases.set_type_or_check(CasesType::Nat);
                         cases.set_nat_zero(body);

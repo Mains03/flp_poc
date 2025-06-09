@@ -16,3 +16,20 @@ pub enum Expr {
     Pair(Box<Stm>, Box<Stm>),
     Stm(Box<Stm>)
 }
+
+impl Expr {
+    pub fn strip_parentheses(self) -> Expr {
+        let mut e = self;
+        loop {
+            match e {
+                Expr::Stm(stm) => match *stm {
+                    Stm::Expr(expr) => e = expr,
+                    stm => e = Expr::Stm(Box::new(stm))
+                },
+                _ => break
+            }
+        }
+
+        e
+    }
+}
