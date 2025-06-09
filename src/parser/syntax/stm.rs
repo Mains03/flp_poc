@@ -1,4 +1,4 @@
-use crate::parser::syntax::case_arm::CaseArm;
+use crate::parser::syntax::cases::Cases;
 
 use super::{expr::Expr, r#type::Type};
 
@@ -27,7 +27,7 @@ pub enum Stm {
     Choice(Vec<Expr>),
     Case {
         expr: Expr,
-        cases: Vec<CaseArm>
+        cases: Cases
     },
     Expr(Expr)
 }

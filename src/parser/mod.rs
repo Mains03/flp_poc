@@ -3,7 +3,7 @@ use pest_derive::Parser;
 
 use syntax::{arg::Arg, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
 
-use crate::parser::syntax::case_arm::CaseArm;
+use crate::parser::syntax::cases::{Cases, CasesType};
 
 pub mod syntax;
 
@@ -212,14 +212,50 @@ fn parse_expression(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
     }
 }
 
-fn parse_cases(mut pairs: pest::iterators::Pairs<Rule>) -> Vec<CaseArm> {
-    let mut cases = vec![];
+fn parse_cases(mut pairs: pest::iterators::Pairs<Rule>) -> Cases {
+    let mut cases = Cases::new();
+
     loop {
         match pairs.next() {
-            Some(p) => cases.push(CaseArm {
-                pattern: parse_expression(p.into_inner()),
-                expression: parse_expression(pairs.next().unwrap().into_inner())
-            }),
+            Some(p) => {
+                let expr = parse_expression(p.into_inner());
+                let body = parse_expression(pairs.next().unwrap().into_inner());
+
+                match expr {
+                    Expr::Zero => {
+                        cases.set_type_or_check(CasesType::Nat);
+                        cases.set_nat_zero(body);
+                    },
+                    Expr::Succ(e) => {
+                        let var = match *e {
+                            Expr::Ident(s) => s,
+                            _ => panic!("expected identifier")
+                        };
+
+                        cases.set_type_or_check(CasesType::Nat);
+                        cases.set_nat_succ(var, body);
+                    },
+                    Expr::Nil => {
+                        cases.set_type_or_check(CasesType::List);
+                        cases.set_list_nil(body);
+                    },
+                    Expr::Cons(e1, e2) => {
+                        let x = match *e1 {
+                            Expr::Ident(s) => s,
+                            _ => panic!("expected identifier")
+                        };
+
+                        let xs = match *e2 {
+                            Expr::Ident(s) => s,
+                            _ => panic!("expected identifier")
+                        };
+
+                        cases.set_type_or_check(CasesType::List);
+                        cases.set_list_cons(x, xs, body);
+                    },
+                    _ => panic!("bad cases")
+                }
+            },
             None => break
         }
     }

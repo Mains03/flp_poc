@@ -2,9 +2,11 @@ use super::{arg::Arg, bexpr::BExpr, stm::Stm};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Expr {
+    Zero,
+    Succ(Box<Expr>),
+    Nil,
     Cons(Box<Expr>, Box<Expr>),
     App(Box<Expr>, Box<Expr>),
-    Succ(Box<Expr>),
     BExpr(BExpr),
     List(Vec<Expr>),
     Lambda(Arg, Box<Stm>),
