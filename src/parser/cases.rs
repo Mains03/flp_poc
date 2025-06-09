@@ -1,4 +1,4 @@
-use crate::parser::syntax::expr::Expr;
+use crate::parser::expr::Expr;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Cases {

@@ -1,11 +1,15 @@
 use pest::{error::Error, Parser};
 use pest_derive::Parser;
 
-use syntax::{arg::Arg, bexpr::BExpr, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
+use crate::parser::{arg::Arg, bexpr::BExpr, cases::{Cases, CasesType}, decl::Decl, expr::Expr, stm::Stm, r#type::Type};
 
-use crate::parser::syntax::cases::{Cases, CasesType};
-
-pub mod syntax;
+pub mod arg;
+pub mod cases;
+pub mod decl;
+pub mod r#type;
+pub mod stm;
+pub mod expr;
+pub mod bexpr;
 
 #[derive(Parser)]
 #[grammar = "parser/lang.pest"]

@@ -1,4 +1,4 @@
-use crate::parser::syntax::cases::Cases;
+use crate::parser::cases::Cases;
 
 use super::{expr::Expr, r#type::Type};
 

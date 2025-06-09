@@ -1,6 +1,5 @@
 use std::{collections::HashMap, rc::Rc};
-use crate::{machine::value_type::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, cases::CasesType, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
-use crate::machine::translate::Expr::Ident;
+use crate::{machine::value_type::ValueType, parser::{arg::{self, Arg}, bexpr::BExpr, cases::CasesType, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
 use super::{mterms::{MComputation, MValue}, Env, VClosure};
 
 type Idx = usize;
