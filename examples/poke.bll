@@ -1,6 +1,6 @@
 poke :: Nat -> Nat
 poke n = case n of
               0 -> 0
-            | z + 1 -> (poke z) + 1.
+            | S z -> S (poke z).
   
 exists x :: Nat. poke x.
