@@ -1,6 +1,6 @@
 add :: Nat -> Nat -> Nat
 add n m = case m of
-              0 -> n
+              Z -> n
             | S z -> S (add n z).
             
 sum :: [Nat] -> Nat
