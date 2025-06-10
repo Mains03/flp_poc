@@ -273,7 +273,7 @@ fn translate_pair(fst: Expr, snd: Expr, env : &mut TEnv) -> MComputation {
         comp: fst_comp,
         cont: MComputation::Bind {
             comp : snd_comp,
-            cont : MComputation::Return(MValue::Pair(MValue::Var(0).into(), MValue::Var(1).into()).into()).into()
+            cont : MComputation::Return(MValue::Pair(MValue::Var(1).into(), MValue::Var(0).into()).into()).into()
         }.into()
     }.into()
 }
