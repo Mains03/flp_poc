@@ -1,51 +1,50 @@
-program = _{ SOI ~ decl* ~ EOI }
+program = _{ SOI ~ declaration* ~ EOI }
 
-decl = { func_type | func | stm ~ "." }
+declaration = { function_type | function | statement ~ "." }
 
-func_type = { ident ~ "::" ~ type }
-type = { arrow_type | primary_type }
+function_type = { identifier ~ "::" ~ type }
+
+type = { arrow_type | product_type | primary_type }
 arrow_type = { primary_type ~ "->" ~ type }
-primary_type = { ident | list_type | pair_type | "(" ~ type ~ ")" }
+product_type = { primary_type ~ "*" ~ type }
+
+primary_type = { identifier | list_type | "(" ~ type ~ ")" }
 list_type = { "[" ~ type ~ "]"}
-pair_type = { "(" ~ type ~ "," ~ type ~ ")" }
 
-func = { ident ~ arg* ~ "=" ~ stm ~ "." }
-arg = { ident | arg_pair }
-arg_pair = { "(" ~ arg ~ "," ~ arg ~ ")" }
+function = { identifier ~ argument* ~ "=" ~ statement ~ "." }
+argument = { identifier | argument_pair }
+argument_pair = { "(" ~ argument ~ "," ~ argument ~ ")" }
 
-stm = { if_stm | let_stm | exists_stm | equate_stm | choice_stm | case_stm | expr }
+// The underscores are necessary since otherwise the word name conflicts with
+// rust reserved words
+statement = { _if | _let | exists | equate | choice | case | expression }
 
-if_stm = { "if" ~ stm ~ "then" ~ stm ~ "else" ~ stm }
-let_stm = { "let" ~ ident ~ "=" ~ stm ~ "in" ~ stm }
-exists_stm = { "exists" ~ ident ~ "::" ~ type ~ "." ~ stm }
-equate_stm = { expr ~ "=:=" ~ expr ~ "." ~ stm }
-choice_stm = { expr ~ ("<>" ~ expr)+ }
+_if = { "if" ~ statement ~ "then" ~ statement ~ "else" ~ statement }
+_let = { "let" ~ identifier ~ "=" ~ statement ~ "in" ~ statement }
+exists = { "exists" ~ identifier ~ "::" ~ type ~ "." ~ statement }
+equate = { expression ~ "=:=" ~ expression ~ "." ~ statement }
+choice = { expression ~ ("<>" ~ expression)+ }
+case = { "case" ~ expression ~ "of" ~ cases }
+cases = { expression ~ "->" ~ expression ~ ("|" ~ expression ~ "->" ~ expression)*}
 
-case_stm = { "case" ~ ident ~ "of" ~ pattern ~ "->" ~ expr ~ ("|" ~ pattern ~ "->" ~ expr)* }
-pattern = { nat_pattern | list_pattern }
-nat_pattern = { zero_pattern | succ_pattern }
-zero_pattern = { "0" }
-succ_pattern = { ident ~ "+ 1" }
-list_pattern = { empty_list | cons_pattern }
-empty_list = { "[" ~ "]" }
-cons_pattern = { "(" ~ ident ~ ":" ~ ident ~ ")" }
+expression = { cons | succ | application | boolean_expr | lambda | primary_expr }
+cons = { primary_expr ~ ":" ~ expression }
+succ = { "S" ~ expression }
+application = { primary_expr ~ primary_expr+ }
+boolean_expr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
+lambda = { "\\" ~ argument ~ "." ~ statement }
 
-expr = { cons | succ | app | bexpr | lambda | primary_expr }
-cons = { primary_expr ~ ":" ~ expr }
-succ = { primary_expr ~ "+ 1" }
-app = { primary_expr ~ primary_expr+ }
-bexpr = { primary_expr ~ bexpr_op ~ primary_expr | "!" ~ primary_expr }
-lambda = { "\\" ~ arg ~ "." ~ stm }
-
-primary_expr = { ident | nat | bool | pair | list | "(" ~ stm ~ ")" }
-pair = { "(" ~ stm ~ "," ~ stm ~ ")" }
-list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)? ~ "]" }
+primary_expr = { nat_zero | list_nil | identifier | number | boolean | pair | list | "(" ~ statement ~ ")" }
+nat_zero = { "Z" }
+list_nil = { "[" ~ "]" }
+pair = { "(" ~ primary_expr ~ "," ~ primary_expr ~ ")" }
+list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)+ ~ "]" }
 
 bexpr_op = { "==" | "!=" | "&&" | "||" }
 
-ident = @{ keywords? ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | bool }
-nat = @{ ASCII_DIGIT+ }
-bool = { "true" | "false" }
+identifier = @{ keywords? ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | "case" | "of" | boolean }
+number = @{ ASCII_DIGIT+ }
+boolean = { "true" | "false" }
 
 WHITESPACE = _{ WHITE_SPACE }

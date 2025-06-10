@@ -1,7 +1,7 @@
 add :: Nat -> Nat -> Nat
 add n m = case m of
-              0 -> n
-            | z + 1 -> (add n z) + 1.
+              Z -> n
+            | S z -> S (add n z).
             
 sum :: [Nat] -> Nat
 sum xs = case xs of 
@@ -11,6 +11,6 @@ sum xs = case xs of
 length :: [Nat] -> Nat
 length xs = case xs of
               [] -> 0
-            | (z:zs) -> (length zs) + 1.
+            | (z:zs) -> S (length zs).
             
 exists xs :: [Nat]. length xs =:= 7. sum xs =:= 5. xs.

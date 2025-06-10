@@ -4,19 +4,16 @@ use std::fs::File;
 use std::io::{self, Read};
 
 use crate::machine::translate::translate;
-use cbpv::terms;
 
 mod parser;
-mod cbpv;
-mod eval;
 mod machine;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-     if args.len() < 1 || args.len() > 2 {
+     if args.len() != 2 {
         eprintln!("Error: Expected one argument, but got {}.", args.len() - 1);
-        eprintln!("Usage: {} source_file [number of solutions]", args[0]);
+        eprintln!("Usage: {} source_file", args[0]);
         process::exit(1);
     }
 

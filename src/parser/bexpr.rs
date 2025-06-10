@@ -1,5 +1,6 @@
 use super::expr::Expr;
 
+// Boolean expressions
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BExpr {
     Eq(Box<Expr>, Box<Expr>),

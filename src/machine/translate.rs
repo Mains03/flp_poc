@@ -1,6 +1,5 @@
 use std::{collections::HashMap, rc::Rc};
-use crate::{cbpv::terms::ValueType, parser::syntax::{arg::{self, Arg}, bexpr::BExpr, case::Case, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
-use crate::machine::translate::Expr::Ident;
+use crate::{machine::value_type::ValueType, parser::{arg::{self, Arg}, bexpr::BExpr, cases::CasesType, decl::Decl, expr::Expr, stm::Stm, r#type::Type}};
 use super::{mterms::{MComputation, MValue}, Env, VClosure};
 
 type Idx = usize;
@@ -83,7 +82,7 @@ fn translate_vtype(ptype : Type) -> ValueType {
         Type::Ident(s) => 
             if s == "Nat" { ValueType::Nat } else { todo!() },
         Type::List(t) => ValueType::List(Box::new(translate_vtype(*t))),
-        Type::Pair(t1, t2) => ValueType::Pair(Box::new(translate_vtype(*t1)), Box::new(translate_vtype(*t2)))
+        Type::Product(t1, t2) => ValueType::Product(Box::new(translate_vtype(*t1)), Box::new(translate_vtype(*t2)))
     }
 }
 
@@ -131,26 +130,36 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
             exprs.into_iter()
                 .map(|e| translate_expr(e, env).into()).collect()
         ),
-        Stm::Case(var, case) => 
-            match case {
-                Case::Nat(nat_case) => {
-                    let zk = translate_expr(nat_case.zero.unwrap().expr, env).into();
-                    let succ_case = nat_case.succ.unwrap();
-                    env.bind(&succ_case.var); 
+        Stm::Case { expr, cases } => {
+            env.bind(&"_foo".to_string());
+            let cont = match cases.r#type.unwrap() {
+                CasesType::Nat => {
+                    let nat_case = cases.nat_case.unwrap();
+                    let zk = translate_expr(nat_case.zk.unwrap(), env).into();
+                    let succ_case = nat_case.sk.unwrap();
+                    env.bind(&succ_case.var);
                     let sk = translate_expr(succ_case.expr, env).into();
-                    env.unbind(); 
-                    MComputation::Ifz { num: MValue::Var(env.find(&var)).into(), zk, sk }
+                    env.unbind();
+                    MComputation::Ifz { num: MValue::Var(0).into(), zk, sk }
                 },
-                Case::List(list_case) => {
-                    let nilk = translate_expr(list_case.empty.unwrap().expr, env).into();
-                    let cons_case = list_case.cons.unwrap();
-                    env.bind(&cons_case.x); 
+                CasesType::List => {
+                    let list_case = cases.list_case.unwrap();
+                    let nilk = translate_expr(list_case.nilk.unwrap(), env).into();
+                    let cons_case = list_case.consk.unwrap();
+                    env.bind(&cons_case.x);
                     env.bind(&cons_case.xs);
                     let consk = translate_expr(cons_case.expr, env).into();
-                    env.unbind(); 
                     env.unbind();
-                    MComputation::Match { list: MValue::Var(env.find(&var)).into(), nilk, consk }
+                    env.unbind();
+                    MComputation::Match { list: MValue::Var(0).into(), nilk, consk }
                 }
+            }.into();
+            env.unbind();
+
+            MComputation::Bind {
+                comp: translate_expr(expr, env).into(),
+                cont
+            }
         },
         Stm::Expr(e) => translate_expr(e, env)
     }
@@ -158,6 +167,14 @@ fn translate_stm(stm: Stm, env : &mut TEnv) -> MComputation {
 
 fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
     match expr {
+        Expr::Zero => MComputation::Return(MValue::Zero.into()),
+        Expr::Succ(body) => {
+            MComputation::Bind { 
+                comp: translate_expr(*body, env).into(),
+                cont: MComputation::Return(MValue::Succ(MValue::Var(0).into()).into()).into()
+            }
+        },
+        Expr::Nil => MComputation::Return(MValue::Nil.into()),
         Expr::Cons(x, xs) => {
             let comp_head = translate_expr(*x, env).into();
             env.bind(&"_foo".to_string());
@@ -169,12 +186,6 @@ fn translate_expr(expr: Expr, env : &mut TEnv) -> MComputation {
                     comp: comp_tail,
                     cont: MComputation::Return(MValue::Cons(MValue::Var(1).into(), MValue::Var(0).into()).into()).into(),
                 }.into()
-            }
-        },
-        Expr::Succ(body) => {
-            MComputation::Bind { 
-                comp: translate_expr(*body, env).into(),
-                cont: MComputation::Return(MValue::Succ(MValue::Var(0).into()).into()).into()
             }
         },
         Expr::Lambda(arg, body) => {
@@ -253,16 +264,16 @@ fn translate_nat(n: usize) -> MComputation {
     MComputation::Return(nat_val.into())
 }
 
-fn translate_pair(fst: Stm, snd: Stm, env : &mut TEnv) -> MComputation {
-    let fst_comp = translate_stm(fst, env).into();
+fn translate_pair(fst: Expr, snd: Expr, env : &mut TEnv) -> MComputation {
+    let fst_comp = translate_expr(fst, env).into();
     env.bind(&"_foo".to_string());
-    let snd_comp = translate_stm(snd, env).into();
+    let snd_comp = translate_expr(snd, env).into();
     env.unbind();
     MComputation::Bind { 
         comp: fst_comp,
         cont: MComputation::Bind {
             comp : snd_comp,
-            cont : MComputation::Return(MValue::Pair(MValue::Var(0).into(), MValue::Var(1).into()).into()).into()
+            cont : MComputation::Return(MValue::Pair(MValue::Var(1).into(), MValue::Var(0).into()).into()).into()
         }.into()
     }.into()
 }

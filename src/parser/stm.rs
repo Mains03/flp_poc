@@ -1,4 +1,6 @@
-use super::{case::Case, expr::Expr, r#type::Type};
+use crate::parser::cases::Cases;
+
+use super::{expr::Expr, r#type::Type};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Stm {
@@ -23,6 +25,9 @@ pub enum Stm {
         body: Box<Stm>
     },
     Choice(Vec<Expr>),
-    Case(String, Case),
+    Case {
+        expr: Expr,
+        cases: Cases
+    },
     Expr(Expr)
 }

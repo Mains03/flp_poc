@@ -1,6 +1,6 @@
 use std::{fmt::Display, rc::Rc};
 
-use crate::{cbpv::terms::ValueType, machine::vclosure::VClosure};
+use crate::machine::{value_type::ValueType, vclosure::VClosure};
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum MValue {

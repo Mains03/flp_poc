@@ -1,6 +1,6 @@
 add :: Nat -> Nat -> Nat
 add n m = case m of
-              0 -> n
-            | z + 1 -> (add n z) + 1.
+              Z -> n
+            | S z -> S (add n z).
 
 exists x :: Nat. exists y :: Nat. add x y =:= 100. (x, y).
