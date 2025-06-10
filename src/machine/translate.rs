@@ -82,7 +82,7 @@ fn translate_vtype(ptype : Type) -> ValueType {
         Type::Ident(s) => 
             if s == "Nat" { ValueType::Nat } else { todo!() },
         Type::List(t) => ValueType::List(Box::new(translate_vtype(*t))),
-        Type::Pair(t1, t2) => ValueType::Pair(Box::new(translate_vtype(*t1)), Box::new(translate_vtype(*t2)))
+        Type::Product(t1, t2) => ValueType::Product(Box::new(translate_vtype(*t1)), Box::new(translate_vtype(*t2)))
     }
 }
 

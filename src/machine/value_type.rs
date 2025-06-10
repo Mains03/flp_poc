@@ -3,7 +3,7 @@ use std::fmt::Display;
 #[derive(PartialEq, Clone, Debug)]
 pub enum ValueType {
     Nat,
-    Pair(Box<ValueType>, Box<ValueType>),
+    Product(Box<ValueType>, Box<ValueType>),
     Sum(Box<ValueType>, Box<ValueType>),
     List(Box<ValueType>),
     Thunk(Box<ComputationType>)
@@ -15,7 +15,7 @@ impl Display for ValueType {
             ValueType::Nat => write!(f, "Nat"),
             ValueType::List(value_type) => write!(f, "[{}]", value_type),
             ValueType::Thunk(computation_type) => write!(f, "THONK"),
-            ValueType::Pair(value_type, value_type1) => todo!(),
+            ValueType::Product(value_type, value_type1) => todo!(),
             ValueType::Sum(value_type, value_type1) => todo!(),
         }
     }

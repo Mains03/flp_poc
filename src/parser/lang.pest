@@ -3,11 +3,13 @@ program = _{ SOI ~ declaration* ~ EOI }
 declaration = { function_type | function | statement ~ "." }
 
 function_type = { identifier ~ "::" ~ type }
-type = { arrow_type | primary_type }
+
+type = { arrow_type | product_type | primary_type }
 arrow_type = { primary_type ~ "->" ~ type }
-primary_type = { identifier | list_type | pair_type | "(" ~ type ~ ")" }
+product_type = { primary_type ~ "*" ~ type }
+
+primary_type = { identifier | list_type | "(" ~ type ~ ")" }
 list_type = { "[" ~ type ~ "]"}
-pair_type = { "(" ~ type ~ "," ~ type ~ ")" }
 
 function = { identifier ~ argument* ~ "=" ~ statement ~ "." }
 argument = { identifier | argument_pair }
