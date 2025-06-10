@@ -43,7 +43,7 @@ list = { "[" ~ (primary_expr ~ ("," ~ primary_expr)*)+ ~ "]" }
 bexpr_op = { "==" | "!=" | "&&" | "||" }
 
 identifier = @{ keywords? ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
-keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | "case" | "of" | "(" | ")" | boolean }
+keywords = { "if" | "then" | "else" | "let" | "in" | "exists" | "case" | "of" | boolean }
 number = @{ ASCII_DIGIT+ }
 boolean = { "true" | "false" }
 
