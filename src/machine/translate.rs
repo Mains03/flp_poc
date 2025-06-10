@@ -264,10 +264,10 @@ fn translate_nat(n: usize) -> MComputation {
     MComputation::Return(nat_val.into())
 }
 
-fn translate_pair(fst: Stm, snd: Stm, env : &mut TEnv) -> MComputation {
-    let fst_comp = translate_stm(fst, env).into();
+fn translate_pair(fst: Expr, snd: Expr, env : &mut TEnv) -> MComputation {
+    let fst_comp = translate_expr(fst, env).into();
     env.bind(&"_foo".to_string());
-    let snd_comp = translate_stm(snd, env).into();
+    let snd_comp = translate_expr(snd, env).into();
     env.unbind();
     MComputation::Bind { 
         comp: fst_comp,

@@ -13,7 +13,7 @@ pub enum Expr {
     Ident(String),
     Nat(usize),
     Bool(bool),
-    Pair(Box<Stm>, Box<Stm>),
+    Pair(Box<Expr>, Box<Expr>),
     Stm(Box<Stm>)
 }
 

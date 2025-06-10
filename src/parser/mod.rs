@@ -195,8 +195,8 @@ fn parse_expression(mut pairs: pest::iterators::Pairs<Rule>) -> Expr {
             let mut pairs = pair.into_inner();
 
             Expr::Pair(
-                Box::new(parse_statement(pairs.next().unwrap().into_inner())),
-                Box::new(parse_statement(pairs.next().unwrap().into_inner()))
+                Box::new(parse_expression(pairs.next().unwrap().into_inner())),
+                Box::new(parse_expression(pairs.next().unwrap().into_inner()))
             )
         },
         Rule::list => Expr::List(parse_list(pair.into_inner())),
