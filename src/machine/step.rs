@@ -1,32 +1,34 @@
-use std::{borrow::Borrow, cell::RefCell, collections::{HashMap, VecDeque}, ptr, rc::Rc};
+use std::rc::Rc;
 use crate::machine::{lvar, senv, value_type::ValueType};
 use super::{lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, unify::UnifyError, Env, Ident, VClosure};
 use crate::machine::unify::unify;
     
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Frame {
     Value(Rc<MValue>),
     To(Rc<MComputation>),
-    Set(Ident, Rc<MComputation>)
+    Set(Ident, Rc<MComputation>),
 }
 
 #[derive(Clone, Debug)]
 pub struct Closure {
-    frame : Rc<Frame>,
-    env : Rc<Env>
+    frame: Frame,
+    env: Rc<Env>,
 }
 
-type Stack = Vec<Closure>;
-
-pub fn empty_stack() -> Stack { vec![] }
-
-fn push_closure(stack : &Stack, frame : Frame, env : Rc<Env>) -> Rc<Stack> {
-    let mut stk = stack.clone();
-    stk.push(Closure { frame: frame.into(), env });
-    Rc::new(stk)
+#[derive(Clone, Debug)]
+pub enum Stack {
+    Nil,
+    Cons(Closure, Rc<Stack>),
 }
 
-fn push_susp(stack : &Stack, ident : Ident, c : Rc<MComputation>, env:  Rc<Env>) -> Rc<Stack> {
+pub fn empty_stack() -> Rc<Stack> { Rc::new(Stack::Nil) }
+
+fn push_closure(stack: &Rc<Stack>, frame: Frame, env: Rc<Env>) -> Rc<Stack> {
+    Rc::new(Stack::Cons(Closure { frame, env }, stack.clone()))
+}
+
+fn push_susp(stack: &Rc<Stack>, ident: Ident, c: Rc<MComputation>, env: Rc<Env>) -> Rc<Stack> {
     push_closure(stack, Frame::Set(ident, c), env)
 }
 
@@ -36,7 +38,7 @@ pub struct Machine {
     pub env  : Rc<Env>,
     pub lenv : LogicEnv,
     pub senv : SuspEnv,
-    pub stack : Rc<Stack>,
+    pub stack: Rc<Stack>,
     pub done : bool
 }
 
@@ -44,34 +46,32 @@ impl Machine {
     pub fn step(self) -> Vec<Machine> {
         let m = self;
         
-        match &*(m.comp) {
+        match &*m.comp {
             MComputation::Return(val) => {
-                match &*(m.stack).as_slice() {
-                    [] => {
+                match &*m.stack {
+                    Stack::Nil => {
                         match m.senv.next() {
                             Some((ident, (c, env))) =>
-                                vec![Machine { comp : c.clone(), env : env.clone(), stack : push_susp(&m.stack, *ident, m.comp, m.env), ..m  }]
-                            ,
-                            None => vec![Machine { done: true, ..m }]
+                                vec![Machine { comp: c.clone(), env: env.clone(), stack: push_susp(&m.stack, *ident, m.comp, m.env), ..m }],
+                            None => vec![Machine { done: true, ..m }],
                         }
-                    },
-                    [tail @ .., clos] => {
-                        let Closure { frame , env } = &*clos;
-                        match &**frame {
+                    }
+                    Stack::Cons(clos, tail) => {
+                        let Closure { frame, env } = clos.clone();
+                        match frame {
                             Frame::Value(_) => unreachable!("return throws value to a value"),
                             Frame::To(cont) => {
                                 let new_env = env.extend_clos(val.clone(), m.env.clone());
-                                vec![Machine { comp: cont.clone(), stack : Rc::new(tail.to_vec()), env : new_env, ..m }]
-                            },
+                                vec![Machine { comp: cont.clone(), stack: tail.clone(), env: new_env, ..m }]
+                            }
                             Frame::Set(i, cont) => {
                                 let mut senv = m.senv;
-                                senv.set(i, val.clone(), m.env);
-                                vec![Machine { comp: cont.clone(), stack : Rc::new(tail.to_vec()), env : env.clone(), senv : senv, ..m }]
-                            },
+                                senv.set(&i, val.clone(), m.env);
+                                vec![Machine { comp: cont.clone(), stack: tail.clone(), env: env.clone(), senv, ..m }]
+                            }
                         }
-                    },
-                      _ => unreachable!()
-                  }
+                    }
+                }
             },
             MComputation::Bind { comp, cont } => {
                 match &**comp {
@@ -82,7 +82,7 @@ impl Machine {
                     _ => {
                         let mut senv = m.senv;
                         let env = &m.env;
-                        let ident = senv.fresh(comp, &m.env);
+                        let ident = senv.fresh(&comp, &m.env);
                         let new_env = env.extend_susp(ident);
                         vec![Machine { comp : cont.clone(), env : new_env, senv : senv, ..m}]
                     }
@@ -108,20 +108,21 @@ impl Machine {
                 }
             },
             MComputation::Lambda { body } => {
-                match &*(m.stack).as_slice() {
-                    [] => panic!("lambda met with empty stack"),
-                    [tail @ .., clos] => {
-                        let Closure { frame , env} = &*clos;
-                        if let Frame::Value(val) = &**frame {
+                match &*m.stack {
+                    Stack::Nil => panic!("lambda met with empty stack"),
+                    Stack::Cons(clos, tail) => {
+                        let Closure { frame, env } = clos.clone();
+                        if let Frame::Value(val) = frame {
                             let new_env = m.env.extend_clos(val.clone(), env.clone());
-                            vec![Machine { comp: body.clone(), stack: Rc::new(tail.to_vec()), env : new_env, ..m}]
-                        } else { panic!("lambda but no value frame in the stack") }
-                    },
-                    _ => unreachable!()
-                  }
+                            vec![Machine { comp: body.clone(), stack: tail.clone(), env: new_env, ..m }]
+                        } else {
+                            panic!("lambda but no value frame in the stack")
+                        }
+                    }
+                }
             },
-            MComputation::App { op, arg } => 
-                vec![Machine { comp: op.clone(), stack: push_closure(&m.stack, Frame::Value(arg.clone()), m.env.clone()), ..m}],
+            MComputation::App { op, arg } =>
+                vec![Machine { comp: op.clone(), stack: push_closure(&m.stack, Frame::Value(arg.clone()), m.env.clone()), ..m }],
             MComputation::Choice(choices) => 
               choices.iter().map(|c| Machine { comp: c.clone(), ..m.clone()}).collect(),
             MComputation::Exists { ptype, body } => {
@@ -132,7 +133,7 @@ impl Machine {
             MComputation::Equate { lhs, rhs, body } => {
                 let mut lenv = m.lenv;
                 let mut senv = m.senv;
-                match unify(lhs, rhs, &m.env, &mut lenv, &senv) {
+                match unify(&lhs, &rhs, &m.env, &mut lenv, &senv) {
                     Ok(()) => vec![Machine {comp : body.clone(), lenv : lenv, senv : senv, ..m }],
                     Err(UnifyError::Susp(a)) => {
                         vec![Machine { comp : a.comp, env : a.env, stack : push_susp(&m.stack, a.ident, m.comp, m.env), lenv : lenv, senv : senv, ..m  }]
