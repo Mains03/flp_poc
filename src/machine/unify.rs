@@ -21,8 +21,8 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
     while let Some((lhs, rhs)) = q.pop_front() {
 
         // close the LHS and RHS to find what their head is
-        let lhs = lhs.close_head(&lenv, senv).map_err(|a| UnifyError::Susp(a))?;
-        let rhs = rhs.close_head(&lenv, senv).map_err(|a| UnifyError::Susp(a))?;
+        let lhs = lhs.close_head(&lenv, senv).map_err(UnifyError::Susp)?;
+        let rhs = rhs.close_head(&lenv, senv).map_err(UnifyError::Susp)?;
 
         // println!("[DEBUG] about to unify {} and {}", lhs.val(), rhs.val());
         match (&lhs, &rhs) {
@@ -32,17 +32,17 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
             },
             (VClosure::LogicVar { ident }, _) => { 
                 // the LHS is a logic variable
-                if rhs.occurs_lvar(&lenv, senv, *ident) { return Err(UnifyError::Occurs) }
-                lenv.set_vclos(*ident, rhs.clone());
+                if rhs.occurs_lvar(&lenv, senv, *ident).map_err(UnifyError::Susp)? { return Err(UnifyError::Occurs) }
+                lenv.set_vclos(*ident, rhs);
             },
             (_, VClosure::LogicVar { ident }) => { 
                 // the RHS is a logic variable
-                if lhs.occurs_lvar(&lenv, senv, *ident) { return Err(UnifyError::Occurs) }
+                if lhs.occurs_lvar(&lenv, senv, *ident).map_err(UnifyError::Susp)? { return Err(UnifyError::Occurs) }
                 lenv.set_vclos(*ident, lhs);
             },
             (VClosure::Clos { val : lhs_val, env: lhs_env}, VClosure::Clos { val : rhs_val, env : rhs_env }) =>
                 match (&**lhs_val, &**rhs_val) {
-                    (MValue::Zero, MValue::Zero) => { continue },
+                    (MValue::Zero, MValue::Zero) => continue,
                     (MValue::Zero, _) => { return Err(UnifyError::Fail) },
                     (MValue::Succ(v), MValue::Succ(w)) => {
                         q.push_back((VClosure::Clos { val: v.clone(), env: lhs_env.clone() }.into(), VClosure::Clos { val : w.clone(), env : rhs_env.clone()}.into()));

@@ -25,25 +25,21 @@ impl VClosure {
         VClosure::Clos { val : val.clone(), env : env.clone() }
     }
 
-    pub fn occurs_lvar(&self, lenv : &LogicEnv, senv : &SuspEnv, ident : Ident) -> bool {
-        match self.clone().close_head(lenv, &senv) {
-            Ok(vclos) => 
-                match vclos {
-                    VClosure::Clos { val, env } => {
-                        match &*val {
-                            MValue::Succ(v) => VClosure::Clos {val : v.clone(), env: env.clone() }.occurs_lvar(lenv, senv, ident),
-                            MValue::Cons(v, w) => 
-                                VClosure::Clos { val : v.clone(), env: env.clone()}.occurs_lvar(lenv, senv, ident)
-                                || VClosure::Clos { val : w.clone(), env : env.clone()}.occurs_lvar(lenv, senv, ident),
-                            MValue::Var(_) => unreachable!("value should be head-closed in occurs check"),
-                            MValue::Thunk(_) => panic!("mustn't be doing occurs to a computation"),
-                            _ => false
-                        }
-                    },
-                    VClosure::LogicVar { ident } => lenv.lookup(ident).expect("oops").occurs_lvar(lenv, senv, ident) ,
-                    VClosure::Susp { ident } => todo!(),
-                },
-            Err(i) => panic!("shouldn't be doing occurs to a suspension"),
+    pub fn occurs_lvar(&self, lenv : &LogicEnv, senv : &SuspEnv, ident : Ident) -> Result<bool, SuspAt> {
+        match self.clone().close_head(lenv, &senv)? {
+            VClosure::Clos { val, env } => {
+                match &*val {
+                    MValue::Succ(v) => VClosure::mk_clos(v, &env).occurs_lvar(lenv, senv, ident),
+                    MValue::Cons(v, w) => 
+                        Ok(VClosure::Clos { val : v.clone(), env: env.clone()}.occurs_lvar(lenv, senv, ident)?
+                        || VClosure::Clos { val : w.clone(), env : env.clone()}.occurs_lvar(lenv, senv, ident)?),
+                    MValue::Var(_) => unreachable!("value should be head-closed in occurs check"),
+                    MValue::Thunk(_) => panic!("mustn't be doing occurs to a computation"),
+                    _ => Ok(false)
+                }
+            },
+            VClosure::LogicVar { ident : ident2 } => Ok(ident == ident2),
+            VClosure::Susp { ident } => todo!()
         }
     }
     
