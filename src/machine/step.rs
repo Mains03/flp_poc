@@ -61,7 +61,6 @@ impl Machine {
                         match m.senv.next() {
                             Some(a) =>
                                 vec![ m.eval_susp_then(a) ],
-                                // vec![Machine { comp: c.clone(), env: env.clone(), stack: m.stack.push_susp(*ident, m.comp, m.env), ..m }],
                             None => vec![Machine { done: true, ..m }],
                         }
                     }
@@ -75,7 +74,7 @@ impl Machine {
                             }
                             Frame::Set(i, cont) => {
                                 let mut senv = m.senv;
-                                senv.set(&i, val.clone(), m.env);
+                                senv.set(&i, val, &m.env);
                                 vec![Machine { comp: cont.clone(), stack: tail.clone(), env: env.clone(), senv, ..m }]
                             }
                         }
@@ -167,7 +166,7 @@ impl Machine {
                                 let env = m.env.extend_val(v.clone(), env.clone());
                                 vec![Machine { comp: sk.clone(), env, ..m}]
                             }
-                            _ => panic!("Ifz on something non-numerical")
+                            _ => panic!("Ifz on {}", &*val)
                         }
                     },
                     Ok(VClosure::LogicVar { ident }) => { // must be unresolved, by structure of close_head
@@ -194,24 +193,23 @@ impl Machine {
 
                         vec![m_zero, m_succ]
                     },
-                    Ok(VClosure::Susp { ident }) => unreachable!("shouldn't")
+                    Ok(VClosure::Susp { ident }) => unreachable!("shouldn't be encountering a suspension here")
                 }
             },
 
             MComputation::Match { list, nilk, consk } => {
-                let vclos = VClosure::Clos { val : list.clone(), env: m.env.clone() };
+                let vclos = VClosure::mk_clos(list, &m.env);
                 let closed_list = vclos.close_head(&m.lenv, &m.senv);
                 match closed_list {
-                    Err(a) => vec![Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), ..m  }],
+                    Err(a) => vec![ m.eval_susp_then(a) ],
                     Ok(vclos) => 
                         match vclos {
                             VClosure::Clos { val, env } => {
                                 match &*val {
                                     MValue::Nil => vec![Machine { comp: nilk.clone(), ..m}],
                                     MValue::Cons(v, w) => {
-                                        let new_menv = 
-                                            m.env.extend_val(v.clone(), env.clone()).extend_val(w.clone(), env.clone());
-                                        vec![Machine { comp: consk.clone(), env : new_menv, ..m}]
+                                        let env = m.env.extend_val(v.clone(), env.clone()).extend_val(w.clone(), env.clone());
+                                        vec![Machine { comp: consk.clone(), env, ..m}]
                                     },
                                     _ => panic!("Match on non-list")
                                 }
@@ -226,9 +224,9 @@ impl Machine {
                                 let m_nil  = {
                                     
                                     let mut lenv = m.lenv.clone();
-                                    lenv.set_vclos(ident, VClosure::Clos { val: MValue::Nil.into(), env: Env::empty() });
+                                    lenv.set_vclos(ident, VClosure::mk_clos(&MValue::Nil.into(), &Env::empty().into()));
 
-                                    Machine { comp: nilk.clone(), lenv : lenv, ..m.clone()}
+                                    Machine { comp: nilk.clone(), lenv, ..m.clone()}
                                 };
                                 
                                 let m_cons = {
@@ -237,10 +235,10 @@ impl Machine {
                                     let head_ident = lenv.fresh(*ptype.clone());
                                     let tail_ident = lenv.fresh(ValueType::List(ptype));
                                     
-                                    lenv.set_vclos(ident, VClosure::Clos {
-                                        val: MValue::Cons(Rc::new(MValue::Var(1)), Rc::new(MValue::Var(0))).into(),
-                                        env: Env::empty().extend_lvar(head_ident).extend_lvar(tail_ident)
-                                    });
+                                    lenv.set_vclos(ident, VClosure::mk_clos(
+                                         &MValue::Cons(MValue::Var(1).into(), MValue::Var(0).into()).into(),
+                                         &Env::empty().extend_lvar(head_ident).extend_lvar(tail_ident).into()
+                                    ));
                                     
                                     let env = m.env.extend_lvar(head_ident).extend_lvar(tail_ident);
 
@@ -248,15 +246,15 @@ impl Machine {
                                 };
                                 vec![m_nil, m_cons]
                             }
-                            VClosure::Susp { ident } => unreachable!("nonono"),
+                            VClosure::Susp { ident } => unreachable!("shouldn't be matching on a suspension"),
                         }
                 }
             },
             MComputation::Case { sum, inlk, inrk } => {
-                let vclos = VClosure::Clos { val : sum.clone(), env: m.env.clone() };
+                let vclos = VClosure::mk_clos(sum, &m.env);
                 let closed_sum = vclos.close_head(&m.lenv, &m.senv);
                 match closed_sum {
-                    Err(a) => vec![Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), ..m  }],
+                    Err(a) => vec![ m.eval_susp_then(a) ],
                     Ok(vclos) => 
                         match vclos {
                             VClosure::Clos { val, env } => {
@@ -278,7 +276,7 @@ impl Machine {
                                                               
                                 let (ptype1, ptype2) = match m.lenv.get_type(ident) {
                                     ValueType::Sum(t1, t2) => (t1, t2),
-                                    _ => panic!("case-ing on a non-sum logical variable")
+                                    _ => panic!("casing on a non-sum logical variable")
                                 };
 
                                 let m_inl = {

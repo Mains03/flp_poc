@@ -19,8 +19,6 @@ use vclosure::VClosure;
 use std::io::stdout;
 
 pub type Ident = usize;
-type ValueInEnv = (Rc<MValue>, Rc<Env>);
-type ComputationInEnv = (Rc<MComputation>, Rc<Env>);
 
 
 pub fn eval(comp : MComputation, env : Rc<Env>) {

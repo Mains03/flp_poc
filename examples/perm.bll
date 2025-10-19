@@ -17,4 +17,4 @@ last :: [Nat] -> Nat
 last xs = exists ys :: [Nat]. exists y :: Nat.
     cat ys [y] =:= xs. y.
 
-let xs = perm [1,2,3,4,5,6,7,8] in last xs =:= 1. xs.
+let xs = perm [1,2,3,4,5,6,7] in last xs =:= 1. xs.

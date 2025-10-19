@@ -2,7 +2,7 @@ use std::rc::Rc;
 
 use crate::machine::senv::SuspAt;
 
-use super::{env::Env, lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, ComputationInEnv, Ident};
+use super::{env::Env, lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, Ident};
 
 #[derive(Clone, Debug)]
 pub enum VClosure {
@@ -87,12 +87,7 @@ impl VClosure {
                         None => break,
                     }
                 }
-                VClosure::Susp { ident } => {
-                    match senv.lookup(ident) {
-                        Ok((v, env)) => VClosure::mk_clos(v, env),
-                        Err((comp, env)) => return Err(SuspAt { ident: *ident, comp: comp.clone(), env: env.clone() }),
-                    }
-                },
+                VClosure::Susp { ident } => senv.lookup(ident)?
             }
         }
         Ok(vclos)
@@ -132,7 +127,7 @@ impl VClosure {
             }
             VClosure::Susp { ident } => {
                 match senv.lookup(ident) {
-                    Ok((val, env)) => VClosure::mk_clos(val, env).close_val(lenv, senv),
+                    Ok(vclos) => vclos.close_val(lenv, senv),
                     Err(_) => panic!("trying to close value with unresolved suspension"),
                 }
             },
