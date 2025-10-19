@@ -32,12 +32,12 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
             },
             (VClosure::LogicVar { ident }, _) => { 
                 // the LHS is a logic variable
-                if rhs.occurs_lvar(&lenv, senv, &ident) { return Err(UnifyError::Occurs) }
-                lenv.set_vclos(*ident, rhs);
+                if rhs.occurs_lvar(&lenv, senv, *ident) { return Err(UnifyError::Occurs) }
+                lenv.set_vclos(*ident, rhs.clone());
             },
             (_, VClosure::LogicVar { ident }) => { 
                 // the RHS is a logic variable
-                if lhs.occurs_lvar(&lenv, senv, &ident) { return Err(UnifyError::Occurs) }
+                if lhs.occurs_lvar(&lenv, senv, *ident) { return Err(UnifyError::Occurs) }
                 lenv.set_vclos(*ident, lhs);
             },
             (VClosure::Clos { val : lhs_val, env: lhs_env}, VClosure::Clos { val : rhs_val, env : rhs_env }) =>

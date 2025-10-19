@@ -8,7 +8,7 @@ use super::{env::Env, mterms::MValue, union_find::UnionFind, Ident, VClosure};
 
 #[derive(Clone)]
 pub struct LogicEnv {
-    map : HashMap<Ident, (ValueType, Option<Rc<VClosure>>)>,
+    map : HashMap<Ident, (ValueType, Option<VClosure>)>,
     union_vars : UnionFind,
     next : usize
 }
@@ -34,7 +34,7 @@ impl LogicEnv {
         next
     }
     
-    pub fn lookup(&self, ident : Ident) -> Option<Rc<VClosure>> {
+    pub fn lookup(&self, ident : Ident) -> Option<VClosure> {
         let root = self.union_vars.find(ident);
         if let Some((_, Some(vclos))) = self.map.get(&root) { 
             // println!("[DEBUG] looked up {} to be {}", ident, vclos.clone().val());

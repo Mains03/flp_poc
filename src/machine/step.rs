@@ -140,20 +140,18 @@ impl Machine {
 
             MComputation::Equate { lhs, rhs, body } => {
                 let mut lenv = m.lenv;
-                let mut senv = m.senv;
-                match unify(&lhs, &rhs, &m.env, &mut lenv, &senv) {
-                    Ok(()) => vec![Machine {comp : body.clone(), lenv : lenv, senv : senv, ..m }],
+                match unify(&lhs, &rhs, &m.env, &mut lenv, &m.senv) {
+                    Ok(()) => vec![Machine { comp : body.clone(), lenv : lenv, ..m }],
                     Err(UnifyError::Susp(a)) => {
-                        vec![Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), lenv : lenv, senv : senv, ..m  }]
+                        vec![Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), lenv : lenv, ..m  }]
                     }
                     Err(_) => vec![]
                 }
             },
 
             MComputation::Ifz { num, zk, sk } => {
-                let vclos = VClosure::Clos { val : num.clone(), env: m.env.clone() };
-                let closed_num = vclos.close_head(&m.lenv, &m.senv);
-                match closed_num {
+                let vclos = VClosure::mk_clos(num, &m.env);
+                match vclos.close_head(&m.lenv, &m.senv) {
                     Err(a) =>
                         vec![Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), ..m  }],
                     Ok(VClosure::Clos { val, env }) => {

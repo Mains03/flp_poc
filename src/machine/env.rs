@@ -14,8 +14,8 @@ impl Env {
         Env { vec : Vector::new() }.into()
     }
 
-    pub fn lookup(&self, i : usize) -> Option<&VClosure> {
-        self.vec.get(i).map(|v| &*v)
+    pub fn lookup(&self, i : usize) -> Option<VClosure> {
+        self.vec.get(i).map(|v| v.clone())
     }
     
     fn extend(&self, vclos : VClosure) -> Env {
