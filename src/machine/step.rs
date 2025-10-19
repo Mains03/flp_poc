@@ -1,5 +1,5 @@
 use std::rc::Rc;
-use crate::machine::{lvar, senv, value_type::ValueType};
+use crate::machine::{lvar, senv, senv::SuspAt, value_type::ValueType};
 use super::{lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, unify::UnifyError, Env, Ident, VClosure};
 use crate::machine::unify::unify;
     
@@ -45,6 +45,11 @@ pub struct Machine {
 }
 
 impl Machine {
+
+    fn eval_susp_then(self, a : SuspAt) -> Machine {
+        Machine { comp : a.comp, env : a.env, stack : self.stack.push_susp(a.ident, self.comp, self.env), ..self  }
+    }
+
     pub fn step(self) -> Vec<Machine> {
         let m = self;
         
@@ -54,8 +59,9 @@ impl Machine {
                 match &*m.stack {
                     Stack::Nil => {
                         match m.senv.next() {
-                            Some((ident, (c, env))) =>
-                                vec![Machine { comp: c.clone(), env: env.clone(), stack: m.stack.push_susp(*ident, m.comp, m.env), ..m }],
+                            Some(a) =>
+                                vec![ m.eval_susp_then(a) ],
+                                // vec![Machine { comp: c.clone(), env: env.clone(), stack: m.stack.push_susp(*ident, m.comp, m.env), ..m }],
                             None => vec![Machine { done: true, ..m }],
                         }
                     }

@@ -4,6 +4,13 @@ use im::HashMap;
 
 use super::{env::Env, mterms::{MComputation, MValue}, union_find::UnionFind, ComputationInEnv, Ident, VClosure, ValueInEnv};
 
+pub struct SuspAt {
+    pub ident : Ident,
+    pub comp : Rc<MComputation>,
+    pub env : Rc<Env>
+}
+
+
 #[derive(Clone)]
 pub struct SuspEnv {
     map : HashMap<Ident, Result<ValueInEnv, ComputationInEnv>>,
@@ -38,9 +45,16 @@ impl SuspEnv {
     
     }
     
-    pub fn next(&self) -> Option<(&Ident, &ComputationInEnv)> {
-        if let Some((i, Err(cenv))) = self.map.iter().find(|(_, w)| w.is_err()) {
-            Some((i, cenv))
+    // pub fn next(&self) -> Option<(&Ident, &ComputationInEnv)> {
+    //     if let Some((i, Err(cenv))) = self.map.iter().find(|(_, w)| w.is_err()) {
+    //         Some((i, cenv))
+    //     }
+    //     else { None }
+    // }
+    
+    pub fn next(&self) -> Option<SuspAt> {
+        if let Some((i, Err((comp, env)))) = self.map.iter().find(|(_, w)| w.is_err()) {
+            Some(SuspAt { ident : *i, comp : comp.clone(), env : env.clone() })
         }
         else { None }
     }

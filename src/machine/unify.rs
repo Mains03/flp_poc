@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, rc::Rc};
 
-use super::{env::Env, lvar::LogicEnv, mterms::MValue, senv::SuspEnv, vclosure::SuspAt, VClosure};
+use super::{env::Env, lvar::LogicEnv, mterms::MValue, senv::SuspEnv, senv::SuspAt, VClosure};
 
 pub enum UnifyError {
     Occurs,

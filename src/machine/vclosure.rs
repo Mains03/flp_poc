@@ -1,5 +1,7 @@
 use std::rc::Rc;
 
+use crate::machine::senv::SuspAt;
+
 use super::{env::Env, lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, ComputationInEnv, Ident};
 
 #[derive(Clone, Debug)]
@@ -7,12 +9,6 @@ pub enum VClosure {
     Clos { val : Rc<MValue>, env : Rc<Env> },
     LogicVar { ident : Ident },
     Susp { ident : Ident }
-}
-
-pub struct SuspAt {
-    pub ident : Ident,
-    pub comp : Rc<MComputation>,
-    pub env : Rc<Env>
 }
 
 impl VClosure {
@@ -30,7 +26,7 @@ impl VClosure {
     }
 
     pub fn occurs_lvar(&self, lenv : &LogicEnv, senv : &SuspEnv, ident : Ident) -> bool {
-        match self.close_head(lenv, &senv) {
+        match self.clone().close_head(lenv, &senv) {
             Ok(vclos) => 
                 match vclos {
                     VClosure::Clos { val, env } => {
@@ -53,80 +49,50 @@ impl VClosure {
     
     pub fn find_susp(self, lenv : &LogicEnv, senv : &SuspEnv) -> Option<SuspAt> {
         match self.close_head(lenv, senv) {
-            Ok(vclos) => 
-                match vclos {
-                    VClosure::Clos { val, env } => 
-                        match &*val {
-                            MValue::Var(i) => env.lookup(*i).expect("oops").find_susp(lenv, senv),
-                            MValue::Zero => None,
-                            MValue::Succ(v) => VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv),
-                            MValue::Pair(v, w) => 
-                                VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv)
-                                .or(VClosure::Clos { val: w.clone(), env: env.clone() }.find_susp(lenv, senv)),
-                            MValue::Inl(v) => VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv),
-                            MValue::Inr(v) => VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv),
-                            MValue::Nil => None,
-                            MValue::Cons(v, w) =>
-                                VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv)
-                                .or(VClosure::Clos { val: w.clone(), env: env.clone() }.find_susp(lenv, senv)),
-                            MValue::Thunk(t) => None,
-                        },
-                    VClosure::LogicVar { ident } => lenv.lookup(ident)?.find_susp(lenv, senv),
-                    VClosure::Susp { .. } => vclos.find_susp(lenv, senv)
+            Ok(VClosure::Clos { val, env }) => 
+                match &*val {
+                    MValue::Var(i) => env.lookup(*i).expect("oops").find_susp(lenv, senv),
+                    MValue::Zero => None,
+                    MValue::Succ(v) => VClosure::mk_clos(v, &env).find_susp(lenv, senv),
+                    MValue::Pair(v, w) => 
+                        VClosure::mk_clos(v, &env).find_susp(lenv, senv)
+                        .or(VClosure::mk_clos(w, &env).find_susp(lenv, senv)),
+                    MValue::Inl(v) => VClosure::mk_clos(v, &env).find_susp(lenv, senv),
+                    MValue::Inr(v) => VClosure::mk_clos(v, &env).find_susp(lenv, senv),
+                    MValue::Nil => None,
+                    MValue::Cons(v, w) =>
+                        VClosure::mk_clos(v, &env).find_susp(lenv, senv)
+                        .or(VClosure::mk_clos(w, &env).find_susp(lenv, senv)),
+                    MValue::Thunk(t) => None,
                 },
-            Err(a) => Some(a),
+            Ok(VClosure::LogicVar { ident }) => lenv.lookup(ident)?.find_susp(lenv, senv),
+            Ok(VClosure::Susp { .. }) => unreachable!("there is an unexpected suspension"),
+            Err(a) => Some(a)
         }
     }
 
-    pub fn close_head(&self, lenv : &LogicEnv, senv : &SuspEnv) -> Result<VClosure, SuspAt> {
+    pub fn close_head(self, lenv : &LogicEnv, senv : &SuspEnv) -> Result<VClosure, SuspAt> {
         let mut vclos = self;
         loop {
-            vclos = match vclos {
+            vclos = match &vclos {
                 VClosure::Clos { val, env } => {
                     match &**val {
-                        MValue::Var(i) => &env.lookup(*i).expect("failed to find index"),
+                        MValue::Var(i) => env.lookup(*i).expect("failed to find index"),
                         _ => break
                     }
                 },
-                VClosure::LogicVar { ref ident } => {
-                    match lenv.lookup(*ident) {
-                        Some(vclos) => &vclos,
-                        None => break,
-                    }
-                }
-                VClosure::Susp { ref ident } => {
-                    match senv.lookup(ident) {
-                        Ok((v, env)) => &VClosure::mk_clos(v, env),
-                        Err((comp, env)) => return Err(SuspAt { ident: *ident, comp: comp.clone(), env: env.clone() }),
-                    }
-                },
-            }
-        }
-        Ok(vclos)
-    }
-
-    pub fn close_head_err(&self, lenv : &LogicEnv) -> Result<VClosure, ()> {
-        let mut vclos = *self;
-        loop {
-            vclos = match vclos {
-                VClosure::Clos { ref val, ref env } => {
-                    match **val {
-                        MValue::Var(i) => {
-                            match env.lookup(i) {
-                                Some(vclos) => vclos,
-                                None => return Err(()),
-                            }
-                        },
-                        _ => break
-                    }
-                },
-                VClosure::LogicVar { ref ident } => {
+                VClosure::LogicVar { ident } => {
                     match lenv.lookup(*ident) {
                         Some(vclos) => vclos,
                         None => break,
                     }
                 }
-                VClosure::Susp { ident } => todo!(),
+                VClosure::Susp { ident } => {
+                    match senv.lookup(ident) {
+                        Ok((v, env)) => VClosure::mk_clos(v, env),
+                        Err((comp, env)) => return Err(SuspAt { ident: *ident, comp: comp.clone(), env: env.clone() }),
+                    }
+                },
             }
         }
         Ok(vclos)
@@ -139,23 +105,23 @@ impl VClosure {
                 match &**val {
                     MValue::Var(i) => env.lookup(*i)?.close_val(lenv, senv),
                     MValue::Zero => Some(MValue::Zero),
-                    MValue::Succ(v) => Some(MValue::Succ(VClosure::Clos { val: v.clone(), env : env.clone() }.close_val(lenv, senv)?.into())),
+                    MValue::Succ(v) => Some(MValue::Succ(VClosure::mk_clos(v, env).close_val(lenv, senv)?.into())),
                     MValue::Nil => Some(MValue::Nil),
                     MValue::Cons(v, w) => 
                         Some(MValue::Cons(
-                            VClosure::Clos { val: v.clone(), env : env.clone() }.close_val(lenv, senv)?.into(),
-                            VClosure::Clos { val: w.clone(), env : env.clone() }.close_val(lenv, senv)?.into()
+                            VClosure::mk_clos(v, env).close_val(lenv, senv)?.into(),
+                            VClosure::mk_clos(w, env).close_val(lenv, senv)?.into()
                         )),
                     MValue::Pair(fst, snd) => 
                         Some(MValue::Pair(
-                            VClosure::Clos{ val : fst.clone(), env : env.clone()}.close_val(lenv, senv)?.into(),
-                            VClosure::Clos{ val : snd.clone(), env : env.clone() }.close_val(lenv, senv)?.into(),
+                            VClosure::mk_clos(fst, env).close_val(lenv, senv)?.into(),
+                            VClosure::mk_clos(snd, env).close_val(lenv, senv)?.into(),
                         )),
                     MValue::Inl(v) =>
-                        Some(MValue::Inl(VClosure::Clos{ val : v.clone(), env : env.clone() }.close_val(lenv, senv)?.into())),
+                        Some(MValue::Inl(VClosure::mk_clos(v, env).close_val(lenv, senv)?.into())),
                     MValue::Inr(v) => 
-                        Some(MValue::Inr(VClosure::Clos{ val : v.clone(), env : env.clone() }.close_val(lenv, senv)?.into())),
-                    MValue::Thunk(t) => panic!("shouldn't be returning a thunk anyway: {}", *t),
+                        Some(MValue::Inr(VClosure::mk_clos(v, env).close_val(lenv, senv)?.into())),
+                    MValue::Thunk(t) => panic!("tried to close thunk: {}", *t),
                 }
             },
             VClosure::LogicVar { ref ident } => {
@@ -166,7 +132,7 @@ impl VClosure {
             }
             VClosure::Susp { ident } => {
                 match senv.lookup(ident) {
-                    Ok((val, env)) => VClosure::Clos { val: val.clone(), env: env.clone() }.close_val(lenv, senv),
+                    Ok((val, env)) => VClosure::mk_clos(val, env).close_val(lenv, senv),
                     Err(_) => panic!("trying to close value with unresolved suspension"),
                 }
             },
