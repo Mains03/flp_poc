@@ -34,7 +34,7 @@ pub fn translate(ast: Vec<Decl>) -> (MComputation, Rc<Env>) {
                 let result : Rc<MValue> = translate_func(&name, args, body, &mut tenv).into();
                 // println!("[DEBUG] definition: {} = {}", name, *result);
                 tenv.bind(&name);
-                env = env.extend_clos(result.clone(), env.clone())
+                env = env.extend_val(result.clone(), env.clone())
             },
             Decl::Stm(stm) => {
                 let stmt = translate_stm(stm, &mut tenv);

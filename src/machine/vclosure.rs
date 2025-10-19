@@ -16,6 +16,7 @@ pub struct SuspAt {
 }
 
 impl VClosure {
+
     pub fn val(&self) -> String { 
         match self {
             VClosure::Clos { val, env } => format!("value: {}", val.to_string()),
@@ -23,13 +24,17 @@ impl VClosure {
             VClosure::Susp { ident } => format!("suspension: {}", ident),
         }
     }
-    
+
+    pub fn mk_clos(val : &Rc<MValue>, env : &Rc<Env>) -> VClosure {
+        VClosure::Clos { val : val.clone(), env : env.clone() }
+    }
+
     pub fn occurs_lvar(&self, lenv : &LogicEnv, senv : &SuspEnv, ident : &Ident) -> bool {
         match self.close_head(lenv, &senv) {
             Ok(vclos) => 
-                match &*vclos {
+                match vclos {
                     VClosure::Clos { val, env } => {
-                        match &**val {
+                        match &*val {
                             MValue::Succ(v) => VClosure::Clos {val : v.clone(), env: env.clone() }.occurs_lvar(lenv, senv, ident),
                             MValue::Cons(v, w) => 
                                 VClosure::Clos { val : v.clone(), env: env.clone()}.occurs_lvar(lenv, senv, ident)
@@ -49,9 +54,9 @@ impl VClosure {
     pub fn find_susp(&self, lenv : &LogicEnv, senv : &SuspEnv) -> Option<SuspAt> {
         match self.close_head(lenv, senv) {
             Ok(vclos) => 
-                match &*vclos {
+                match vclos {
                     VClosure::Clos { val, env } => 
-                        match &**val {
+                        match &*val {
                             MValue::Var(i) => env.lookup(*i).expect("oops").find_susp(lenv, senv),
                             MValue::Zero => None,
                             MValue::Succ(v) => VClosure::Clos { val: v.clone(), env: env.clone() }.find_susp(lenv, senv),
@@ -73,7 +78,7 @@ impl VClosure {
         }
     }
 
-    pub fn close_head(&self, lenv : &LogicEnv, senv : &SuspEnv) -> Result<Rc<VClosure>, SuspAt> {
+    pub fn close_head(&self, lenv : &LogicEnv, senv : &SuspEnv) -> Result<VClosure, SuspAt> {
         let mut vclos = self.clone();
         loop {
             vclos = match vclos {
@@ -84,7 +89,7 @@ impl VClosure {
                     }
                 },
                 VClosure::LogicVar { ref ident } => {
-                    match lenv.lookup(ident) {
+                    match lenv.lookup(*ident) {
                         Some(vclos) => (*vclos).clone(),
                         None => break,
                     }
@@ -116,7 +121,7 @@ impl VClosure {
                     }
                 },
                 VClosure::LogicVar { ref ident } => {
-                    match lenv.lookup(ident) {
+                    match lenv.lookup(*ident) {
                         Some(vclos) => (*vclos).clone(),
                         None => break,
                     }
@@ -154,7 +159,7 @@ impl VClosure {
                 }
             },
             VClosure::LogicVar { ref ident } => {
-                match lenv.lookup(ident) {
+                match lenv.lookup(*ident) {
                     Some(v) => v.close_val(lenv, senv),
                     None => None,
                 }

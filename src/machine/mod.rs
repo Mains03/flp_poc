@@ -14,7 +14,7 @@ use im::vector::Vector;
 use lvar::LogicEnv;
 use mterms::{MComputation, MValue};
 use senv::SuspEnv;
-use step::{empty_stack, Machine};
+use step::{Stack, Machine};
 use vclosure::VClosure;
 use std::io::stdout;
 
@@ -26,7 +26,7 @@ type ComputationInEnv = (Rc<MComputation>, Rc<Env>);
 pub fn eval(comp : MComputation, env : Rc<Env>) {
 
     // println!("[DEBUG] main stmt: {}", comp.clone()) ;
-    let m = Machine { comp: comp.into() , env: env.clone(), stack: empty_stack(), lenv : LogicEnv::new().into(), senv : SuspEnv::new().into(), done: false };
+    let m = Machine { comp: comp.into() , env: env.clone(), stack: Stack::empty_stack(), lenv : LogicEnv::new().into(), senv : SuspEnv::new().into(), done: false };
     let mut machines = vec![m];
     let mut solns = 0;
     while !machines.is_empty() {

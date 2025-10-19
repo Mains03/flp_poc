@@ -142,6 +142,11 @@ pub enum MComputation {
 }
 
 impl MComputation {
+
+    pub fn thunk(self : &Rc<MComputation>) -> Rc<MValue> {
+        MValue::Thunk(self.clone()).into()
+    }
+
     pub fn up(&self, offset : usize) -> MComputation {
         match self {
             MComputation::Ifz { num, zk, sk } => 
