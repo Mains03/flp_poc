@@ -62,5 +62,5 @@ pub fn eval(comp : MComputation, env : Rc<Env>) {
 }
 
 fn output(val : Rc<MValue>, env : Rc<Env>, lenv : &LogicEnv, senv : &SuspEnv) -> Option<String> {
-    Some(VClosure::Clos { val, env }.close_val(lenv, senv)?.to_string())
+    Some(VClosure::Clos { val, env }.close(lenv, senv)?.to_string())
 }

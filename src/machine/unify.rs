@@ -45,14 +45,14 @@ pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut L
                     (MValue::Zero, MValue::Zero) => continue,
                     (MValue::Zero, _) => { return Err(UnifyError::Fail) },
                     (MValue::Succ(v), MValue::Succ(w)) => {
-                        q.push_back((VClosure::Clos { val: v.clone(), env: lhs_env.clone() }.into(), VClosure::Clos { val : w.clone(), env : rhs_env.clone()}.into()));
+                        q.push_back((VClosure::mk_clos(v, &lhs_env), VClosure::mk_clos(w, &rhs_env)));
                     }
                     (MValue::Succ(_), _) => { return Err(UnifyError::Fail) }
                     (MValue::Nil, MValue::Nil) => continue,
                     (MValue::Nil, _) => { return Err(UnifyError::Fail) },
                     (MValue::Cons(x, xs), MValue::Cons(y, ys)) => { 
-                        q.push_back((VClosure::Clos { val: x.clone(), env: lhs_env.clone() }, VClosure::Clos { val : y.clone(), env : rhs_env.clone()}));
-                        q.push_back((VClosure::Clos { val: xs.clone(), env: lhs_env.clone() }, VClosure::Clos { val : ys.clone(), env : rhs_env.clone()}));
+                        q.push_back((VClosure::mk_clos(x, &lhs_env), VClosure::mk_clos(y, &rhs_env)));
+                        q.push_back((VClosure::mk_clos(xs, &lhs_env), VClosure::mk_clos(ys, &rhs_env)));
                     }
                     (MValue::Cons(_, _), _) => { return Err(UnifyError::Fail) }
                     _ => { panic!("tried to unify a thunk") }

@@ -4,20 +4,19 @@ use im::HashMap;
 
 use super::{env::Env, mterms::{MComputation, MValue}, union_find::UnionFind, Ident, VClosure};
 
-
 type CClosure = (Rc<MComputation>, Rc<Env>);
-#[derive(Clone)]
-pub struct SuspAt {
-    pub ident : Ident,
-    pub comp : Rc<MComputation>,
-    pub env : Rc<Env>
-}
-
 
 #[derive(Clone)]
 pub struct SuspEnv {
     map : HashMap<Ident, Result<VClosure, CClosure>>,
     next : usize
+}
+
+#[derive(Clone, Debug)]
+pub struct SuspAt {
+    pub ident : Ident,
+    pub comp : Rc<MComputation>,
+    pub env : Rc<Env>
 }
 
 impl SuspEnv {
