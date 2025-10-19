@@ -97,6 +97,7 @@ impl Machine {
                     }
                 }
             },
+
             MComputation::Force(v) => {
                 let vclos = VClosure::Clos { val: v.clone(), env: m.env.clone() };
                 match vclos.close_head(&m.lenv, &m.senv) {
@@ -157,8 +158,7 @@ impl Machine {
             MComputation::Ifz { num, zk, sk } => {
                 let vclos = VClosure::mk_clos(num, &m.env);
                 match vclos.close_head(&m.lenv, &m.senv) {
-                    Err(a) =>
-                        vec![Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), ..m  }],
+                    Err(a) => vec![ m.eval_susp_then(a) ],
                     Ok(VClosure::Clos { val, env }) => {
                         match &*val {
                             MValue::Zero => vec![Machine { comp: zk.clone(), ..m}],
@@ -242,7 +242,7 @@ impl Machine {
                                     
                                     let env = m.env.extend_lvar(head_ident).extend_lvar(tail_ident);
 
-                                    Machine { comp: consk.clone(), lenv : lenv, env : env, ..m.clone()}
+                                    Machine { comp: consk.clone(), lenv, env, ..m.clone()}
                                 };
                                 vec![m_nil, m_cons]
                             }
@@ -280,33 +280,33 @@ impl Machine {
                                 };
 
                                 let m_inl = {
-                                    // let env = m.env.deep_clone();
-                                    // let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
-                                    // let closed = vclos.close_head(); // re-find lvar in deep clone
-                                    // if let VClosure::LogicVar { lvar } = &*closed {
-                                    //     // make a new lvar of inl type, and stick it into the new machine
-                                    //     let lvar_inl = LogicVar::new(*(ptype1.clone()));
-                                    //     let mut new_env = Env::empty().extend_lvar(lvar_inl);
-                                    //     lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env)
-                                    // }
-                                    // Machine { comp: inlk.clone(), env, ..m.clone()}
-                                    todo!()
+                                    let mut lenv = m.lenv.clone();
+                                    let inl_ident = lenv.fresh(*ptype1.clone());
+
+                                    lenv.set_vclos(ident, VClosure::mk_clos(
+                                            &MValue::Inl(MValue::Var(0).into()).into(),
+                                            &Env::empty().extend_lvar(inl_ident)
+                                    ));
+
+                                    let env = m.env.extend_lvar(inl_ident);
+
+                                    Machine { comp: inlk.clone(), lenv, env, ..m.clone()}
                                 };
 
                                 let m_inr = {
-                                    // let env = m.env.deep_clone();
-                                    // let vclos = VClosure::Clos { val : sum.clone(), env: env.clone() };
-                                    // let closed = vclos.close_head(); // re-find lvar in deep clone
-                                    // if let VClosure::LogicVar { lvar } = &*closed {
-                                    //     // make a new lvar of inl type, and stick it into the new machine
-                                    //     let lvar_inr = LogicVar::new(*(ptype2.clone()));
-                                    //     let mut new_env = Env::empty().extend_lvar(lvar_inr);
-                                    //     lvar.set_val(MValue::Inl(Rc::new(MValue::Var(0))).into(), new_env)
-                                    // }
-                                    // Machine { comp: inlk.clone(), env, ..m.clone()}
-                                    todo!()
+                                    let mut lenv = m.lenv.clone();
+                                    let inr_ident = lenv.fresh(*ptype2.clone());
+
+                                    lenv.set_vclos(ident, VClosure::mk_clos(
+                                            &MValue::Inr(MValue::Var(0).into()).into(),
+                                            &Env::empty().extend_lvar(inr_ident)
+                                    ));
+
+                                    let env = m.env.extend_lvar(inr_ident);
+
+                                    Machine { comp: inrk.clone(), lenv, env, ..m.clone()}
                                 };
-                                
+
                                 vec![m_inl, m_inr]
                             }
                             VClosure::Susp { ident } => unreachable!("oops")
