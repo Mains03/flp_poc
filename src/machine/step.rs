@@ -4,7 +4,7 @@ use super::{lvar::LogicEnv, mterms::{MComputation, MValue}, senv::SuspEnv, unify
 use crate::machine::unify::unify;
     
 #[derive(Clone, Debug)]
-enum Frame {
+enum StkFrame {
     Value(Rc<MValue>),
     To(Rc<MComputation>),
     Set(Ident, Rc<MComputation>),
@@ -12,7 +12,7 @@ enum Frame {
 
 #[derive(Clone, Debug)]
 pub struct StkClosure {
-    frame: Frame,
+    stk_frame: StkFrame,
     env: Rc<Env>,
 }
 
@@ -25,12 +25,12 @@ pub enum Stack {
 impl Stack {
     pub fn empty_stack() -> Rc<Stack> { Rc::new(Stack::Nil) }
 
-    fn push_closure(self: &Rc<Stack>, frame: Frame, env: Rc<Env>) -> Rc<Stack> {
-        Stack::Cons(StkClosure { frame, env }, self.clone()).into()
+    fn push_closure(self: &Rc<Stack>, stk_frame : StkFrame, env: Rc<Env>) -> Rc<Stack> {
+        Stack::Cons(StkClosure { stk_frame, env }, self.clone()).into()
     }
 
     fn push_susp(self: &Rc<Stack>, ident: Ident, c: Rc<MComputation>, env: Rc<Env>) -> Rc<Stack> {
-        Stack::push_closure(self, Frame::Set(ident, c), env)
+        Stack::push_closure(self, StkFrame::Set(ident, c), env)
     }
 }
 
@@ -65,14 +65,14 @@ impl Machine {
                         }
                     }
                     Stack::Cons(clos, tail) => {
-                        let StkClosure { frame, env } = clos.clone();
-                        match frame {
-                            Frame::Value(_) => unreachable!("return throws value to a value"),
-                            Frame::To(cont) => {
+                        let StkClosure { stk_frame, env } = clos.clone();
+                        match stk_frame {
+                            StkFrame::Value(_) => unreachable!("return throws value to a value"),
+                            StkFrame::To(cont) => {
                                 let new_env = env.extend_val(val.clone(), m.env.clone());
                                 vec![Machine { comp: cont.clone(), stack: tail.clone(), env: new_env, ..m }]
                             }
-                            Frame::Set(i, cont) => {
+                            StkFrame::Set(i, cont) => {
                                 let mut senv = m.senv;
                                 senv.set(&i, val, &m.env);
                                 vec![Machine { comp: cont.clone(), stack: tail.clone(), env: env.clone(), senv, ..m }]
@@ -120,12 +120,12 @@ impl Machine {
 
             MComputation::Lambda { body } => {
                 match &*m.stack {
-                    Stack::Cons(StkClosure { frame, env }, tail) => {
-                        if let Frame::Value(val) = frame {
+                    Stack::Cons(StkClosure { stk_frame, env }, tail) => {
+                        if let StkFrame::Value(val) = stk_frame {
                             let env = m.env.extend_val(val.clone(), env.clone());
                             vec![Machine { comp: body.clone(), stack: tail.clone(), env, ..m }]
                         } else {
-                            panic!("lambda but no value frame in the stack")
+                            panic!("lambda but no value StkFrame in the stack")
                         }
                     },
                     Stack::Nil => panic!("lambda met with empty stack")
@@ -133,7 +133,7 @@ impl Machine {
             },
 
             MComputation::App { op, arg } =>
-                vec![Machine { comp: op.clone(), stack: m.stack.push_closure(Frame::Value(arg.clone()), m.env.clone()), ..m }],
+                vec![Machine { comp: op.clone(), stack: m.stack.push_closure(StkFrame::Value(arg.clone()), m.env.clone()), ..m }],
 
             MComputation::Choice(choices) => 
               choices.iter().map(|c| Machine { comp: c.clone(), ..m.clone()}).collect(),
