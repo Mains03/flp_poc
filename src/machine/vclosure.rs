@@ -15,9 +15,9 @@ impl VClosure {
 
     pub fn val(&self) -> String { 
         match self {
-            VClosure::Clos { val, env } => format!("value: {}", val.to_string()),
-            VClosure::LogicVar { ident } => format!("logic var: {}", ident),
-            VClosure::Susp { ident } => format!("suspension: {}", ident),
+            VClosure::Clos { val, env } => format!("val({})", val.to_string()),
+            VClosure::LogicVar { ident } => format!("lvar({})", ident),
+            VClosure::Susp { ident } => format!("susp({})", ident),
         }
     }
 

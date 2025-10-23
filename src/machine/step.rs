@@ -13,7 +13,7 @@ enum StkFrame {
 #[derive(Clone, Debug)]
 pub struct StkClosure {
     stk_frame: StkFrame,
-    env: Rc<Env>,
+    stk_env: Rc<Env>,
 }
 
 #[derive(Clone, Debug)]
@@ -25,8 +25,8 @@ pub enum Stack {
 impl Stack {
     pub fn empty_stack() -> Rc<Stack> { Rc::new(Stack::Nil) }
 
-    fn push_closure(self: &Rc<Stack>, stk_frame : StkFrame, env: Rc<Env>) -> Rc<Stack> {
-        Stack::Cons(StkClosure { stk_frame, env }, self.clone()).into()
+    fn push_closure(self: &Rc<Stack>, stk_frame : StkFrame, stk_env: Rc<Env>) -> Rc<Stack> {
+        Stack::Cons(StkClosure { stk_frame, stk_env }, self.clone()).into()
     }
 
     fn push_susp(self: &Rc<Stack>, ident: Ident, c: Rc<MComputation>, env: Rc<Env>) -> Rc<Stack> {
@@ -44,11 +44,11 @@ pub struct Machine {
     pub done : bool
 }
 
-impl Machine {
+fn eval_susp_then(a : SuspAt, m : Machine) -> Machine {
+    Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), ..m  }
+}
 
-    fn eval_susp_then(self, a : SuspAt) -> Machine {
-        Machine { comp : a.comp, env : a.env, stack : self.stack.push_susp(a.ident, self.comp, self.env), ..self  }
-    }
+impl Machine {
 
     pub fn step(self) -> Vec<Machine> {
         let m = self;
@@ -59,23 +59,22 @@ impl Machine {
                 match &*m.stack {
                     Stack::Nil => {
                         match m.senv.next() {
-                            Some(a) =>
-                                vec![ m.eval_susp_then(a) ],
+                            Some(a) => vec![ eval_susp_then(a, m) ],
                             None => vec![Machine { done: true, ..m }],
                         }
                     }
-                    Stack::Cons(clos, tail) => {
-                        let StkClosure { stk_frame, env } = clos.clone();
+                    Stack::Cons(stk_clos, stk_tail) => {
+                        let StkClosure { stk_frame, stk_env } = stk_clos.clone();
                         match stk_frame {
                             StkFrame::Value(_) => unreachable!("return throws value to a value"),
                             StkFrame::To(cont) => {
-                                let new_env = env.extend_val(val.clone(), m.env.clone());
-                                vec![Machine { comp: cont.clone(), stack: tail.clone(), env: new_env, ..m }]
+                                let new_env = stk_env.extend_val(val.clone(), m.env.clone());
+                                vec![Machine { comp: cont.clone(), stack: stk_tail.clone(), env: new_env, ..m }]
                             }
                             StkFrame::Set(i, cont) => {
                                 let mut senv = m.senv;
                                 senv.set(&i, val, &m.env);
-                                vec![Machine { comp: cont.clone(), stack: tail.clone(), env: env.clone(), senv, ..m }]
+                                vec![Machine { comp: cont.clone(), stack: stk_tail.clone(), env: stk_env.clone(), senv, ..m }]
                             }
                         }
                     }
@@ -120,9 +119,9 @@ impl Machine {
 
             MComputation::Lambda { body } => {
                 match &*m.stack {
-                    Stack::Cons(StkClosure { stk_frame, env }, tail) => {
+                    Stack::Cons(StkClosure { stk_frame, stk_env }, tail) => {
                         if let StkFrame::Value(val) = stk_frame {
-                            let env = m.env.extend_val(val.clone(), env.clone());
+                            let env = m.env.extend_val(val.clone(), stk_env.clone());
                             vec![Machine { comp: body.clone(), stack: tail.clone(), env, ..m }]
                         } else {
                             panic!("lambda but no value StkFrame in the stack")
@@ -147,10 +146,8 @@ impl Machine {
             MComputation::Equate { lhs, rhs, body } => {
                 let mut lenv = m.lenv;
                 match unify(&lhs, &rhs, &m.env, &mut lenv, &m.senv) {
-                    Ok(()) => vec![Machine { comp : body.clone(), lenv : lenv, ..m }],
-                    Err(UnifyError::Susp(a)) => {
-                        vec![Machine { comp : a.comp, env : a.env, stack : m.stack.push_susp(a.ident, m.comp, m.env), lenv : lenv, ..m  }]
-                    }
+                    Ok(()) => vec![ Machine { comp : body.clone(), lenv : lenv, ..m } ],
+                    Err(UnifyError::Susp(a)) => vec![ eval_susp_then(a, Machine { lenv : lenv, ..m }) ],
                     Err(_) => vec![]
                 }
             },
@@ -158,7 +155,7 @@ impl Machine {
             MComputation::Ifz { num, zk, sk } => {
                 let vclos = VClosure::mk_clos(num, &m.env);
                 match vclos.close_head(&m.lenv, &m.senv) {
-                    Err(a) => vec![ m.eval_susp_then(a) ],
+                    Err(a) => vec![ eval_susp_then(a, m) ],
                     Ok(VClosure::Clos { val, env }) => {
                         match &*val {
                             MValue::Zero => vec![Machine { comp: zk.clone(), ..m}],
@@ -201,7 +198,7 @@ impl Machine {
                 let vclos = VClosure::mk_clos(list, &m.env);
                 let closed_list = vclos.close_head(&m.lenv, &m.senv);
                 match closed_list {
-                    Err(a) => vec![ m.eval_susp_then(a) ],
+                    Err(a) => vec![ eval_susp_then(a, m) ],
                     Ok(vclos) => 
                         match vclos {
                             VClosure::Clos { val, env } => {
@@ -254,7 +251,7 @@ impl Machine {
                 let vclos = VClosure::mk_clos(sum, &m.env);
                 let closed_sum = vclos.close_head(&m.lenv, &m.senv);
                 match closed_sum {
-                    Err(a) => vec![ m.eval_susp_then(a) ],
+                    Err(a) => vec![ eval_susp_then(a, m) ],
                     Ok(vclos) => 
                         match vclos {
                             VClosure::Clos { val, env } => {

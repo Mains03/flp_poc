@@ -1,0 +1,11 @@
+add :: Nat -> Nat -> Nat
+add n m = case m of
+    Z -> n
+  | S z -> S (add n z).
+
+mult :: Nat -> Nat -> Nat
+mult n m = case m of
+    Z -> Z
+  | S z -> add n (mult n z).
+
+exists n :: Nat. mult n n =:= 16. n.

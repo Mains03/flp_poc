@@ -1,4 +1,0 @@
-f :: Nat -> Nat
-f n m = S n.
-
-exists x :: Nat. exists y :: Nat. (f x y) =:= 11. (x, x).

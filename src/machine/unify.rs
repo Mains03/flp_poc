@@ -6,16 +6,13 @@ pub enum UnifyError {
     Occurs,
     Fail,
     Susp(SuspAt),
-    Other,
 }
 
 pub fn unify(lhs : &Rc<MValue>, rhs : &Rc<MValue>, env : &Rc<Env>, lenv : &mut LogicEnv, senv : &SuspEnv) -> Result<(),UnifyError> { 
 
     let mut q : VecDeque<(VClosure, VClosure)> = VecDeque::new();
-    
     let lhs_clos = VClosure::mk_clos(lhs, env);
     let rhs_clos = VClosure::mk_clos(rhs, env);
-    
     q.push_back((lhs_clos, rhs_clos));
 
     while let Some((lhs, rhs)) = q.pop_front() {

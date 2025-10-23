@@ -1,0 +1,14 @@
+add :: Nat -> Nat -> Nat
+add n m = case m of
+    Z -> n
+  | S z -> S (add n z).
+
+mult :: Nat -> Nat -> Nat
+mult n m = case m of
+    Z -> Z
+  | S z -> add n (mult n z).
+
+exists a :: Nat. exists b :: Nat. exists c :: Nat.
+add (mult a a) (mult b b) =:= (mult c c).
+c =:= 5.
+(a, (b, c)).
